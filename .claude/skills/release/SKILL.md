@@ -8,10 +8,11 @@ description: Cut a new Gravity release — pick the version, land the version-bu
 A release is a signed `v*` tag on `main`. Pushing that tag runs
 `.github/workflows/release.yml` on a GitHub-hosted macOS ARM64 runner, which
 builds the desktop app, packages `gravityd`, and creates the GitHub release.
-Signing, notarization, updater artifacts, and the R2 mirror are optional; see
+Signing, notarization and updater artifacts are configurable; see
 `docs/public-builds.md` for the required variables and secrets. Verify that
 configuration before releasing. For an existing distribution, preserve the
-updater signing pair and download endpoint so installed clients still update.
+updater signing pair. When changing download endpoints, retain a compatibility
+bridge for every endpoint embedded in existing installations.
 Publishing `latest.json` makes configured running apps offer the update.
 
 ## The rule that governs everything here
@@ -75,7 +76,8 @@ re-check the manifests in that commit first:
 git show <sha>:Cargo.toml | sed -n '6p'
 ```
 
-A pushed tag publishes to GitHub releases and any configured mirror.
+A pushed tag uploads all assets to a draft GitHub release, then publishes it as
+latest. Existing R2 objects remain available, but new releases do not upload there.
 
 ## 4. Watch the run
 
@@ -107,7 +109,9 @@ gh release view v0.12.0 --json name,url,assets
 
 Expect the DMG and `gravityd` tarball. With updater signing enabled, also expect
 `.app.tar.gz`, its `.sig`, and `latest.json`. Fetch the configured manifest and
-confirm its version and artifact URL. If R2 is enabled, check that mirror too.
+confirm its version and GitHub artifact URL. Check the legacy manifest bridge
+and website download redirect too, and verify updater signatures against the
+existing public key. Keep the bridge for dormant installations.
 
 Also check the release notes: the workflow appends a Gatekeeper/`xattr`
 warning when notarization was unavailable. That is expected for builds without
@@ -116,18 +120,17 @@ Apple credentials; official notarized distributions should treat it as a failure
 ## Dry runs
 
 `workflow_dispatch` on `release.yml` builds from `tauri.conf.json`'s version
-and only uploads artifacts to the run — no tag, no R2, no GitHub release. Use
+and only uploads artifacts to the run — no tag or GitHub release. Use
 it to prove a build change before tagging.
 
 ## When a release goes wrong
 
-Versioned R2 objects are immutable and `latest.json` is `no-cache`, so the
-recovery is always forward: fix, bump to the next patch, tag again. Do not
-delete or move a published tag — apps may already have the manifest. If a bad
-`latest.json` is live and the fix will take a while, re-put the previous
-version's manifest to stop the rollout:
+Recovery is normally forward: fix, bump to the next patch, and tag again. Do not
+delete or move a published tag or replace its signed archives — apps may already
+have the manifest. If a bad release is latest, select the previous verified
+GitHub release as latest to stop new clients discovering it. Point the legacy
+bridge at that same version-specific manifest if needed. This stops future
+update offers; it does not downgrade installed apps.
 
-```bash
-pnpm --dir apps/marketing exec wrangler r2 object put "$R2_BUCKET/desktop/gravity/latest.json" \
-  --file latest.json --content-type application/json --cache-control no-cache --remote
-```
+See `apps/marketing/README.md` for the bridge activation and rollback procedure.
+Do not remove the old R2 custom domain or historical artifacts during recovery.

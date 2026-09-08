@@ -20,9 +20,6 @@ jobs:
   build:
     name: macOS (aarch64)
     runs-on: macos-15
-    env:
-      RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-      R2_BUCKET: ${{ vars.R2_BUCKET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -149,9 +146,6 @@ jobs:
             exit 1
           fi
           endpoint="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json"
-          if [[ -n "$RELEASE_BASE_URL" ]]; then
-            endpoint="${RELEASE_BASE_URL%/}/desktop/gravity/latest.json"
-          fi
           config="$(jq -cn --arg key "$UPDATER_PUBLIC_KEY" --arg endpoint "$endpoint" \
             '{plugins: {updater: {pubkey: $key, endpoints: [$endpoint]}}, bundle: {createUpdaterArtifacts: true}}')"
           echo "GRAVITY_RELEASE_CONFIG=$config" >> "$GITHUB_ENV"
@@ -194,9 +188,6 @@ jobs:
         run: |
           archive="gravity-desktop-$VERSION-aarch64.app.tar.gz"
           url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$archive"
-          if [[ -n "$RELEASE_BASE_URL" ]]; then
-            url="${RELEASE_BASE_URL%/}/desktop/gravity/$VERSION/$archive"
-          fi
           jq -n \
             --arg version "$VERSION" \
             --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -231,32 +222,6 @@ jobs:
           name: release-${{ steps.version.outputs.version }}
           path: dist/*
           if-no-files-found: error
-
-      # Optional mirror; GitHub release assets are the default distribution.
-      - name: Publish to R2
-        if: github.ref_type == 'tag' && env.R2_BUCKET != '' && env.RELEASE_BASE_URL != ''
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          put() {
-            pnpm --dir apps/marketing exec wrangler r2 object put "$R2_BUCKET/$1" --file "$GITHUB_WORKSPACE/$2" \
-              --content-type "$3" --cache-control "$4" --remote
-          }
-          immutable="public, max-age=31536000, immutable"
-          pnpm --dir apps/marketing install --frozen-lockfile
-          if [[ "$UPDATER_ENABLED" == "true" ]]; then
-            put "desktop/gravity/$VERSION/gravity-desktop-$VERSION-aarch64.app.tar.gz" \
-              "dist/gravity-desktop-$VERSION-aarch64.app.tar.gz" application/gzip "$immutable"
-          fi
-          put "desktop/gravity/$VERSION/gravity-desktop-$VERSION-aarch64.dmg" \
-            "dist/gravity-desktop-$VERSION-aarch64.dmg" application/x-apple-diskimage "$immutable"
-          put "gravityd/$VERSION/gravityd-$VERSION-aarch64-apple-darwin.tar.gz" \
-            "dist/gravityd-$VERSION-aarch64-apple-darwin.tar.gz" application/gzip "$immutable"
-          if [[ "$UPDATER_ENABLED" == "true" ]]; then
-            put "desktop/gravity/latest.json" dist/latest.json application/json "no-cache"
-          fi
 
       - name: Publish GitHub release
         if: github.ref_type == 'tag'
@@ -305,4 +270,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "Gravity $VERSION" \
             --notes-file notes.md \
-            --generate-notes
+            --generate-notes --draft
+          # Expose latest.json only after every release asset has uploaded.
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

@@ -4,5 +4,5 @@
     "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src/release.ts", "src/worker.ts"]
+  "include": ["src/release.ts", "src/worker.ts", "src/updater-bridge.ts", "src/updater-proxy.ts"]
 }
