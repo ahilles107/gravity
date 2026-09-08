@@ -44,8 +44,8 @@
     "third-party/overrides/index.json": "a6475cc8d82f7a649267d1b8e4a0bbe9f8b87f465c771bc9a0ae3fa7721d7665"
   },
   "outputs": {
-    "third-party/DAEMON_NOTICES.txt": "058aae41a7133efa04dea5641f58822456aa6b7c7b514dd8133795712a11868b",
-    "third-party/DESKTOP_NOTICES.txt": "302e588e0711953359bb443ca3e11198496077b4d0f117da60d785e870ff1846",
+    "third-party/DAEMON_NOTICES.txt": "16edad102976855d4f28dc80c079ffc6c0cc1226b13518ecfa711d88d7dad2f1",
+    "third-party/DESKTOP_NOTICES.txt": "bbef7cc4186be1371620b4c50516907d558d87831d9f14a3e9910bb28d6bec04",
     "apps/marketing/public/THIRD_PARTY_NOTICES.txt": "fc951fe31f6a54f577bfc136177bed747b4c36efc833b0a07413090fa19ad866"
   },
   "packages": [
@@ -11557,15 +11557,15 @@
     {
       "ecosystem": "Rust toolchain",
       "name": "standard-library",
-      "version": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+      "version": "rustc 1.98.1 (48a229cea 2026-09-01)",
       "license": "MIT OR Apache-2.0; upstream component exceptions below",
       "components": {
         "daemon": "runtime",
         "desktop": "runtime"
       },
-      "source": "https://static.rust-lang.org/dist/rustc-1.98.0-src.tar.xz",
-      "checksum": "271fa73d8174f53d713c46a8310da7bf7cfdcfb8b7cfd1c2b74b84a83ae9fb1e",
-      "copyright_source": "https://static.rust-lang.org/dist/rustc-1.98.0-aarch64-apple-darwin.tar.xz",
+      "source": "https://static.rust-lang.org/dist/rustc-1.98.1-src.tar.xz",
+      "checksum": "be1816e7f6c40abb90245ad6e024bed2a7e88d7dda4561e4d5470207df616b9f",
+      "copyright_source": "https://static.rust-lang.org/dist/rustc-1.98.1-aarch64-apple-darwin.tar.xz",
       "notices": [
         {
           "path": "COPYRIGHT-library.html",
