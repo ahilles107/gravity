@@ -21,46 +21,52 @@ end to end. Two modes, cheapest first:
 
 ```bash
 cargo build -p gravityd
-H=/tmp/gravityd-bustest   # throwaway home; pick a fresh path per run
-rm -rf $H && mkdir -p $H
-cat > $H/gravityd.toml <<EOF
-home = "$H"
-port = 49666                 # any free port
+umask 077
+BUS_HOME=$(mktemp -d "${TMPDIR:-/tmp}/gravity-bus.XXXXXX")
+BUS_HOME=$(cd "$BUS_HOME" && pwd -P)
+cat > "$BUS_HOME/gravityd.toml" <<EOF
+home = "$BUS_HOME"
+bind = ["127.0.0.1"]
+port = 49666                 # verify this test port is free first
+negotiate_port = false
 runtime = "double"           # or "pty" for real mode
 supervision_interval_ms = 1000
 
 [scheduler]
 tick_interval_ms = 2000      # fast expiry sweeps; default is 30s
 EOF
-./target/debug/gravityd --config $H/gravityd.toml > $H/gravityd.log 2>&1 &
-sleep 2 && curl -s http://127.0.0.1:49666/health   # expect status ok
+./target/debug/gravityd --config "$BUS_HOME/gravityd.toml" > "$BUS_HOME/gravityd.log" 2>&1 &
+BUS_DAEMON_PID=$!
 ```
 
-For **real mode** add `claude_bin = "$(which claude)"` (absolute path — the
+Wait for the published `$BUS_HOME/gravityd.port`, verify it is 49666, and
+check `curl --fail http://127.0.0.1:49666/health`. Confirm the recorded PID
+is still running; stop on startup failure. Never reuse the installed daemon
+or stop another process to free this port.
+
+For **real mode** add `claude_bin = "$(command -v claude)"` (absolute path — the
 daemon's PATH may not include `~/.local/bin`) and set `runtime = "pty"`.
 
 Create a project and bots with the bundled driver (Node 22+, no deps):
 
 ```bash
-node .claude/skills/bus-live-test/scripts/bus.mjs setup $H 49666 \
+node .claude/skills/bus-live-test/scripts/bus.mjs setup "$BUS_HOME" 49666 \
   "lead:You coordinate work." "worker:You do small jobs."
 # prints {"project":..., "bots":{"lead":"<id>","worker":"<id>"}}
 ```
 
-Credentials on disk: client token at `$H/secrets/client.token`, per-bot MCP
-tokens at `$H/secrets/bot-<id>.token`.
+Credentials on disk: client token at `$BUS_HOME/secrets/client.token`, per-bot MCP
+tokens at `$BUS_HOME/secrets/bot-<id>.token`.
 
 ## Synthetic mode: act as the bots
 
-Call bus tools directly with a bot's bearer token:
+Set `LEAD` and `WORKER` to the IDs printed by setup. Call bus tools with
+tokens loaded from disk; do not paste token values into tool calls, terminal
+arguments, logs, issues, or chat. Review responses before sharing them:
 
 ```bash
-mcp() { # mcp <bot-id> <tool> <json-args>
-  curl -s http://127.0.0.1:49666/mcp \
-    -H "Authorization: Bearer $(cat $H/secrets/bot-$1.token)" \
-    -H 'Content-Type: application/json' \
-    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$2\",\"arguments\":$3}}" \
-  | python3 -c "import json,sys;r=json.load(sys.stdin)['result'];print(('REFUSED: ' if r.get('isError') else 'OK: ')+r['content'][0]['text'])"
+mcp() { # mcp <bot-id> <tool> <json-args>; token is read only inside Node
+  node .claude/skills/bus-live-test/scripts/bus.mjs mcp "$BUS_HOME" 49666 "$@"
 }
 mcp $LEAD send_message '{"to":"worker","body":"do X","kind":"task"}'
 mcp $WORKER complete_task '{"task_id":"...","result":"done","artifacts":["/path"]}'
@@ -81,7 +87,7 @@ Guardrail checklist — force each refusal and read its hint text:
 5. **Expiry**: backdate a deadline and watch the sweep flip it and notify
    both ends exactly once:
    ```bash
-   sqlite3 $H/bus.sqlite "UPDATE task SET deadline_at='2020-01-01T00:00:00Z' WHERE id='<id>';"
+   sqlite3 "$BUS_HOME/bus.sqlite" "UPDATE task SET deadline_at='2020-01-01T00:00:00Z' WHERE id='<id>';"
    # within ~2 ticks: state='expired', WARN "task exceeded its deadline" in the log,
    # one system note per live end (assignee: stop work; requester: re-delegate)
    ```
@@ -101,7 +107,7 @@ Wait for boot (`active_bots` in `/health`, `turn complete` per bot in the
 log), then speak as the user:
 
 ```bash
-node .claude/skills/bus-live-test/scripts/bus.mjs chat $H 49666 <lead-bot-id> \
+node .claude/skills/bus-live-test/scripts/bus.mjs chat "$BUS_HOME" 49666 <lead-bot-id> \
   "Delegate this to worker: ... When you get the result, read the artifact and tell me ..."
 ```
 
@@ -117,8 +123,8 @@ Good scenario shapes (each verified to exercise the guardrails):
 
 - **Bus ledger** — the ground truth for chatter:
   ```bash
-  sqlite3 $H/bus.sqlite "SELECT num,sender_name,kind,substr(replace(body,char(10),' '),1,100) FROM message ORDER BY num;"
-  sqlite3 $H/bus.sqlite "SELECT substr(id,1,8),state,hop_count,reply_count,deadline_at IS NOT NULL FROM task;"
+  sqlite3 "$BUS_HOME/bus.sqlite" "SELECT num,sender_name,kind,substr(replace(body,char(10),' '),1,100) FROM message ORDER BY num;"
+  sqlite3 "$BUS_HOME/bus.sqlite" "SELECT substr(id,1,8),state,hop_count,reply_count,deadline_at IS NOT NULL FROM task;"
   ```
 - **Daemon log** — bot state transitions, delivery, expiry warns.
 - **Session transcripts** — tool-by-tool behavior including refusals the bot
@@ -145,12 +151,19 @@ Good scenario shapes (each verified to exercise the guardrails):
   note to filter out.
 - Real mode writes residue outside the throwaway home: transcript dirs in
   `~/.claude/projects/` and trust entries in `~/.claude.json` for the
-  workspaces. Tell the user; offer to prune.
+  workspaces. Tell the user; do not remove it without approval.
 
 ## Cleanup
 
+Stop only the daemon started in this live shell:
+
 ```bash
-pkill -f "target/debug/gravityd --config $H"
-pkill -f "claude.*$H" 2>/dev/null   # real mode: orphaned sessions
-rm -rf $H
+kill "$BUS_DAEMON_PID"
+wait "$BUS_DAEMON_PID"
 ```
+
+If the shell/session was lost, verify process ownership again before signalling.
+Never use broad process-name matching. Retain the run directory and logs for
+review; ask before deleting its exact path. In real mode, identify any remaining
+child sessions narrowly, and obtain approval before removing their exact
+transcript directories or trust entries from the user's real home.

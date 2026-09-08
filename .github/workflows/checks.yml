@@ -38,6 +38,10 @@ jobs:
       - name: oxfmt
         run: pnpm format:check
 
+      - name: Agent skill safety checks
+        working-directory: .
+        run: node --test .claude/skills/lib/*.test.mjs
+
       - name: Dependency notices
         working-directory: .
         run: |

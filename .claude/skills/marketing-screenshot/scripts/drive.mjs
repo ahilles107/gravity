@@ -11,15 +11,21 @@
 //   node drive.mjs delete <botId>
 //
 // Env: GRAVITY_WS (default ws://127.0.0.1:49888/ws),
-//      GRAVITY_HOME (default /tmp/gravity-shot/daemon).
+//      GRAVITY_HOME (required; use a fresh disposable home).
 
 import { readFileSync } from "node:fs";
+import { localDaemon } from "../../lib/local-daemon.mjs";
 
-const URL = process.env.GRAVITY_WS ?? "ws://127.0.0.1:49888/ws";
-const HOME = process.env.GRAVITY_HOME ?? "/tmp/gravity-shot/daemon";
-const TOKEN = readFileSync(`${HOME}/secrets/client.token`, "utf8").trim();
-
-const ws = new WebSocket(URL);
+const daemon = localDaemon(
+  process.env.GRAVITY_HOME,
+  process.env.GRAVITY_WS ?? "ws://127.0.0.1:49888/ws",
+);
+const token = readFileSync(`${daemon.home}/secrets/client.token`, "utf8").trim();
+const ws = new WebSocket(daemon.endpoint);
+const watchdog = setTimeout(() => {
+  console.error("driver timed out");
+  process.exit(1);
+}, 360_000);
 let nextReq = 1;
 const pending = new Map();
 const states = new Map();
@@ -52,10 +58,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitReady(id, seconds = 300) {
   for (let i = 0; i < seconds * 2; i++) {
-    if (states.get(id) === "ready") return true;
+    if (states.get(id) === "ready") {
+      return true;
+    }
     await sleep(500);
   }
-  return false;
+  throw new Error(`bot ${id} never became ready`);
 }
 
 await new Promise((resolve, reject) => {
@@ -65,11 +73,11 @@ await new Promise((resolve, reject) => {
 const hello = await request({
   type: "hello",
   protocol_version: 2,
-  token: TOKEN,
+  token,
   client: "shot-driver/0",
 });
 if (hello.type !== "hello_ok") {
-  throw new Error(`handshake failed: ${JSON.stringify(hello)}`);
+  throw new Error("handshake failed");
 }
 
 const [, , mode, ...rest] = process.argv;
@@ -96,7 +104,9 @@ if (mode === "list") {
     instructions,
     ...(avatar ? { avatar } : {}),
   });
-  if (!res.bot) throw new Error(JSON.stringify(res));
+  if (!res.bot) {
+    throw new Error("create_bot failed");
+  }
   console.log(`${res.bot.id}  ${res.bot.workspace_path}`);
   console.log(`ready: ${await waitReady(res.bot.id)}`);
 } else if (mode === "say") {
@@ -109,6 +119,8 @@ if (mode === "list") {
 } else if (mode === "peek") {
   fire({ type: "attach", bot_id: rest[0] });
   await sleep(3000);
+  // ANSI escape sequences are intentionally stripped from terminal output.
+  /* eslint-disable no-control-regex */
   console.log(
     term
       .join("")
@@ -116,6 +128,7 @@ if (mode === "list") {
       .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
       .replace(/\x1b\][^\x07]*\x07/g, ""),
   );
+  /* eslint-enable no-control-regex */
 } else if (mode === "update") {
   const res = await request({
     type: "update_bot",
@@ -132,5 +145,6 @@ if (mode === "list") {
   process.exitCode = 1;
 }
 
+clearTimeout(watchdog);
 ws.close();
 process.exit(process.exitCode ?? 0);

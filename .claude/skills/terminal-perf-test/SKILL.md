@@ -19,46 +19,63 @@ Why the double runtime: it echoes every `input` byte back as terminal output
 
 ## Setup
 
-1. Build and start the daemon on a throwaway home:
+Use Node 22+ for the driver and the prerequisites in `CONTRIBUTING.md`.
+Run from the repository root in a dedicated terminal. Verify test ports 49555
+and 1420 are free first; choose unused ports consistently if needed.
 
-   ```bash
-   cargo build -p gravityd
-   mkdir -p /tmp/gravityd-uidev
-   cat > /tmp/gravityd-uidev/gravityd.toml <<'EOF'
-   home = "/tmp/gravityd-uidev"
-   port = 49555
-   runtime = "double"
-   supervision_interval_ms = 500
-   EOF
-   ./target/debug/gravityd --config /tmp/gravityd-uidev/gravityd.toml > /tmp/gravityd-uidev/gravityd.log 2>&1 &
-   ```
+```bash
+umask 077
+PERF_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gravity-perf.XXXXXX")
+PERF_DIR=$(cd "$PERF_DIR" && pwd -P)
+export GRAVITY_HOME="$PERF_DIR"
+export GRAVITY_WS=ws://127.0.0.1:49555/ws
+cargo build -p gravityd
+cat > "$GRAVITY_HOME/gravityd.toml" <<EOF
+home = "$GRAVITY_HOME"
+bind = ["127.0.0.1"]
+port = 49555
+negotiate_port = false
+runtime = "double"
+supervision_interval_ms = 500
+EOF
+./target/debug/gravityd --config "$GRAVITY_HOME/gravityd.toml" > "$PERF_DIR/gravityd.log" 2>&1 &
+PERF_DAEMON_PID=$!
+```
 
-   The client token appears at `/tmp/gravityd-uidev/secrets/client.token`.
+Wait for `$GRAVITY_HOME/gravityd.port`, confirm it is 49555 and the recorded
+PID is still running, then check `curl --fail http://127.0.0.1:49555/health`.
+Stop on startup failure. Do not connect the driver to an installed daemon or
+use it with `pty`: its generated input belongs only in the echo runtime.
 
-2. Start the frontend: `cd apps/desktop && pnpm dev` (port 1420, strict).
+Start the frontend in this shell, with shell tracing off. The dev token stays
+in the local process environment; do not print it or paste it into browser
+commands or chat.
 
-3. Open `http://localhost:1420/` in Chrome using the claude-in-chrome tools
-   (the `chrome-devtools-axi` bridge has proven flaky for eval/snapshot — use
-   the extension tools). Configure the app via the javascript tool, then
-   reload:
+```bash
+export VITE_GRAVITY_DEV_PORT=49555
+export VITE_GRAVITY_DEV_TOKEN="$(cat "$GRAVITY_HOME/secrets/client.token")"
+(cd apps/desktop && env -u CONDUCTOR_PORT pnpm dev)
+```
 
-   ```js
-   localStorage.setItem('gravity.connection', JSON.stringify({host:'127.0.0.1', port:49555}));
-   localStorage.setItem('gravity.device-token', '<contents of client.token>');
-   localStorage.setItem('gravity.setup-complete', 'true');
-   location.reload();
-   ```
+Open `http://localhost:1420/` with available browser automation in a fresh test
+profile. Stored connection settings override these defaults: confirm the footer
+shows `127.0.0.1:49555 · connected` before interacting. Never expose or deploy
+the dev frontend containing this token.
 
-4. Seed bots and data: `node .claude/skills/terminal-perf-test/scripts/drive.mjs setup`
-   Creates project "perf" with bots turbo1–turbo5; turbo1 gets ~2.3 MiB
-   (forces the trimmed non-resumable replay), the others ~300 KiB. The script
-   prints the bot ids — keep them for stream mode.
+In another terminal, set `GRAVITY_HOME` to this run's exact directory and
+`GRAVITY_WS` to the matching loopback URL, then seed:
+
+```bash
+node .claude/skills/terminal-perf-test/scripts/drive.mjs setup
+```
+
+This creates project "perf" and turbo1–turbo5. Turbo1 exceeds the 1 MiB ring;
+the others receive smaller histories. Keep the printed bot IDs for stream mode.
 
 ## Verification checklist
 
-Run each check; all must hold. Read console errors after every phase
-(`read_console_messages` with `onlyErrors`) — zero exceptions expected
-throughout.
+Run each check; all must hold. Read browser console errors after every phase using the available tools;
+zero exceptions are expected throughout.
 
 1. **WebGL renderer active** — in the page:
    ```js
@@ -107,8 +124,8 @@ throughout.
      .observe({ entryTypes: ['longtask'] });
    ```
    Read afterwards: avg fps ≈ display refresh rate, `longTasks` 0, worst
-   frame well under 100 ms. Baseline on a 120 Hz display (2026-08): 120 fps
-   avg, worst 28 ms, 0 long tasks over 52 s.
+   frame well under 100 ms. Record the display refresh rate, hardware and elapsed time; compare with
+   an unchanged build on the same machine. Reload afterwards to stop the meter.
 
 6. **Rapid-switch storm** — 25 programmatic clicks across all bots at 120 ms
    intervals (dispatch mousedown/mouseup/click on the sidebar rows from the
@@ -129,9 +146,11 @@ throughout.
 
 ## Cleanup
 
-```bash
-pkill -f "target/debug/gravityd"; pkill -f "node.*vite"
-rm -rf /tmp/gravityd-uidev
-```
+Stop the foreground Vite session with Ctrl-C. Stop only the daemon started in
+this live shell (`kill "$PERF_DAEMON_PID"; wait "$PERF_DAEMON_PID"`). If the
+session was lost, verify process ownership again before signalling. Do not use
+broad process-name matching. Unset the temporary Vite token environment.
 
-Close the Chrome tab, and revert any temporary A/B edits.
+Close the test browser profile. Retain the run directory for review and ask
+before deleting its exact path. Restore only your temporary A/B edits, preserving
+any pre-existing changes.
