@@ -11,7 +11,7 @@ byte against a committed baseline in
 
 ## The rule that governs everything here
 
-**Never generate a baseline locally.** They are only reproducible inside the
+**Adopt baselines from the pinned CI environment.** They are only reproducible inside the
 pinned Playwright container that CI uses (`mcr.microsoft.com/playwright` — the
 tag lives in `scripts/vr-ci.sh`). A macOS or bare-Linux checkout renders
 different glyphs and antialiasing, so a locally produced PNG is guaranteed to
@@ -22,6 +22,12 @@ fail on the next push while looking correct in the diff.
 failure rather than a silent write. Do not work around either guard.
 
 ## Adopting new baselines
+
+Before adopting, verify the repository, branch and exact run commit. Inspect
+`git status --short -- apps/desktop/tests/visual/__screenshots__` for existing
+edits and untracked files. Do not overwrite them. The acceptance script
+replaces the entire directory: identify that target, preserve local work, and
+obtain approval for replacement if it is not already authorized.
 
 When `visual` fails, the job regenerates the complete baseline set inside the
 container and uploads it as the `visual-snapshots` artifact. Adopt it with:
@@ -48,7 +54,8 @@ different tree.
 at what actually changed:
 
 ```bash
-gh run download <run-id> --name visual-report --dir /tmp/vr-report
+VR_REPORT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gravity-visual.XXXXXX")
+gh run download <run-id> --name visual-report --dir "$VR_REPORT_DIR"
 ```
 
 The Playwright HTML report has expected/actual/diff for every failure. Read

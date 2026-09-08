@@ -5,7 +5,8 @@ description: Cut a new Gravity release — pick the version, land the version-bu
 
 # Releasing Gravity
 
-A release is a signed `v*` tag on `main`. Pushing that tag runs
+A release is an annotated `v*` tag on `main`; use the configured signing
+identity for official tags. Pushing that tag runs
 `.github/workflows/release.yml` on a GitHub-hosted macOS ARM64 runner, which
 builds the desktop app, packages `gravityd`, and creates the GitHub release.
 Signing, notarization and updater artifacts are configurable; see
@@ -14,6 +15,9 @@ configuration before releasing. For an existing distribution, preserve the
 updater signing pair. When changing download endpoints, retain a compatibility
 bridge for every endpoint embedded in existing installations.
 Publishing `latest.json` makes configured running apps offer the update.
+Verify the intended repository and existing publication authorization before
+pushing a tag;
+do not infer access to official signing credentials in a contributor fork.
 
 ## The rule that governs everything here
 
@@ -30,7 +34,9 @@ Look at what landed since the last tag — that is the whole changelog:
 
 ```bash
 git fetch origin --tags
-git log $(git describe --tags --abbrev=0)..origin/main --oneline
+git describe --tags --abbrev=0 origin/main
+# Use that tag as <previous-tag>; if no tag exists, review origin/main in full.
+git log <previous-tag>..origin/main --oneline
 ```
 
 Pre-1.0, so: **minor** for anything user-visible — a new feature, a removed
@@ -44,7 +50,7 @@ Never bump straight on `main` — it goes through a PR like any other change
 with a What/Why/How tested description.
 
 ```bash
-git checkout -b release/v0.12.0
+git switch -c release/vX.Y.Z origin/main
 # edit the four manifests, then sync both lockfiles:
 cargo update --workspace --offline
 (cd apps/desktop/src-tauri && cargo update --workspace --offline)
@@ -54,7 +60,11 @@ cargo update --workspace --offline
 `@xterm/addon-web-links` dependency, not ours. Leave it.
 
 Commit as `chore(release): bump version to X.Y.Z`, open the PR against `main`
-with the usual What/Why/How tested body, and wait for `checks` and `tests`.
+with the usual What/Why/How tested body and link the primary issue. Before
+pushing, run `pnpm run verify` (typecheck, tests, lint, builds and visual checks).
+Regenerate dependency notices with `pnpm notices:generate` when versions or
+lockfiles change; follow `third-party/README.md` for the pinned toolchain.
+Wait for **all required PR checks**, including visual and secret scanning.
 **Ask before merging** unless the user already said to — merging is what makes
 the tag possible.
 
@@ -65,15 +75,18 @@ is enabled:
 
 ```bash
 git fetch origin
-git tag -a -m "Gravity 0.12.0" v0.12.0 <merge-commit-sha>
-git push origin v0.12.0
+git tag -a -m "Gravity X.Y.Z" vX.Y.Z <merge-commit-sha>
+git push origin vX.Y.Z
 ```
 
-Tag the actual squash-merge commit on `origin/main`, not local `HEAD`, and
+Tag the actual merged commit on `origin/main`, not local `HEAD`, and
 re-check the manifests in that commit first:
 
 ```bash
-git show <sha>:Cargo.toml | sed -n '6p'
+git show <sha>:Cargo.toml
+git show <sha>:apps/desktop/src-tauri/Cargo.toml
+git show <sha>:apps/desktop/package.json
+git show <sha>:apps/desktop/src-tauri/tauri.conf.json
 ```
 
 A pushed tag uploads all assets to a draft GitHub release, then publishes it as
@@ -86,7 +99,7 @@ gh run list --workflow release.yml --limit 3
 gh run watch <run-id> --exit-status --interval 30
 ```
 
-Expect **~25 minutes**. `gh run watch` sometimes dies mid-stream on a transient
+Build and notarization times vary. `gh run watch` may stop on a transient
 `HTTP 404` from the jobs API — that says nothing about the run. Fall back to
 polling in the background rather than assuming failure:
 
@@ -103,7 +116,7 @@ done
 ## 5. Verify the publish, don't trust the green check
 
 ```bash
-gh release view v0.12.0 --json name,url,assets
+gh release view vX.Y.Z --json name,url,assets
 # Fetch the updater endpoint configured for this distribution, if enabled.
 ```
 

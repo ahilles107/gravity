@@ -4,6 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+node --test .claude/skills/lib/*.test.mjs
 pnpm notices:check
 python3 -m unittest discover -s scripts -p 'test_notices.py'
 cargo fmt --all --check

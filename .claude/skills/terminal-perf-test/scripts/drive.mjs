@@ -10,17 +10,22 @@
 //
 // Environment:
 //   GRAVITY_WS      WebSocket URL     (default ws://127.0.0.1:49555/ws)
-//   GRAVITY_TOKEN   client token, or
 //   GRAVITY_HOME    daemon home dir to read secrets/client.token from
-//                (default /tmp/gravityd-uidev)
+//                   (required; use a fresh disposable home)
 
 import { readFileSync } from "node:fs";
+import { localDaemon } from "../../lib/local-daemon.mjs";
 
-const URL = process.env.GRAVITY_WS ?? "ws://127.0.0.1:49555/ws";
-const HOME = process.env.GRAVITY_HOME ?? "/tmp/gravityd-uidev";
-const TOKEN = process.env.GRAVITY_TOKEN ?? readFileSync(`${HOME}/secrets/client.token`, "utf8").trim();
-
-const ws = new WebSocket(URL);
+const daemon = localDaemon(
+  process.env.GRAVITY_HOME,
+  process.env.GRAVITY_WS ?? "ws://127.0.0.1:49555/ws",
+);
+const token = readFileSync(`${daemon.home}/secrets/client.token`, "utf8").trim();
+const ws = new WebSocket(daemon.endpoint);
+const watchdog = setTimeout(() => {
+  console.error("driver timed out");
+  process.exit(1);
+}, 360_000);
 let nextReq = 1;
 const pending = new Map();
 const states = new Map();
@@ -52,7 +57,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitReady(botId) {
   for (let i = 0; i < 100; i++) {
-    if (states.get(botId) === "ready") return;
+    if (states.get(botId) === "ready") {
+      return;
+    }
     await sleep(100);
   }
   throw new Error(`bot ${botId} never became ready`);
@@ -75,11 +82,13 @@ await new Promise((resolve, reject) => {
 });
 const hello = await request({
   type: "hello",
-  protocol_version: 1,
-  token: TOKEN,
+  protocol_version: 2,
+  token,
   client: "perf-driver/0",
 });
-if (hello.type !== "hello_ok") throw new Error("handshake failed: " + JSON.stringify(hello));
+if (hello.type !== "hello_ok") {
+  throw new Error("handshake failed");
+}
 
 const mode = process.argv[2] ?? "setup";
 
@@ -92,7 +101,9 @@ if (mode === "setup") {
     bots[name] = created.bot.id;
     console.log(`created ${name} = ${created.bot.id}`);
   }
-  for (const name of Object.keys(bots)) await waitReady(bots[name]);
+  for (const name of Object.keys(bots)) {
+    await waitReady(bots[name]);
+  }
   console.log("all ready");
 
   // turbo1 gets ~2.3 MiB — well past the daemon's 1 MiB scrollback ring, so
@@ -102,7 +113,9 @@ if (mode === "setup") {
   for (const [name, chunks] of Object.entries(sizes)) {
     for (let i = 0; i < chunks; i++) {
       fire({ type: "input", bot_id: bots[name], data: chunk(name, i) });
-      if (i % 100 === 0) await sleep(20); // let the socket drain
+      if (i % 100 === 0) {
+        await sleep(20); // let the socket drain
+      }
     }
     console.log(`${name}: ~${Math.round((chunks * chunk(name, 0).length) / 1024)} KiB pumped`);
   }
@@ -110,8 +123,13 @@ if (mode === "setup") {
   console.log(JSON.stringify(bots));
 } else if (mode === "stream") {
   const botId = process.argv[3];
-  if (!botId) throw new Error("stream mode needs a bot id");
+  if (!botId) {
+    throw new Error("stream mode needs a bot id");
+  }
   const seconds = Number(process.argv[4] ?? 15);
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 300) {
+    throw new Error("stream duration must be between 0 and 300 seconds");
+  }
   let i = 0;
   const end = Date.now() + seconds * 1000;
   while (Date.now() < end) {
@@ -119,6 +137,9 @@ if (mode === "setup") {
     await sleep(25);
   }
   console.log(`streamed ${i} chunks`);
+} else {
+  throw new Error("unknown mode; use setup or stream");
 }
+clearTimeout(watchdog);
 ws.close();
 process.exit(0);
