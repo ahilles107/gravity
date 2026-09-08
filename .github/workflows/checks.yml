@@ -38,6 +38,12 @@ jobs:
       - name: oxfmt
         run: pnpm format:check
 
+      - name: Dependency notices
+        working-directory: .
+        run: |
+          pnpm notices:check
+          python3 -m unittest discover -s scripts -p 'test_notices.py'
+
       - name: oxlint
         run: pnpm lint
 

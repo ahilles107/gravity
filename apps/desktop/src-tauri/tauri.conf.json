@@ -33,6 +33,10 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": false,
+    "resources": {
+      "../../../third-party/DESKTOP_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
+      "../../../LICENSE": "LICENSE"
+    },
     "externalBin": [
       "binaries/gravityd"
     ],

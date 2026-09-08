@@ -3,6 +3,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "verify": "bash scripts/verify.sh"
+    "verify": "bash scripts/verify.sh",
+    "notices:generate": "python3 scripts/notices.py --generate",
+    "notices:check": "python3 scripts/notices.py"
   }
 }
