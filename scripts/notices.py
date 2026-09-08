@@ -28,6 +28,8 @@ INPUTS = [
     "apps/desktop/pnpm-lock.yaml", "apps/desktop/vite.config.ts",
     "apps/marketing/package.json", "apps/marketing/pnpm-lock.yaml",
     "apps/marketing/src/main.ts", "apps/marketing/src/worker.ts",
+    "apps/marketing/src/updater-proxy.ts", "apps/marketing/src/updater-bridge.ts",
+    "apps/marketing/wrangler.updater-bridge.jsonc",
     ".github/workflows/release.yml", "scripts/prepare-sidecar.sh",
     "scripts/notices.py", "third-party/README.md",
 ]

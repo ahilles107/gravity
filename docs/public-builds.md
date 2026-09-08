@@ -47,9 +47,6 @@ Optional repository configuration:
 | `UPDATER_PUBLIC_KEY` | Variable | Your updater verification key; public, not a credential |
 | `TAURI_SIGNING_PRIVATE_KEY` | Secret | Enables signed updater archives and `latest.json`; requires the matching public key |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Secret | Password for an encrypted updater private key, if used |
-| `RELEASE_BASE_URL` | Variable | Optional HTTPS download mirror base; default is GitHub release assets |
-| `R2_BUCKET` | Variable | Enables the optional R2 mirror with `RELEASE_BASE_URL` |
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Secrets | Credentials for that optional R2 upload |
 | `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST` | Variables | Optional telemetry destination; enables capture in configured builds |
 | `POSTHOG_PROJECT_ID` | Variable | Optional source-map destination |
 | `POSTHOG_PERSONAL_API_KEY` | Secret | Optional source-map upload credential |
@@ -67,13 +64,23 @@ A local signed build can supply `plugins.updater` and
 distributing a separate app should also choose their own app identifiers and
 launchd labels.
 
-### Optional download mirror
+### Download hosting and existing installations
 
-GitHub release assets are the default download host. To use an R2 mirror,
-configure `RELEASE_BASE_URL` with an HTTPS base URL, `R2_BUCKET` with the bucket
-name, and the two Cloudflare secrets listed above. The workflow uploads versioned
-artifacts before publishing `desktop/gravity/latest.json`. Leave the mirror
-variables unset to use GitHub releases without Cloudflare credentials.
+Tagged releases publish the signed updater archive, DMG, daemon archive and
+`latest.json` on GitHub Releases. New official builds check
+`https://github.com/ahilles107/gravity/releases/latest/download/latest.json`.
+The workflow uses its own repository name for forks. It uploads all assets to a
+draft release before marking it published/latest, so clients cannot discover a
+manifest before its artifacts are available. Manual dry runs do not publish.
+
+The former R2 upload variables and credentials are no longer used. Existing R2
+objects remain available for historical links. A narrow compatibility Worker
+keeps the old manifest endpoint working for installed versions through 0.12.3;
+it proxies the GitHub manifest without changing its signature or artifact URLs.
+After installing 0.12.4 or later, clients check GitHub directly. Keep this bridge
+available for dormant installations and preserve the updater signing key pair.
+
+See [the bridge deployment and rollback procedure](../apps/marketing/README.md#legacy-updater-bridge).
 
 ### Marketing site
 

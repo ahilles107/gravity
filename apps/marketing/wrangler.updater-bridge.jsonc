@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "gravity-updater-bridge",
+  "main": "src/updater-bridge.ts",
+  "compatibility_date": "2026-09-02",
+  "workers_dev": true,
+  // Configure the upstream and the exact legacy manifest route when deploying.
+  // No route by default: verify the Worker before attaching production traffic.
+  "vars": {
+    "RELEASE_MANIFEST_URL": "",
+  },
+}

@@ -1219,7 +1219,7 @@ dependencies = [
 
 [[package]]
 name = "gravity-desktop"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "semver",
  "serde",
