@@ -6,6 +6,19 @@ expected and actual behavior. Remove tokens, personal paths, and private project
 content from logs and screenshots. See [SECURITY.md](SECURITY.md) for security
 reports.
 
+## Issue tracking
+
+GitHub Issues is the source of truth for all Gravity work, including internal
+maintainer tasks and follow-ups. Use this repository's issues instead of Linear
+or `USE-XXX` identifiers. Search for an existing issue before opening one, and
+reference it as `#123` in discussions and pull requests. Use `Fixes #123` when a
+PR fully resolves the issue.
+
+The same workflow applies to coding agents; see [AGENTS.md](AGENTS.md). Review
+private backlog items for sensitive information before proposing any migration
+to public issues. Security reports belong in the private channel described in
+[SECURITY.md](SECURITY.md).
+
 ## Development setup
 
 Use a current stable Rust toolchain, Node.js 22, and pnpm 11. Building the native

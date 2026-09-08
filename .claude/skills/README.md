@@ -5,6 +5,9 @@ required to build or run the app. Start with `CONTRIBUTING.md` for dependencies
 and verification; use whatever terminal, browser or native-window tools your
 agent environment provides.
 
+Follow `AGENTS.md` for issue tracking: internal and contributor work both use
+this repository's GitHub Issues, not Linear.
+
 | Skill | Purpose | Requirements beyond the contributor setup |
 | --- | --- | --- |
 | `bus-live-test` | Exercise bot messaging and guardrails | Node 22+; real Claude sessions require consent and an authenticated CLI |

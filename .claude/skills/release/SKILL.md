@@ -60,7 +60,7 @@ cargo update --workspace --offline
 `@xterm/addon-web-links` dependency, not ours. Leave it.
 
 Commit as `chore(release): bump version to X.Y.Z`, open the PR against `main`
-with the usual What/Why/How tested body and link the primary issue. Before
+with the usual What/Why/How tested body and link the primary GitHub issue (`#123`). Before
 pushing, run `pnpm run verify` (typecheck, tests, lint, builds and visual checks).
 Regenerate dependency notices with `pnpm notices:generate` when versions or
 lockfiles change; follow `third-party/README.md` for the pinned toolchain.
