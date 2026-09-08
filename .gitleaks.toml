@@ -1,0 +1,18 @@
+title = "Gravity secret scanning"
+
+[extend]
+useDefault = true
+
+# This display-only fixture is not a daemon credential (which is 64 hex digits).
+[[allowlists]]
+description = "Synthetic TokenReveal story token"
+condition = "AND"
+paths = ['''apps/desktop/src/components/devices/TokenReveal\.stories\.tsx$''']
+regexTarget = "secret"
+regexes = ['''^grav_5f2c9e4ab8d14c6f9a3e7d1b0c8f2a6e$''']
+
+[[rules]]
+id = "linear-api-key"
+description = "Linear personal API key"
+regex = '''lin_api_[A-Za-z0-9]{20,}'''
+keywords = ["lin_api_"]

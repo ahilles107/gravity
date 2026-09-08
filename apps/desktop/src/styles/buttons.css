@@ -1,0 +1,60 @@
+/* ---------- buttons ---------- */
+
+.btn {
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: #333a4a;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-small {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: #2b3c63;
+  border-color: #3d5390;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #34497a;
+}
+
+.btn-good {
+  background: #1d3d2a;
+  border-color: #2c5c3f;
+}
+
+.btn-danger {
+  background: #46232a;
+  border-color: #6b3540;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}

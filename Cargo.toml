@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = ["crates/bus", "crates/gravityd"]
+
+[workspace.package]
+version = "0.12.2"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+rusqlite = { version = "0.32", features = ["bundled", "functions", "backup"] }
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+cron = "0.13"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+uuid = { version = "1", features = ["v4", "serde"] }
+toml = "0.8"
+notify = "7"
+portable-pty = "0.8"
+libc = "0.2"
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+futures = "0.3"
+bytes = "1"
+
+[profile.release]
+lto = "thin"

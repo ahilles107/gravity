@@ -1,0 +1,187 @@
+/* Bot avatars: a built-in icon, a flat swatch, or an id-derived colour. */
+.bot-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.bot-avatar-sm {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+
+.bot-avatar-md {
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+}
+
+.bot-avatar-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+
+.bot-avatar-muted {
+  opacity: 0.5;
+}
+
+/* Icons carry their own silhouette, so they are not clipped to a circle. */
+img.bot-avatar {
+  border-radius: 0;
+  object-fit: contain;
+}
+
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.avatar-choice {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.avatar-choice img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  opacity: 0.55;
+}
+
+.avatar-choice:hover:not(:disabled) img,
+.avatar-choice-on img {
+  opacity: 1;
+}
+
+.avatar-choice-on {
+  border-color: var(--accent);
+  background: rgb(255 255 255 / 6%);
+}
+
+.avatar-choice:disabled {
+  cursor: default;
+}
+
+.bot-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* The inspector is deliberately narrow. Stack each metadata label above its
+   value so the avatar does not leave long paths in a sliver of the grid. */
+.bot-info-panel .info-meta {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.bot-info-panel .info-meta dt {
+  margin-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bot-info-panel .info-meta dt:first-child {
+  margin-top: 0;
+}
+
+.bot-info-panel .info-meta dd {
+  margin-top: 3px;
+}
+
+.bot-info-panel .workspace-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.workspace-reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.workspace-reveal:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+/* Identity history: what a bot changed about itself, and the undo for it. */
+.bot-history {
+  margin-top: 16px;
+  border-top: 1px solid var(--border, #2a2a2a);
+  padding-top: 12px;
+}
+
+.bot-history > summary {
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.revision-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.revision {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  font-size: 12px;
+}
+
+.revision-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.revision-at {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.revision-diff {
+  margin: 4px 0;
+  opacity: 0.8;
+  word-break: break-word;
+}
+
+.revision-old {
+  text-decoration: line-through;
+  opacity: 0.7;
+}

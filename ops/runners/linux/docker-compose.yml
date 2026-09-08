@@ -1,0 +1,48 @@
+# Optional self-hosted Linux runners. See ../README.md.
+
+services:
+  runner:
+    build: .
+    image: gh-runner-rust:latest
+    restart: unless-stopped
+    network_mode: host
+    # Adjust the memory limit for the runner host.
+    mem_limit: 6g
+    environment:
+      NODE_OPTIONS: --max-old-space-size=4096
+      REPO_URL: ${REPO_URL:?set REPO_URL}
+      ACCESS_TOKEN: ${ACCESS_TOKEN:?set ACCESS_TOKEN}
+      RUNNER_NAME_PREFIX: ${RUNNER_NAME_PREFIX:-gravity}
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted,linux,x64
+      DISABLE_AUTO_UPDATE: '1'
+      EPHEMERAL: '1'
+    security_opt:
+      - label:disable
+    # The workdir id is a UUID generated once per container and cached on the
+    # container-local overlay, so each replica gets its own directory
+    # (network_mode host makes $(hostname) collide) that survives the ephemeral
+    # restart between jobs.
+    #
+    # CARGO_HOME/RUSTUP_HOME hang off the same id for the same reason plus one
+    # more: the cargo registry and rustup toolchains are worth keeping between
+    # jobs, but sharing one copy across concurrent replicas invites lock
+    # contention, so each replica keeps its own on the persistent volume.
+    # $$ escapes compose interpolation so the literal $ reaches bash.
+    entrypoint:
+      - bash
+      - -c
+      - 'IDF=/opt/.runner-workdir-id; [ -s "$$IDF" ] || cat /proc/sys/kernel/random/uuid > "$$IDF"; ID="$$(cat "$$IDF")"; export RUNNER_WORKDIR="/runner/work/$$ID" CARGO_HOME="/runner/cargo/$$ID" RUSTUP_HOME="/runner/rustup/$$ID"; mkdir -p "$$RUNNER_WORKDIR" "$$CARGO_HOME" "$$RUSTUP_HOME"; exec /entrypoint.sh "$$@"'
+      - bash
+    # Overriding `entrypoint` clears the image's CMD, so restate the stock one —
+    # otherwise the wrapper's "$@" is empty and the runner registers then exits.
+    command: ['./bin/Runner.Listener', 'run', '--startuptype', 'service']
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # One volume for workspaces, the pnpm store and the cargo/rustup homes, so
+      # everything a job touches sits on a single mount (pnpm can only hardlink
+      # out of its store within one mount) and survives container churn.
+      - runner-data:/runner
+
+volumes:
+  runner-data:

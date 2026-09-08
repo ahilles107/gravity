@@ -1,0 +1,26 @@
+[package]
+name = "gravity-desktop"
+version = "0.12.2"
+description = "Gravity desktop client"
+license = "MIT"
+edition = "2021"
+
+# Keep this crate out of the repository root Cargo workspace.
+[workspace]
+
+[lib]
+name = "gravity_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+semver = "1"
+ureq = { version = "2", features = ["json"] }
+toml = "0.8"

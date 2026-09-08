@@ -1,0 +1,113 @@
+/* ---------- devices ---------- */
+
+.device-revoked td {
+  opacity: 0.55;
+}
+
+.device-revoked .device-name {
+  text-decoration: line-through;
+}
+
+.token-reveal {
+  margin-bottom: 14px;
+}
+
+.token-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--amber);
+}
+
+.token-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px dashed rgba(251, 191, 36, 0.5);
+  border-radius: 8px;
+}
+
+.token-box input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cap-checks {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.revoke-confirm {
+  display: inline-flex;
+  gap: 6px;
+}
+
+/* ---------- diagnostics ---------- */
+
+.diagnostics-view {
+  height: 100%;
+}
+
+.diag-grid {
+  grid-template-columns: 160px 1fr;
+}
+
+/* ---------- empty state ---------- */
+
+.empty-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.empty-state {
+  margin: auto;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.empty-state h1 {
+  color: var(--text);
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.empty-art-hero {
+  display: block;
+  width: 440px;
+  max-width: 70%;
+  margin: 0 auto 12px;
+  -webkit-user-drag: none;
+}
+
+.empty-art-quiet {
+  display: block;
+  width: 140px;
+  margin: 0 auto 10px;
+  opacity: 0.9;
+  -webkit-user-drag: none;
+}
+
+/* The welcome pane borrows the sidebar's project form, but the boxed
+   look reads as a dialog out here: strip the chrome, keep the stack. */
+.empty-state .mini-form {
+  width: 280px;
+  max-width: 90%;
+  margin: 16px auto 0;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.empty-state .mini-form input {
+  text-align: center;
+}
+
+.empty-state .mini-form-actions .btn-small {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 13px;
+}

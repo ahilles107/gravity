@@ -1,0 +1,10 @@
+/* Ladle's chrome defaults to light; the app ships dark only. */
+:root {
+  --ladle-bg-color-primary: var(--bg);
+  --ladle-bg-color-secondary: var(--bg-raised);
+  --ladle-color-primary: var(--text);
+  --ladle-color-secondary: var(--text-dim);
+  --ladle-color-hover: var(--text);
+  --ladle-color-accent: var(--accent);
+  --ladle-blueprint: var(--bg-raised);
+}

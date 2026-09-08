@@ -1,0 +1,77 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: fallow / oxlint / oxfmt
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: oxfmt
+        run: pnpm format:check
+
+      - name: oxlint
+        run: pnpm lint
+
+      # `fallow health` needs a fresh coverage report, so it runs in the tests
+      # workflow instead — these two checks read the sources only.
+      - name: fallow dead-code
+        run: pnpm exec fallow dead-code
+
+      - name: fallow dupes
+        run: pnpm exec fallow dupes
+
+  marketing:
+    name: marketing site
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/marketing
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/marketing/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # typecheck, oxfmt, oxlint, vitest and the Vite build — the same gate the
+      # deploy workflow relies on before publishing the Worker.
+      - name: check
+        run: pnpm check

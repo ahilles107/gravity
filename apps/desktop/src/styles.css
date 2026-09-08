@@ -1,0 +1,15 @@
+/* Entry point: partials live in `src/styles/`, one concern per file. */
+@import "./styles/base.css";
+@import "./styles/buttons.css";
+@import "./styles/sidebar.css";
+@import "./styles/sidebar-rows.css";
+@import "./styles/sidebar-footer.css";
+@import "./styles/views.css";
+@import "./styles/panels.css";
+@import "./styles/bot-identity.css";
+@import "./styles/message.css";
+@import "./styles/overlays.css";
+@import "./styles/settings.css";
+@import "./styles/devices.css";
+@import "./styles/toasts.css";
+@import "./styles/setup.css";

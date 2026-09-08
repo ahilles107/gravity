@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+#
+# Pre-commit: formatting, lint and dead-code checks for the desktop client.
+#
+# Enabled for every worktree of this repository with:
+#   git config core.hooksPath .githooks
+#
+# Bypass a single commit with `git commit --no-verify`.
+#
+# Note: these tools inspect the working tree, not the index, so a partial
+# (staged-hunk) commit is checked against the files as they are on disk.
+
+root=$(git rev-parse --show-toplevel) || exit 1
+desktop="$root/apps/desktop"
+bin="$desktop/node_modules/.bin"
+
+# Nothing to do when the commit does not touch the desktop client.
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -q '^apps/desktop/'; then
+  exit 0
+fi
+
+if [ ! -x "$bin/oxlint" ]; then
+  echo "pre-commit: apps/desktop dependencies are missing." >&2
+  echo "            run 'pnpm install' in apps/desktop, or commit with --no-verify." >&2
+  exit 1
+fi
+
+cd "$desktop" || exit 1
+
+if ! "$bin/oxfmt" --check; then
+  echo "pre-commit: formatting check failed — run 'pnpm format' in apps/desktop." >&2
+  exit 1
+fi
+
+if ! "$bin/oxlint"; then
+  echo "pre-commit: oxlint failed — run 'pnpm lint:fix' in apps/desktop for the fixable ones." >&2
+  exit 1
+fi
+
+if ! "$bin/fallow" dead-code || ! "$bin/fallow" dupes; then
+  echo "pre-commit: fallow failed — remove the dead code or extract the duplication." >&2
+  exit 1
+fi

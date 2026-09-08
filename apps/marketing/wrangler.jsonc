@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "gravity-marketing",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-02",
+  "workers_dev": true,
+  // Optional: set your updater manifest URL to enable /download/latest.
+  "vars": {
+    "RELEASE_MANIFEST_URL": "",
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "html_handling": "drop-trailing-slash",
+    "run_worker_first": ["/download/*"],
+  },
+}

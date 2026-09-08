@@ -1,0 +1,296 @@
+name: release
+
+# Builds a production release: the desktop app DMG and a gravityd
+# tarball (binary + config + launchd agent + installer). Pushing a `v*`
+# tag publishes a GitHub release; a manual dispatch only uploads the
+# artifacts to the run, for dry runs.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  build:
+    name: macOS (aarch64)
+    runs-on: macos-15
+    env:
+      RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Restores the cache seeded by warm-release-cache.yml on main. Saving is
+      # skipped here: caches written on a tag ref are unreachable by every
+      # other tag, so they would only evict useful entries.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          save-if: false
+          workspaces: |
+            .
+            apps/desktop/src-tauri
+
+      - name: Resolve version
+        id: version
+        run: |
+          # macos-latest still ships bash 3.2, so no associative arrays here.
+          cargo_version() { sed -n 's/^version = "\(.*\)"$/\1/p' "$1" | head -1; }
+          conf="$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$conf"
+          fi
+          # Every manifest carrying the release version. The desktop crate is
+          # outside the root workspace, so it cannot inherit the version and
+          # silently drifts unless it is checked here.
+          for pair in \
+            "apps/desktop/src-tauri/tauri.conf.json=$conf" \
+            "Cargo.toml=$(cargo_version Cargo.toml)" \
+            "apps/desktop/src-tauri/Cargo.toml=$(cargo_version apps/desktop/src-tauri/Cargo.toml)" \
+            "apps/desktop/package.json=$(jq -r .version apps/desktop/package.json)"; do
+            if [[ "$version" != "${pair#*=}" ]]; then
+              echo "Version $version does not match ${pair%%=*} (${pair#*=})." >&2
+              exit 1
+            fi
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build gravityd
+        run: cargo build --release -p gravityd
+
+      - name: Package gravityd
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          stage="stage/gravityd-$VERSION"
+          mkdir -p dist "$stage"
+          cp target/release/gravityd "$stage/gravityd"
+          cp ops/gravityd.example.toml "$stage/"
+          cp scripts/install-gravityd.sh "$stage/"
+          chmod +x "$stage/install-gravityd.sh"
+          tar -czf "dist/gravityd-$VERSION-aarch64-apple-darwin.tar.gz" -C stage "gravityd-$VERSION"
+
+      # The desktop bundle ships the daemon as a signed sidecar; the app's
+      # first-run wizard installs it as a launchd user agent.
+      - name: Stage gravityd sidecar
+        run: |
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          mkdir -p apps/desktop/src-tauri/binaries
+          cp target/release/gravityd "apps/desktop/src-tauri/binaries/gravityd-$triple"
+
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: pnpm install --frozen-lockfile
+
+      # With the APPLE_* secrets configured, Tauri signs with the Developer ID
+      # certificate and notarizes the app, so end users get no Gatekeeper
+      # prompts. Without them the build falls back to an ad-hoc signature and
+      # the release notes include the quarantine workaround.
+      - name: Enable signing and notarization
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "$APPLE_CERTIFICATE" ]]; then
+            echo "No APPLE_CERTIFICATE secret — building an ad-hoc signed, unnotarized app."
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          for var in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            {
+              echo "$var<<GHA_EOF"
+              printf '%s\n' "${!var}"
+              echo "GHA_EOF"
+            } >> "$GITHUB_ENV"
+          done
+          echo "SIGNED=true" >> "$GITHUB_ENV"
+
+      # Source builds do not subscribe to any distributor's update channel.
+      # Signing and an explicit public key enable updater artifacts for releases.
+      - name: Configure updater
+        env:
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
+            echo "UPDATER_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [[ -z "$UPDATER_PUBLIC_KEY" ]]; then
+            echo "Set UPDATER_PUBLIC_KEY when configuring updater signing." >&2
+            exit 1
+          fi
+          endpoint="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json"
+          if [[ -n "$RELEASE_BASE_URL" ]]; then
+            endpoint="${RELEASE_BASE_URL%/}/desktop/gravity/latest.json"
+          fi
+          config="$(jq -cn --arg key "$UPDATER_PUBLIC_KEY" --arg endpoint "$endpoint" \
+            '{plugins: {updater: {pubkey: $key, endpoints: [$endpoint]}}, bundle: {createUpdaterArtifacts: true}}')"
+          echo "GRAVITY_RELEASE_CONFIG=$config" >> "$GITHUB_ENV"
+          echo "UPDATER_ENABLED=true" >> "$GITHUB_ENV"
+
+      - name: Build desktop app
+        working-directory: apps/desktop
+        env:
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://eu.i.posthog.com' }}
+          POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ vars.POSTHOG_PROJECT_ID }}
+          POSTHOG_RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_APP_VERSION: ${{ steps.version.outputs.version }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://eu.i.posthog.com' }}
+          VITE_POSTHOG_PROJECT_TOKEN: ${{ vars.POSTHOG_PROJECT_TOKEN }}
+        run: |
+          if [[ "$UPDATER_ENABLED" == "true" ]]; then
+            pnpm tauri build --config "$GRAVITY_RELEASE_CONFIG"
+          else
+            pnpm tauri build
+          fi
+
+      - name: Collect DMG and updater artifact
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bundle=apps/desktop/src-tauri/target/release/bundle
+          mv "$bundle"/dmg/*.dmg "dist/gravity-desktop-$VERSION-aarch64.dmg"
+          if [[ "$UPDATER_ENABLED" == "true" ]]; then
+            mv "$bundle"/macos/*.app.tar.gz "dist/gravity-desktop-$VERSION-aarch64.app.tar.gz"
+            mv "$bundle"/macos/*.app.tar.gz.sig "dist/gravity-desktop-$VERSION-aarch64.app.tar.gz.sig"
+          fi
+
+      - name: Write updater manifest
+        if: env.UPDATER_ENABLED == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          archive="gravity-desktop-$VERSION-aarch64.app.tar.gz"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$archive"
+          if [[ -n "$RELEASE_BASE_URL" ]]; then
+            url="${RELEASE_BASE_URL%/}/desktop/gravity/$VERSION/$archive"
+          fi
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg signature "$(cat "dist/gravity-desktop-$VERSION-aarch64.app.tar.gz.sig")" \
+            --arg url "$url" \
+            '{version: $version, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $signature, url: $url}}}' \
+            > dist/latest.json
+
+      # Tauri notarizes and staples the .app; notarize the DMG container too
+      # so the download itself passes Gatekeeper's primary-signature check.
+      - name: Notarize DMG
+        if: env.SIGNED == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dmg="dist/gravity-desktop-$VERSION-aarch64.dmg"
+          xcrun notarytool submit "$dmg" \
+            --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "$dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      # Optional mirror; GitHub release assets are the default distribution.
+      - name: Publish to R2
+        if: github.ref_type == 'tag' && env.R2_BUCKET != '' && env.RELEASE_BASE_URL != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          put() {
+            pnpm --dir apps/marketing exec wrangler r2 object put "$R2_BUCKET/$1" --file "$GITHUB_WORKSPACE/$2" \
+              --content-type "$3" --cache-control "$4" --remote
+          }
+          immutable="public, max-age=31536000, immutable"
+          pnpm --dir apps/marketing install --frozen-lockfile
+          if [[ "$UPDATER_ENABLED" == "true" ]]; then
+            put "desktop/gravity/$VERSION/gravity-desktop-$VERSION-aarch64.app.tar.gz" \
+              "dist/gravity-desktop-$VERSION-aarch64.app.tar.gz" application/gzip "$immutable"
+          fi
+          put "desktop/gravity/$VERSION/gravity-desktop-$VERSION-aarch64.dmg" \
+            "dist/gravity-desktop-$VERSION-aarch64.dmg" application/x-apple-diskimage "$immutable"
+          put "gravityd/$VERSION/gravityd-$VERSION-aarch64-apple-darwin.tar.gz" \
+            "dist/gravityd-$VERSION-aarch64-apple-darwin.tar.gz" application/gzip "$immutable"
+          if [[ "$UPDATER_ENABLED" == "true" ]]; then
+            put "desktop/gravity/latest.json" dist/latest.json application/json "no-cache"
+          fi
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cat > notes.md <<'EOF'
+          ## Install
+
+          ### Desktop app (this is all most people need)
+
+          Download the DMG attached to this release,
+          open it and drag **Gravity** to Applications. The app bundles
+          the daemon: on first launch a setup wizard offers to run bots on this
+          Mac (installs the bundled daemon as a background service — no
+          terminal, no sudo) or to attach to a remote daemon with a device
+          token. Builds configured with updater signing offer app updates
+          and can update the local daemon to match.
+
+          Gravity keeps its state under `~/.gravity` and serves on port
+          `49777`. A daemon already answering there stops the install: it
+          refuses to start rather than run a second one against the same state.
+
+          ### Daemon only (headless Mac mini / server)
+
+          ```sh
+          # Download the gravityd tarball attached to this release first.
+          tar -xzf gravityd-VERSION-aarch64-apple-darwin.tar.gz
+          gravityd-VERSION/gravityd service install
+          ```
+
+          Installs `gravityd` under `~/.gravity/bin`, writes a default
+          config to `~/.gravity/gravityd.toml` (kept if it already exists), and
+          starts the launchd user agent `in.mikolajczuk.gravityd`. No sudo needed.
+          EOF
+          if [[ "$SIGNED" != "true" ]]; then
+            cat >> notes.md <<'EOF'
+
+          > **Note:** this build is not notarized. Gatekeeper will block the
+          > first launch on another machine — clear the quarantine flag once:
+          > `xattr -cr "/Applications/Gravity.app"`
+          EOF
+          fi
+          sed -i '' "s/VERSION/$VERSION/g" notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Gravity $VERSION" \
+            --notes-file notes.md \
+            --generate-notes

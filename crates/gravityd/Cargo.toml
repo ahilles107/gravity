@@ -1,0 +1,35 @@
+[package]
+name = "gravityd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bus = { path = "../bus" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+rusqlite = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+cron = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+uuid = { workspace = true }
+toml = { workspace = true }
+portable-pty = { workspace = true }
+libc = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio-tungstenite = "0.24"
+reqwest = { version = "0.12", features = ["json"] }

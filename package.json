@@ -1,0 +1,8 @@
+{
+  "name": "gravity",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "verify": "bash scripts/verify.sh"
+  }
+}

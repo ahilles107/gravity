@@ -1,0 +1,147 @@
+/* sidebar footer */
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding: 8px;
+}
+
+.conn-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.conn-line:hover {
+  background: var(--bg-hover);
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gray);
+}
+
+.conn-connected {
+  background: var(--green);
+  color: var(--green);
+}
+
+.conn-connecting {
+  background: var(--amber);
+  color: var(--amber);
+}
+
+.conn-disconnected,
+.conn-auth_failed,
+.conn-version_mismatch {
+  background: var(--red);
+  color: var(--red);
+}
+
+.conn-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conn-hint {
+  font-size: 12px;
+}
+
+.conn-hint.conn-connected {
+  background: none;
+}
+
+.conn-hint.conn-connecting,
+.conn-hint.conn-disconnected,
+.conn-hint.conn-auth_failed,
+.conn-hint.conn-version_mismatch {
+  background: none;
+}
+
+/* mini forms */
+
+.mini-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin: 4px 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mini-form-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.member-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.member-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* ---------- row context menu ---------- */
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.context-menu-danger {
+  color: var(--red);
+}
+
+.context-menu-icon {
+  display: flex;
+  color: var(--text-dim);
+}

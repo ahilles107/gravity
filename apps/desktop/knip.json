@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["index.html", "scripts/*.mjs"],
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.ts"],
+  "vite": {
+    "config": ["vite.config.ts"]
+  },
+  "vitest": {
+    "config": ["vitest.config.ts"],
+    "entry": ["src/**/*.test.{ts,tsx}"]
+  },
+  "playwright": {
+    "config": ["playwright.config.ts"],
+    "entry": ["tests/visual/*.spec.ts"]
+  }
+}

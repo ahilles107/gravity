@@ -1,0 +1,58 @@
+name: warm-release-cache
+
+# Seeds the macOS release-profile Rust cache from main so tag builds start
+# warm. GitHub scopes caches per ref and tag runs can only restore caches
+# saved on the default branch — never ones saved by earlier tags — so the
+# seeding must happen here. Scoped to dependency manifests: source-only
+# changes rebuild quickly on top of a warm dependency cache anyway.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**/Cargo.toml"
+      - "apps/desktop/src-tauri/Cargo.toml"
+      - "apps/desktop/src-tauri/Cargo.lock"
+      - ".github/workflows/warm-release-cache.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warm-release-cache
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    name: macOS release cache
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          workspaces: |
+            .
+            apps/desktop/src-tauri
+
+      - name: Build gravityd (release)
+        run: cargo build --release -p gravityd
+
+      # tauri::generate_context! embeds the frontend at compile time, so a
+      # placeholder dist is enough to compile all dependencies for caching.
+      # tauri_build also insists the external binary (the gravityd sidecar)
+      # exists, so stage the one just built.
+      - name: Build desktop shell (release)
+        run: |
+          mkdir -p apps/desktop/dist
+          [ -f apps/desktop/dist/index.html ] || echo "<!doctype html>" > apps/desktop/dist/index.html
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          mkdir -p apps/desktop/src-tauri/binaries
+          cp target/release/gravityd "apps/desktop/src-tauri/binaries/gravityd-$triple"
+          cargo build --release --manifest-path apps/desktop/src-tauri/Cargo.toml

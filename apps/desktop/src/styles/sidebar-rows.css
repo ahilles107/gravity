@@ -1,0 +1,284 @@
+/* ---------- pinned bots ---------- */
+
+.pin-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 4px 0 8px;
+}
+
+/* A lone pinned bot sits centred rather than stranded in the first column. */
+.pin-strip-single {
+  grid-template-columns: 1fr;
+}
+
+.pin-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 4px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pin-tile:hover {
+  background: var(--bg-hover);
+}
+
+.pin-tile-selected,
+.pin-tile-selected:hover {
+  background: var(--bg-active);
+}
+
+.pin-avatar {
+  position: relative;
+  display: inline-flex;
+}
+
+.pin-avatar .bot-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 26px;
+}
+
+.pin-avatar .dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bg-raised);
+}
+
+.pin-tile:hover .pin-avatar .dot {
+  border-color: var(--bg-hover);
+}
+
+.pin-tile-selected .pin-avatar .dot,
+.pin-tile-selected:hover .pin-avatar .dot {
+  border-color: var(--bg-active);
+}
+
+.pin-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+}
+
+.pin-name {
+  max-width: 100%;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.row-selected,
+.row-selected:hover {
+  background: var(--bg-active);
+}
+
+.row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-next {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* bot rows: avatar beside a name/time line and a message preview line */
+
+.bot-row {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 8px;
+}
+
+.bot-row-avatar {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.bot-row-avatar .dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--bg-raised);
+}
+
+.row:hover .bot-row-avatar .dot {
+  border-color: var(--bg-hover);
+}
+
+.row-selected .bot-row-avatar .dot,
+.row-selected:hover .bot-row-avatar .dot {
+  border-color: var(--bg-active);
+}
+
+.bot-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bot-row-top,
+.bot-row-bottom {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bot-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bot-row-time {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.bot-row-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-dim);
+}
+
+.row-glyph {
+  color: var(--text-dim);
+  font-weight: 600;
+  width: 10px;
+  text-align: center;
+}
+
+.badge {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.badge-unread {
+  background: var(--accent);
+  color: #0b1020;
+}
+
+.badge-failed {
+  background: var(--red);
+  color: #2a0b0b;
+}
+
+/* state dots */
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--gray);
+}
+
+.dot-ready {
+  background: var(--green);
+}
+
+.dot-starting,
+.dot-stopping {
+  background: var(--blue);
+  opacity: 0.6;
+}
+
+.dot-working {
+  background: var(--blue);
+  position: relative;
+}
+
+/* The halo animates transform and opacity on a pseudo-element so it stays on
+   the compositor; animating box-shadow re-resolved style and re-laid out the
+   whole sidebar every frame for as long as any bot was working. */
+.dot-working::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  pointer-events: none;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+.dot-waiting_for_user,
+.dot-waiting_for_approval,
+.dot-rate_limited {
+  background: var(--amber);
+}
+
+.dot-crashed,
+.dot-auth_failed {
+  background: var(--red);
+}
+
+.dot-stopped {
+  background: var(--gray);
+}
+
+/* Scale 2.11 reproduces the old 5px shadow spread on the 9px base dot. */
+@keyframes dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(2.11);
+    opacity: 0;
+  }
+}

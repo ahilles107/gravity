@@ -1,0 +1,229 @@
+/* ---------- view headers / tabs ---------- */
+
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+  flex-wrap: wrap;
+}
+
+.view-header-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.view-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.info-panel-toggle:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.info-panel-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.readonly-badge {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- bot view ---------- */
+
+.project-view {
+  height: 100%;
+}
+
+.bot-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bot-view-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.bot-view-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bot-view-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.bot-info-panel {
+  flex: none;
+  min-width: 280px;
+  overflow-y: auto;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+
+.bot-info-panel-collapsed {
+  display: none;
+}
+
+.bot-info-resizer {
+  position: relative;
+  z-index: 2;
+  width: 9px;
+  margin: 0 -5px 0 -4px;
+  flex: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.bot-info-resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  content: "";
+}
+
+.bot-info-resizer:hover::after,
+.bot-info-resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+.tab-pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-pane-hidden {
+  visibility: hidden;
+  z-index: 0;
+}
+
+.tab-pane:not(.tab-pane-hidden) {
+  z-index: 1;
+  background: var(--bg);
+}
+
+.tab-pane-scroll {
+  overflow-y: auto;
+}
+
+.terminal-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  background: #101116;
+}
+
+.terminal-readonly {
+  opacity: 0.92;
+}
+
+.terminal-host {
+  width: 100%;
+  height: 100%;
+}
+
+/* The real target of a hovered OSC 8 hyperlink, whose text may claim another. */
+.terminal-link-target {
+  position: absolute;
+  z-index: 10;
+  transform: translateY(-100%);
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Never intercept the pointer: the link underneath must stay hovered. */
+  pointer-events: none;
+}

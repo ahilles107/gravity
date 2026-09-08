@@ -1,0 +1,65 @@
+/* ---------- first-run setup wizard ---------- */
+
+.setup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.setup-panel {
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.setup-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.setup-note {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.setup-error {
+  margin: 0;
+  color: var(--red);
+  /* An install failure appends the daemon's own log lines. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.setup-detail {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.setup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}

@@ -1,0 +1,255 @@
+.features {
+  display: flex;
+  padding-top: clamp(120px, 17vh, 192px);
+  flex-direction: column;
+  gap: clamp(104px, 15vh, 160px);
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(48px, 8vw, 96px);
+}
+
+.feature-reversed {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.feature-copy {
+  max-width: 430px;
+}
+
+.feature-label {
+  margin-bottom: 16px;
+  color: var(--blue);
+  font-size: 11px;
+}
+
+.feature h3 {
+  font-size: clamp(29px, 3.6vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.06;
+}
+
+.feature-copy > p:last-child {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.bot-grid {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px 14px;
+  list-style: none;
+}
+
+.bot-grid li {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bot-grid img {
+  width: clamp(52px, 6vw, 70px);
+  height: auto;
+}
+
+.bot-grid span,
+.terminal-card,
+.routine-card {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.bot-grid span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.terminal-card,
+.routine-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: linear-gradient(145deg, var(--panel-raised), var(--panel));
+  box-shadow: 0 22px 60px -38px rgb(0 0 0 / 95%);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.terminal-card {
+  padding: 24px 26px;
+}
+
+.terminal-message {
+  padding-left: 50px;
+  color: var(--muted);
+}
+
+.dim {
+  color: var(--muted);
+}
+
+.blue {
+  color: var(--blue);
+}
+
+.amber {
+  color: var(--amber);
+}
+
+.green {
+  color: var(--green);
+}
+
+.routine-card {
+  display: grid;
+  padding: 22px 26px;
+  grid-template-columns: repeat(4, max-content) 6px;
+  gap: 2px;
+  justify-content: start;
+}
+
+.routine-card > div {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 0 18px;
+}
+
+.routine-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.routine-dot-off {
+  border: 1px solid var(--muted);
+  background: none;
+}
+
+.final-cta {
+  display: flex;
+  padding-block: clamp(132px, 19vh, 210px) clamp(96px, 14vh, 148px);
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.final-cta img {
+  width: clamp(116px, 14vw, 164px);
+  height: auto;
+  margin-bottom: 22px;
+  opacity: 0.92;
+}
+
+.final-cta h2 {
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 600;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+}
+
+.final-cta p {
+  max-width: 470px;
+  margin-top: 17px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.final-cta .button {
+  margin-top: 30px;
+}
+
+.final-cta .requirement {
+  margin-top: 17px;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+}
+
+.footer-content {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 360ms ease,
+    transform 360ms ease;
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 720px) {
+  .hero h1 br {
+    display: none;
+  }
+
+  .feature,
+  .feature-reversed {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .feature-copy {
+    max-width: none;
+  }
+
+  .feature-reversed .terminal-card {
+    order: 1;
+  }
+
+  .feature-reversed .feature-copy {
+    order: 0;
+  }
+
+  .routine-card > div {
+    grid-template-columns: 1.3fr 0.8fr;
+  }
+
+  .routine-card > div span:nth-child(3) {
+    display: none;
+  }
+
+  .footer-content {
+    padding-block: 20px;
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}

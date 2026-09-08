@@ -1,0 +1,37 @@
+/* ---------- message rendering ---------- */
+
+.msg-sender {
+  font-weight: 600;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.kind-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 7px;
+  background: var(--bg-active);
+  color: var(--text-dim);
+}
+
+.kind-task {
+  color: var(--blue);
+}
+
+.kind-done {
+  color: var(--green);
+}
+
+.kind-reply {
+  color: var(--accent);
+}
+
+.kind-note {
+  color: var(--amber);
+}

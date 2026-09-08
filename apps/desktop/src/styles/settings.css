@@ -1,0 +1,215 @@
+/* ---------- settings overlay ---------- */
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* The macOS traffic lights are native chrome and always paint above the
+     webview, so the panel has to start below the drag strip instead of being
+     centred over it. */
+  padding-top: var(--titlebar-h);
+}
+
+.settings-panel {
+  width: 95%;
+  height: 95%;
+  display: flex;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.settings-rail {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 8px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.settings-rail-title {
+  padding: 4px 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+/* Dim until the category is selected, so the labels stay the loudest thing. */
+.settings-rail-icon {
+  flex: none;
+  color: var(--text-dim);
+}
+
+.settings-rail .row-selected .settings-rail-icon {
+  color: inherit;
+}
+
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-pane-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.settings-pane-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+
+.settings-section {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* One setting: label + help on the left, its control or value on the right. */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row-form {
+  margin: 0;
+}
+
+.settings-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-row-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-row-help {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Groups related rows within one pane, e.g. daemon config under Connection. */
+.settings-subhead {
+  margin: 22px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.settings-subhead:first-child {
+  margin-top: 0;
+}
+
+.settings-row-error {
+  font-size: 12px;
+  color: var(--red);
+}
+
+.settings-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.settings-row-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-inline-fields {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-inline-fields input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-inline-fields .settings-port {
+  flex: none;
+  width: 80px;
+}
+
+.settings-number {
+  width: 80px;
+}
+
+.settings-inline-fields .settings-tokens {
+  flex: none;
+  width: 140px;
+}
+
+.settings-wide {
+  width: 300px;
+  max-width: 45%;
+}
+
+.settings-shortcut {
+  min-width: 120px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settings-shortcut:hover:not(:disabled) {
+  border-color: var(--text-dim);
+}
+
+.settings-shortcut-recording,
+.settings-shortcut:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.settings-shortcut-recording {
+  color: var(--text-dim);
+}

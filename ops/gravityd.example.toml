@@ -1,0 +1,72 @@
+# Gravity daemon configuration — copy to ~/.gravity/gravityd.toml
+# Every key is optional; defaults shown.
+
+# home = "/Users/you/.gravity"
+
+# Bind addresses. Add your Tailscale interface IP for remote clients;
+# never bind 0.0.0.0.
+bind = ["127.0.0.1"]
+# Control-plane and bus port. 49777 is the default because Atlassian's managed
+# Claude Code policy allowlists that exact loopback /mcp URL; on a
+# policy-managed Mac a bot silently drops any MCP server whose URL is not
+# allowlisted, so an unlisted port disables the bus.
+port = 49777
+# When the app-managed service finds that port occupied by something that is not
+# a daemon, it waits a few seconds, then serves on a free one instead and the
+# app follows it there. It keeps watching, and restarts onto the configured port
+# once that comes free. The bus moves with it in the meantime, so on a
+# policy-managed Mac — where only the allowlisted URL works at all — set this to
+# false and get a daemon that refuses to start instead. Ignored for direct
+# launches and for any daemon bound past loopback, both of which always fail on
+# a collision.
+negotiate_port = true
+
+# "pty" spawns the `claude` CLI in a pseudo-terminal per bot.
+# "double" is a deterministic echo runtime for testing.
+runtime = "pty"
+claude_bin = "claude"
+claude_args = []
+
+# Tokens a bot conversation may reach before Claude Code auto-compacts it
+# (exported as CLAUDE_CODE_AUTO_COMPACT_WINDOW). Every turn re-sends the whole
+# transcript, so leaving the model default (up to 1M) makes long-running bot
+# chats expensive; too small a window compacts constantly and loses context.
+# Accepted range is 100000-1000000; comment out to use the model default.
+# The desktop app's Settings → Daemon can override this at runtime; that
+# override is stored in the daemon's database and wins over this file.
+auto_compact_window = 250000
+
+# Claude Code 2.1.263+ renders in the terminal's alternate screen and takes the
+# mouse, so the desktop's own scrollback stays empty and a pane goes blank
+# whenever the runtime is between screens. This pins the classic renderer
+# (CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1, CLAUDE_CODE_DISABLE_MOUSE=1).
+classic_renderer = true
+
+# Bots are always-on: the daemon starts every live bot at boot and keeps it
+# running. This is how often it reconciles them (and retries crash backoffs).
+supervision_interval_ms = 5000
+
+# Terminal scrollback per bot, bytes.
+scrollback_bytes = 1048576
+
+# Extra allowed WebSocket Origin values for browser-context clients.
+# No-Origin (native) and localhost/tauri origins are always allowed.
+allowed_origins = []
+
+[retention]
+enabled = true
+message_days = 180
+delivery_days = 30
+routine_run_days = 90
+interval_hours = 24
+
+[delivery]
+poll_interval_ms = 1000
+lease_seconds = 60
+max_attempts = 10
+base_backoff_seconds = 5
+
+[scheduler]
+tick_interval_ms = 30000
+lease_seconds = 300
+catch_up_window_minutes = 60

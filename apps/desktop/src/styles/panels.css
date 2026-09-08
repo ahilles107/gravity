@@ -1,0 +1,268 @@
+/* ---------- panels (routines, info, diagnostics) ---------- */
+
+.panel {
+  padding: 16px;
+  max-width: 860px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.panel-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.panel-header .panel-title {
+  margin-bottom: 0;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.field-error {
+  color: var(--red);
+  font-size: 12px;
+}
+
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+
+.field-row .field {
+  flex: 1;
+}
+
+.info-meta {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 6px 12px;
+  margin: 0 0 16px;
+}
+
+.info-meta dt {
+  color: var(--text-dim);
+}
+
+.info-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ok-text {
+  color: var(--green);
+}
+
+.err-text {
+  color: var(--red);
+}
+
+/* routines */
+
+.routine-form {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.routine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.routine-item {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.routine-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.routine-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.routine-name {
+  font-weight: 600;
+}
+
+.routine-trigger,
+.routine-next {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.routine-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.routine-prompt {
+  margin-top: 6px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.routine-prompt.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  overflow: hidden;
+}
+
+.routine-prompt-toggle {
+  margin-top: 6px;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  transition: background 120ms ease;
+}
+
+.toggle-track::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.toggle input:checked + .toggle-track {
+  background: #2b3c63;
+  border-color: #3d5390;
+}
+
+.toggle input:checked + .toggle-track::before {
+  transform: translateX(13px);
+  background: var(--accent);
+}
+
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.runs-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.runs-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.run-state {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--bg-active);
+}
+
+.run-succeeded,
+.delivery-acknowledged,
+.delivery-delivered {
+  color: var(--green);
+}
+
+.run-running,
+.delivery-leased,
+.delivery-queued {
+  color: var(--blue);
+}
+
+.run-scheduled {
+  color: var(--text-dim);
+}
+
+.run-failed,
+.delivery-failed {
+  color: var(--red);
+}
+
+.run-skipped,
+.run-cancelled {
+  color: var(--amber);
+}
+
+.run-source {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.run-error {
+  color: var(--red);
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d0e12" />
+    <meta
+      name="description"
+      content="Gravity gives you a team of persistent, named bots that work together on your Mac."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Gravity — a team of bots that keep working" />
+    <meta
+      property="og:description"
+      content="Persistent bots that hand off work, run on a schedule, and keep going when you close the lid."
+    />
+    <meta property="og:image" content="https://getgravity.build/images/gravity-app.png" />
+    <meta property="og:url" content="https://getgravity.build" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://getgravity.build" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"
+      rel="stylesheet"
+    />
+    <title>Gravity — a team of persistent bots for macOS</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-nav>
+      <nav class="nav shell" aria-label="Primary navigation">
+        <a class="brand" href="#main" aria-label="Gravity home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          gravity
+        </a>
+        <a class="button button-small button-muted" href="/download/latest">Download</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero shell" aria-labelledby="hero-title">
+        <p class="eyebrow">Your bots, with coworkers</p>
+        <h1 id="hero-title">
+          A team of bots that<br />
+          keep working.
+        </h1>
+        <p class="hero-copy">
+          Persistent, named bots on your Mac. They hand work to each other, run on a schedule, and
+          don&rsquo;t stop when you close the lid.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="/download/latest">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M15.42 10.72c-.03-2.68 2.19-3.98 2.29-4.04a4.92 4.92 0 0 0-3.86-2.08c-1.62-.17-3.19.97-4.01.97-.84 0-2.1-.96-3.47-.93a5.13 5.13 0 0 0-4.32 2.63c-1.87 3.24-.48 8 1.32 10.62.9 1.29 1.94 2.72 3.31 2.67 1.34-.06 1.84-.86 3.46-.86 1.6 0 2.08.86 3.48.83 1.44-.02 2.35-1.29 3.21-2.59a10.6 10.6 0 0 0 1.47-2.99 4.62 4.62 0 0 1-2.88-4.23ZM12.8 2.88A4.7 4.7 0 0 0 13.88-.5a4.78 4.78 0 0 0-3.1 1.61 4.5 4.5 0 0 0-1.11 3.26 3.95 3.95 0 0 0 3.13-1.49Z"
+              />
+            </svg>
+            Download for macOS
+          </a>
+          <span class="requirement">macOS 14+ &middot; Apple silicon</span>
+        </div>
+      </section>
+
+      <section class="product-shot" aria-label="Gravity app">
+        <div class="product-glow" aria-hidden="true"></div>
+        <figure class="app-window" data-reveal>
+          <img
+            src="/images/gravity-app.png"
+            alt="Gravity running a team of coding bots in a native macOS app"
+            width="3160"
+            height="1850"
+          />
+        </figure>
+      </section>
+
+      <section class="features shell" aria-labelledby="features-title">
+        <h2 id="features-title" class="sr-only">What Gravity does</h2>
+
+        <article class="feature" data-reveal>
+          <div class="feature-copy">
+            <p class="feature-label">Your bench</p>
+            <h3>Persistent bots</h3>
+            <p>
+              Each bot is a long-lived session with a name, an avatar, and its own instructions. It
+              maintains context across days of work.
+            </p>
+          </div>
+          <ul class="bot-grid" aria-label="Example bot roster">
+            <li><img src="/images/avatars/quartz.png" alt="" /><span>Argus</span></li>
+            <li><img src="/images/avatars/tide.png" alt="" /><span>Echo</span></li>
+            <li><img src="/images/avatars/volt.png" alt="" /><span>Forge</span></li>
+            <li><img src="/images/avatars/orbit.png" alt="" /><span>Pulse</span></li>
+            <li><img src="/images/avatars/bloom.png" alt="" /><span>Quill</span></li>
+            <li><img src="/images/avatars/comet.png" alt="" /><span>Scout</span></li>
+            <li><img src="/images/avatars/slate.png" alt="" /><span>Sentry</span></li>
+            <li><img src="/images/avatars/rune.png" alt="" /><span>Tinker</span></li>
+          </ul>
+        </article>
+
+        <article class="feature feature-reversed" data-reveal>
+          <div class="terminal-card" role="figure" aria-label="One bot hands a task to another">
+            <p><span class="dim">12:04</span> <span class="blue">Argus</span> &rarr; Forge</p>
+            <p class="terminal-message">Pick up USE-1492 &mdash; webhook retries.</p>
+            <p><span class="dim">12:04</span> Forge <span class="amber">working</span></p>
+            <p><span class="dim">12:11</span> Forge &rarr; <span class="blue">Argus</span></p>
+            <p class="terminal-message">
+              <span class="green">done</span> &middot; PR #418 open, handed to Sentry
+            </p>
+          </div>
+          <div class="feature-copy">
+            <p class="feature-label">Handoffs</p>
+            <h3>They talk to each other</h3>
+            <p>
+              A bot can hand a task to another bot and carry on. It gets a message back when the
+              work is done.
+            </p>
+          </div>
+        </article>
+
+        <article class="feature" data-reveal>
+          <div class="feature-copy">
+            <p class="feature-label">On the clock</p>
+            <h3>Routines</h3>
+            <p>
+              Bots own tasks that fire on a schedule or interval. Nightly triage, a dependency sweep
+              every Monday, a queue check every 15 minutes.
+            </p>
+          </div>
+          <div class="routine-card" role="figure" aria-label="Example routine list">
+            <div>
+              <span class="dim">routine</span><span>nightly-triage</span
+              ><span class="dim">daily 02:00</span><span>Echo</span
+              ><span class="routine-dot"></span>
+            </div>
+            <div>
+              <span class="dim">routine</span><span>queue-check</span
+              ><span class="dim">every 15m</span><span>Pulse</span><span class="routine-dot"></span>
+            </div>
+            <div>
+              <span class="dim">routine</span><span>weekly-deps</span
+              ><span class="dim">mon 09:00</span><span>Scout</span><span class="routine-dot"></span>
+            </div>
+            <div>
+              <span class="dim">routine</span><span>flaky-tests</span
+              ><span class="dim">every 6h</span><span>Sentry</span
+              ><span class="routine-dot routine-dot-off"></span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="final-cta shell" data-reveal aria-labelledby="download-title">
+        <img src="/images/quiet.png" alt="" width="320" height="320" />
+        <h2 id="download-title">Put your team to work.</h2>
+        <p>Start with one bot. Add the rest when the work asks for them.</p>
+        <a class="button button-primary" href="/download/latest">Download for macOS</a>
+        <span class="requirement"
+          >macOS 14+ &middot; Apple silicon &middot; Claude Code installed</span
+        >
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-content">
+        <span>&copy; <span data-year>2026</span> Gravity</span>
+        <span>Built for the work that keeps going.</span>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

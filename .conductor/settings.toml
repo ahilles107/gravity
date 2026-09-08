@@ -1,0 +1,40 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "cd apps/desktop && pnpm install"
+# Each workspace runs its own gravityd on its own port with a private
+# .dev/gravityd home, so parallel workspaces never share daemon state.
+run_mode = "concurrent"
+
+# The real Tauri window against a workspace-private daemon; builds the sidecar
+# on first run.
+[scripts.run.dev]
+command = "./scripts/dev.sh"
+available_in = ["local"]
+default = true
+icon = "app-window"
+
+# Frontend in the browser instead of the Tauri window. Fastest loop: Vite HMR,
+# no Tauri/Rust app rebuild.
+[scripts.run.web]
+command = "./scripts/dev.sh web"
+available_in = ["local"]
+icon = "play"
+
+# The browser loop with the deterministic echo runtime instead of the `claude`
+# CLI — UI and terminal work that should not spend tokens.
+[scripts.run.dev-double]
+command = "GRAVITY_RUNTIME=double ./scripts/dev.sh web"
+available_in = ["local"]
+icon = "bot"
+
+# The Ladle component workbench: stories in isolation, no daemon involved.
+# Port CONDUCTOR_PORT+2 keeps it clear of the frontend (+0) and gravityd (+1).
+[scripts.run.ladle]
+command = "cd apps/desktop && pnpm ladle --port $((${CONDUCTOR_PORT:-1420} + 2))"
+available_in = ["local"]
+icon = "layout-grid"
+
+[scripts.run.test]
+command = "cd apps/desktop && pnpm test:watch"
+icon = "test-tube"

@@ -1,0 +1,50 @@
+name: visual
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stories:
+    name: ladle stories (playwright)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # No node/pnpm setup here on purpose: the suite installs and runs
+      # entirely inside the pinned Playwright container, which is the only
+      # environment the committed baselines are valid for.
+      - name: Compare stories against baselines
+        id: compare
+        run: scripts/vr-ci.sh
+
+      # A failure is either a real regression or an intended redesign, and the
+      # difference is a human call. Regenerate the full set so an agent can
+      # adopt it with scripts/vr-accept.sh instead of guessing at pixels.
+      - name: Regenerate baselines for review
+        if: failure() && steps.compare.outcome == 'failure'
+        run: scripts/vr-ci.sh --update
+
+      - name: Upload regenerated baselines
+        if: failure() && steps.compare.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots
+          path: apps/desktop/tests/visual/__screenshots__/
+          if-no-files-found: error
+
+      - name: Upload diff report
+        if: failure() && steps.compare.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: apps/desktop/playwright-report/
+          if-no-files-found: ignore

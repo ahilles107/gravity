@@ -1,0 +1,9 @@
+packages:
+  - "."
+
+allowBuilds:
+  "@posthog/cli": true
+  "@swc/core": false
+  core-js: false
+  esbuild: true
+  msw: false

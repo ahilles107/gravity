@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "entry": ["src/main.tsx", "src/**/*.stories.tsx", "tests/visual/*.spec.ts", "scripts/*.mjs"],
+  "workspaces": {
+    "patterns": ["."]
+  },
+  "health": {
+    "coverage": "coverage/coverage-final.json"
+  },
+  "usedClassMembers": [
+    {
+      "implements": "ScriptedWebSocket",
+      "members": ["*"]
+    }
+  ]
+}
