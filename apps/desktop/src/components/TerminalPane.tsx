@@ -94,7 +94,19 @@ function createTerminal(): CachedTerminal {
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.loadAddon(new WebLinksAddon(activateLink));
-  return { term, fit, element };
+  return { term, fit, element, viewportTop: 0 };
+}
+
+/**
+ * xterm scrolls its screen by scrolling a real element, and the browser resets
+ * a scrollable element's offset when it leaves the DOM. A re-parented terminal
+ * therefore paints the screen it kept while its viewport reports being at the
+ * very top, and the first wheel tick after a bot switch snaps the buffer back
+ * to the start of the scrollback. Carrying the offset across the move keeps
+ * what the user was reading — bottom or mid-scrollback — where they left it.
+ */
+function viewportOf(element: HTMLElement): HTMLElement | null {
+  return element.querySelector(".xterm-viewport");
 }
 
 /** Modal dialogs own keyboard input while open, even if xterm retained focus. */
@@ -179,10 +191,23 @@ export default function TerminalPane({
       fit.fit();
     };
     safeFit();
+    const viewport = viewportOf(element);
     if (cached !== undefined) {
       // The renderer's canvas does not survive re-parenting untouched.
       term.refresh(0, term.rows - 1);
+      if (viewport !== null) {
+        viewport.scrollTop = cached.viewportTop;
+      }
     }
+    // The offset is recorded while the viewport is still in the document: the
+    // scroll event that comes with detaching reports a position nobody
+    // scrolled to, and storing it would park the terminal at the top.
+    const trackScrollTop = (): void => {
+      if (viewport !== null && viewport.isConnected) {
+        entry.viewportTop = viewport.scrollTop;
+      }
+    };
+    viewport?.addEventListener("scroll", trackScrollTop);
     if (canWriteRef.current) {
       term.focus();
     }
@@ -317,6 +342,7 @@ export default function TerminalPane({
 
     return () => {
       disposed = true;
+      viewport?.removeEventListener("scroll", trackScrollTop);
       unsubPrefs();
       observer.disconnect();
       unsubStatus();

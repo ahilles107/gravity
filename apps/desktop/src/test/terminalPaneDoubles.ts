@@ -56,7 +56,13 @@ export const terminalDouble = {
     fontFamily: string;
   },
   loadAddon: vi.fn<(addon: unknown) => void>(),
-  open: vi.fn<(container: HTMLElement) => void>(),
+  // Real xterm builds the scrollable viewport when it opens; panes read and
+  // restore its offset across re-parenting, so the double provides one too.
+  open: vi.fn<(container: HTMLElement) => void>((container) => {
+    const viewport = document.createElement("div");
+    viewport.className = "xterm-viewport";
+    container.appendChild(viewport);
+  }),
   write: vi.fn<(data: string, done?: () => void) => void>((_data, done) => {
     done?.();
   }),
