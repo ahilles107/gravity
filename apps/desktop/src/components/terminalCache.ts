@@ -15,6 +15,8 @@ export interface CachedTerminal {
   readonly term: Terminal;
   readonly fit: FitAddon;
   readonly element: HTMLElement;
+  /** Scroll offset the viewport had when parked; the DOM drops it on detach. */
+  viewportTop: number;
 }
 
 const MAX_CACHED = 3;
