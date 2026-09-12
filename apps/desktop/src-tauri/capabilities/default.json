@@ -4,7 +4,8 @@
   "description": "Default capability for the main window",
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "notification:default"
   ],
   "windows": ["main"]
 }

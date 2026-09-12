@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 use crate::app::AppState;
 use crate::messaging;
+use crate::messaging::Dm;
 
 use super::tasks::describe_tasks;
 use super::{bot_sender, caller};
@@ -110,29 +111,21 @@ pub(super) fn send_message(
             // A reply defaults to referencing the message that opened the
             // task, so the reader sees what it answers.
             let ref_id = ref_id.unwrap_or(task.origin_message_id.as_str());
+            let sender = bot_sender(&me);
             let msg = messaging::send_dm(
                 &app.db,
                 &app.events,
-                &target.id,
-                &bot_sender(&me),
-                kind,
-                body,
-                Some(ref_id),
+                Dm::new(&target.id, &sender, kind, body).re(ref_id),
             )?;
             Ok(json!({ "message_id": msg.id, "num": msg.num }))
         }
         // A note is an FYI: it opens no task, expects no answer, and budgets
         // nothing.
         MessageKind::Note => {
-            let msg = messaging::send_dm(
-                &app.db,
-                &app.events,
-                &target.id,
-                &bot_sender(&me),
-                kind,
-                body,
-                ref_id,
-            )?;
+            let sender = bot_sender(&me);
+            let mut dm = Dm::new(&target.id, &sender, kind, body);
+            dm.ref_message_id = ref_id;
+            let msg = messaging::send_dm(&app.db, &app.events, dm)?;
             Ok(json!({ "message_id": msg.id, "num": msg.num }))
         }
         // A task is a delegation: it extends the chain and opens a task row,
@@ -185,15 +178,10 @@ pub(super) fn send_message(
                 .unwrap_or(DEFAULT_TASK_DEADLINE_HOURS)
                 .clamp(1, 168);
             let deadline_at = chrono::Utc::now() + chrono::Duration::hours(deadline_hours);
-            let msg = messaging::send_dm(
-                &app.db,
-                &app.events,
-                &target.id,
-                &bot_sender(&me),
-                kind,
-                body,
-                ref_id,
-            )?;
+            let sender = bot_sender(&me);
+            let mut dm = Dm::new(&target.id, &sender, kind, body);
+            dm.ref_message_id = ref_id;
+            let msg = messaging::send_dm(&app.db, &app.events, dm)?;
             let task = app.db.create_task(
                 &msg.id,
                 Some(&me.id),
@@ -272,9 +260,31 @@ pub(super) fn check_inbox(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<V
             "opened_at": task.created_at.to_rfc3339()
         }));
     }
+    // The third part of the ledger: what this bot has asked the owner and not
+    // yet heard back on. A session that lost its context would otherwise have
+    // no way to find what it is waiting on, and would ask again.
+    let open_decisions: Vec<Value> = app
+        .db
+        .open_decisions_for(bot_id)?
+        .into_iter()
+        .map(|d| {
+            let mut item = json!({
+                "id": d.id,
+                "title": d.title,
+                "state": d.state.as_str()
+            });
+            if let Some(deadline) = d.deadline_at {
+                item["deadline_at"] = json!(deadline.to_rfc3339());
+            }
+            item
+        })
+        .collect();
     let mut out = json!({ "messages": rendered });
     if !delegated.is_empty() {
         out["delegated_tasks"] = json!(delegated);
+    }
+    if !open_decisions.is_empty() {
+        out["open_decisions"] = json!(open_decisions);
     }
     Ok(out)
 }

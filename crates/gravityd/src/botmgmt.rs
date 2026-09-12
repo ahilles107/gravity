@@ -12,7 +12,7 @@ use bus::{Bot, MessageKind, RevisionField};
 use crate::app::AppState;
 use crate::db::Actor;
 use crate::events::Push;
-use crate::messaging::{self, daemon_sender};
+use crate::messaging::{self, daemon_sender, Dm};
 use crate::paths::{self, BotProvision};
 use crate::supervisor::BOT_TOKEN_ENV;
 
@@ -208,17 +208,14 @@ pub fn regenerate_all_system_md(app: &Arc<AppState>) -> anyhow::Result<()> {
 fn announce_rename(app: &Arc<AppState>, before: &Bot, after: &Bot) -> anyhow::Result<()> {
     let peers = app.db.list_bots(Some(&after.project_id))?;
     for peer in peers.iter().filter(|p| p.id != after.id) {
+        let body = format!(
+            "Bot \"{}\" is now called \"{}\". Use the new name to reach it.",
+            before.name, after.name
+        );
         messaging::send_dm(
             &app.db,
             &app.events,
-            &peer.id,
-            &daemon_sender(),
-            MessageKind::Note,
-            &format!(
-                "Bot \"{}\" is now called \"{}\". Use the new name to reach it.",
-                before.name, after.name
-            ),
-            None,
+            Dm::new(&peer.id, &daemon_sender(), MessageKind::Note, &body),
         )?;
     }
     Ok(())
@@ -231,7 +228,7 @@ fn announce_rename(app: &Arc<AppState>, before: &Bot, after: &Bot) -> anyhow::Re
 ///
 /// A bot that edited itself already knows, so it is not told twice.
 fn notify_running_session(app: &Arc<AppState>, bot: &Bot, actor: &Actor<'_>) -> anyhow::Result<()> {
-    if matches!(actor, Actor::Bot(id) if *id == bot.id) {
+    if actor.bot_id() == Some(bot.id.as_str()) {
         return Ok(());
     }
     let (state, _) = app.supervisor.state(&bot.id);
@@ -250,11 +247,7 @@ fn notify_running_session(app: &Arc<AppState>, bot: &Bot, actor: &Actor<'_>) -> 
     messaging::send_dm(
         &app.db,
         &app.events,
-        &bot.id,
-        &daemon_sender(),
-        MessageKind::Note,
-        &body,
-        None,
+        Dm::new(&bot.id, &daemon_sender(), MessageKind::Note, &body),
     )?;
     Ok(())
 }

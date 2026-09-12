@@ -7,13 +7,22 @@ use bus::*;
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub use revisions::Actor;
+pub use crate::actor::Actor;
+pub use decisions::NewDecision;
+pub use decisions_edit::DecisionEdit;
+pub use decisions_list::DecisionFilter;
 pub use routines::RoutineLimits;
 pub use runs::NewRun;
 pub use signals::NewSignal;
 
 mod bots;
 mod conversations;
+mod decision_threads;
+mod decisions;
+mod decisions_edit;
+mod decisions_list;
+#[cfg(test)]
+mod decisions_tests;
 mod deliveries;
 mod devices;
 mod projects;
@@ -25,6 +34,9 @@ mod runs_state;
 mod runs_tests;
 mod settings;
 mod signals;
+mod tags;
+#[cfg(test)]
+mod tags_tests;
 mod tasks;
 #[cfg(test)]
 mod tests;
@@ -201,7 +213,9 @@ impl Db {
         let messages = {
             // Only messages with no remaining delivery/task references.
             tx.execute(
-                "DELETE FROM task WHERE state != 'open' AND created_at < ?1",
+                "DELETE FROM task WHERE state != 'open' AND created_at < ?1
+                 AND id NOT IN (SELECT source_task_id FROM decision
+                                 WHERE source_task_id IS NOT NULL)",
                 params![cutoff(message_days)],
             )?;
             tx.execute(
@@ -211,11 +225,16 @@ impl Db {
                     AND id NOT IN (SELECT origin_message_id FROM task))",
                 params![cutoff(message_days)],
             )?;
+            // Decisions are never retained away, so neither is the exchange a
+            // decision cites: a registry entry whose context has been pruned
+            // is a ruling nobody can re-read the reason for.
             tx.execute(
                 "DELETE FROM message WHERE created_at < ?1
                  AND id NOT IN (SELECT message_id FROM delivery)
                  AND id NOT IN (SELECT origin_message_id FROM task)
-                 AND id NOT IN (SELECT ref_message_id FROM message WHERE ref_message_id IS NOT NULL)",
+                 AND id NOT IN (SELECT ref_message_id FROM message WHERE ref_message_id IS NOT NULL)
+                 AND id NOT IN (SELECT source_message_id FROM decision
+                                 WHERE source_message_id IS NOT NULL)",
                 params![cutoff(message_days)],
             )?
         };

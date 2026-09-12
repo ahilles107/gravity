@@ -7,22 +7,7 @@
 use bus::*;
 use rusqlite::{params, OptionalExtension, Row};
 
-use super::{parse_ts, ts, Db};
-
-/// Author of a change, as stored in `bot_revision.changed_by`.
-pub enum Actor<'a> {
-    User,
-    Bot(&'a str),
-}
-
-impl Actor<'_> {
-    pub fn as_stored(&self) -> String {
-        match self {
-            Actor::User => "user".to_string(),
-            Actor::Bot(id) => format!("bot:{id}"),
-        }
-    }
-}
+use super::{parse_ts, ts, Actor, Db};
 
 impl Db {
     fn revision_from_row(r: &Row<'_>) -> rusqlite::Result<BotRevision> {

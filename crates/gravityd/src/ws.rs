@@ -18,10 +18,16 @@ use tokio::task::JoinHandle;
 use crate::app::{AppState, DAEMON_VERSION, PROTOCOL_VERSION};
 
 mod admin;
+mod decisions;
+mod decisions_publish;
+mod dispatch;
 mod entities;
 mod messaging;
 mod routines;
 mod terminal;
+mod views;
+
+pub(crate) use views::{bot_view, project_view};
 
 const MAX_FRAME_BYTES: usize = 1024 * 1024;
 
@@ -66,6 +72,9 @@ struct Conn {
     /// bot_id -> forwarding task for live terminal frames.
     attachments: HashMap<String, JoinHandle<()>>,
     caps: Vec<Capability>,
+    /// None for the owner token; the issuing device otherwise. A ruling made
+    /// from a device stays attributable after that device is revoked.
+    device_id: Option<String>,
 }
 
 async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
@@ -83,11 +92,11 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
     });
 
     // Handshake: first frame must be a valid hello.
-    let caps = match stream.next().await {
+    let session = match stream.next().await {
         Some(Ok(WsMessage::Text(text))) => handshake(&app, &out_tx, &text),
         _ => None,
     };
-    let Some(caps) = caps else {
+    let Some((caps, device_id)) = session else {
         drop(out_tx);
         let _ = writer.await;
         return;
@@ -140,6 +149,7 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
         out: out_tx.clone(),
         attachments: HashMap::new(),
         caps,
+        device_id,
     };
 
     while let Some(Ok(frame)) = stream.next().await {
@@ -168,13 +178,13 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
     let _ = writer.await;
 }
 
-/// Returns the authenticated connection's capability grants, or None when the
-/// handshake fails (an error frame is sent first).
+/// Returns the authenticated connection's capability grants and issuing
+/// device, or None when the handshake fails (an error frame is sent first).
 fn handshake(
     app: &Arc<AppState>,
     out: &mpsc::UnboundedSender<Value>,
     text: &str,
-) -> Option<Vec<Capability>> {
+) -> Option<(Vec<Capability>, Option<String>)> {
     let Ok(req) = serde_json::from_str::<Value>(text) else {
         return None;
     };
@@ -228,144 +238,9 @@ fn handshake(
         "type": "hello_ok", "req_id": req_id,
         "protocol_version": PROTOCOL_VERSION,
         "server_version": DAEMON_VERSION,
-        "capabilities": ["terminal_attach", "search", "routines", "devices",
-                         "bot_self_management", "config"],
+        "capabilities": crate::app::CAPABILITIES,
         "grants": cap_strs,
         "device_id": device_id
     }));
-    Some(caps)
-}
-
-/// Capability required for each request type. Everything not listed as
-/// read-only requires `control`.
-fn required_cap(kind: &str) -> Capability {
-    match kind {
-        "list_projects" | "list_bots" | "list_messages" | "list_conversations"
-        | "list_routines" | "list_routine_runs" | "list_deliveries" | "list_devices" | "search"
-        | "diagnostics" | "get_config" | "attach" | "detach" | "list_bot_revisions"
-        | "list_bot_activity" => Capability::Read,
-        _ => Capability::Control,
-    }
-}
-
-impl Conn {
-    pub(super) fn send(&self, v: Value) {
-        let _ = self.out.send(v);
-    }
-
-    pub(super) fn reply_err(&self, req_id: &Value, code: &str, message: &str) {
-        self.send(json!({
-            "type": "error", "req_id": req_id, "code": code, "message": message
-        }));
-    }
-
-    fn dispatch(&mut self, req: &Value) {
-        let req_id = req.get("req_id").cloned().unwrap_or(Value::Null);
-        let kind = req.get("type").and_then(|t| t.as_str()).unwrap_or("");
-        if !self.caps.contains(&required_cap(kind)) {
-            self.reply_err(
-                &req_id,
-                "forbidden",
-                &format!(
-                    "'{kind}' requires the {} capability",
-                    required_cap(kind).as_str()
-                ),
-            );
-            return;
-        }
-        let result = match kind {
-            "list_projects" => self.list_projects(&req_id),
-            "create_project" => self.create_project(&req_id, req),
-            "update_project" => self.update_project(&req_id, req),
-            "delete_project" => self.delete_project(&req_id, req),
-            "list_bots" => self.list_bots(&req_id, req),
-            "list_bot_activity" => self.list_bot_activity(&req_id, req),
-            "create_bot" => self.create_bot(&req_id, req),
-            "update_bot" => self.update_bot(&req_id, req),
-            "delete_bot" => self.delete_bot(&req_id, req),
-            "list_bot_revisions" => self.list_bot_revisions(&req_id, req),
-            "revert_bot_revision" => self.revert_bot_revision(&req_id, req),
-            "attach" => self.attach(&req_id, req),
-            "detach" => self.detach(&req_id, req),
-            "input" => self.input(req),
-            "resize" => self.resize(req),
-            "send_user_message" => self.send_user_message(&req_id, req),
-            "list_messages" => self.list_messages(&req_id, req),
-            "list_conversations" => self.list_conversations(&req_id, req),
-            "list_routines" => self.list_routines(&req_id, req),
-            "create_routine" => self.create_routine(&req_id, req),
-            "set_routine_enabled" => self.set_routine_enabled(&req_id, req),
-            "run_routine_now" => self.run_routine_now(&req_id, req),
-            "cancel_routine_run" => self.cancel_routine_run(&req_id, req),
-            "emit_signal" => self.emit_signal(&req_id, req),
-            "list_routine_runs" => self.list_routine_runs(&req_id, req),
-            "list_deliveries" => self.list_deliveries(&req_id, req),
-            "retry_delivery" => self.retry_delivery(&req_id, req),
-            "search" => self.search(&req_id, req),
-            "diagnostics" => self.diagnostics(&req_id),
-            "get_config" => self.get_config(&req_id),
-            "set_config" => self.set_config(&req_id, req),
-            "list_devices" => self.list_devices(&req_id),
-            "create_device" => self.create_device(&req_id, req),
-            "revoke_device" => self.revoke_device(&req_id, req),
-            other => {
-                self.reply_err(
-                    &req_id,
-                    "invalid_request",
-                    &format!("unknown type: {other}"),
-                );
-                Ok(())
-            }
-        };
-        if let Err(e) = result {
-            self.reply_err(&req_id, "internal", &e.to_string());
-        }
-    }
-
-    pub(super) fn str_field<'a>(req: &'a Value, field: &str) -> anyhow::Result<&'a str> {
-        req.get(field)
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("'{field}' is required"))
-    }
-
-    pub(super) fn bot_json(&self, bot: &bus::Bot) -> Value {
-        bot_view(&self.app, bot)
-    }
-}
-
-/// A project as clients see it, with an archived row's original name restored.
-pub(crate) fn project_view(project: &bus::Project) -> Value {
-    json!({
-        "id": project.id,
-        "name": crate::db::Db::display_project_name(project),
-        "dir_name": project.dir_name,
-        "deleted_at": project.deleted_at.map(|t| t.to_rfc3339()),
-        "created_at": project.created_at.to_rfc3339()
-    })
-}
-
-/// A bot as clients see it: the stored row plus the runtime fields the
-/// supervisor and the delivery tables own. Every path that hands a bot to a
-/// client goes through here, replies and pushes alike, so the two cannot drift.
-pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
-    let (state, reason) = app.supervisor.state(&bot.id);
-    let unread = app.db.unread_count(&bot.id).unwrap_or(0);
-    json!({
-            "id": bot.id,
-            "project_id": bot.project_id,
-            // Archived rows carry a tombstoned name so the original is free to
-            // reuse; clients should always see the name the bot actually had.
-            "name": crate::db::Db::display_name(bot),
-            "description": bot.description,
-            "avatar": bot.avatar,
-            "instructions": bot.instructions,
-            "state": state.as_str(),
-            "state_reason": reason,
-            "unread_count": unread,
-            "workspace_path": bot.workspace_path,
-            "dir_name": bot.dir_name,
-            "created_by_bot_id": bot.created_by_bot_id,
-            "deleted_at": bot.deleted_at.map(|t| t.to_rfc3339()),
-        "created_at": bot.created_at.to_rfc3339()
-    })
+    Some((caps, device_id))
 }

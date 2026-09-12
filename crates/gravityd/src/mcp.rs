@@ -13,17 +13,25 @@ use serde_json::{json, Value};
 
 use crate::app::AppState;
 
+mod decisions;
 mod routines;
 mod schema;
+mod schema_decisions;
 mod selfmgmt;
+mod tags;
 mod tasks;
 mod tools;
 
+use decisions::{
+    comment_decision, get_decision, list_decisions, raise_decision, record_decision,
+    withdraw_decision,
+};
 use routines::{
     create_routine, delete_routine, emit_signal, list_routines, set_routine_enabled, update_routine,
 };
 use schema::tool_list;
 use selfmgmt::{create_bot, delete_bot, get_self, rename_self, update_bot, update_self};
+use tags::{list_tags, retire_tag, upsert_tag};
 use tasks::{cancel_task, complete_task};
 use tools::{check_inbox, list_bots, send_message};
 
@@ -160,6 +168,15 @@ fn tool_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Result<Value,
         "create_bot" => create_bot(app, bot_id, &args),
         "update_bot" => update_bot(app, bot_id, &args),
         "delete_bot" => delete_bot(app, bot_id, &args),
+        "raise_decision" => raise_decision(app, bot_id, &args),
+        "list_decisions" => list_decisions(app, bot_id, &args),
+        "get_decision" => get_decision(app, bot_id, &args),
+        "comment_decision" => comment_decision(app, bot_id, &args),
+        "withdraw_decision" => withdraw_decision(app, bot_id, &args),
+        "record_decision" => record_decision(app, bot_id, &args),
+        "list_tags" => list_tags(app, bot_id),
+        "upsert_tag" => upsert_tag(app, bot_id, &args),
+        "retire_tag" => retire_tag(app, bot_id, &args),
         other => Err(anyhow::anyhow!("unknown tool: {other}")),
     };
     Ok(match out {

@@ -6,6 +6,7 @@ import type { FirstRunSetup } from "./app/useFirstRunSetup";
 import { useDaemonState } from "./app/useDaemonState";
 import type { DaemonState } from "./app/useDaemonState";
 import { useDesktopShell } from "./app/useDesktopShell";
+import { usePendingDecisions } from "./app/usePendingDecisions";
 import { useOverlays } from "./app/useOverlays";
 import type { OverlaysApi } from "./app/useOverlays";
 import { usePaletteActions } from "./app/usePaletteActions";
@@ -120,11 +121,17 @@ export default function App(): ReactElement {
     [select],
   );
 
-  const paletteActions = usePaletteActions({ bots, select, openSettings: overlays.openSettings });
+  const pending = usePendingDecisions(client, daemon.connected);
+
+  const paletteActions = usePaletteActions({
+    bots,
+    select,
+    openSettings: overlays.openSettings,
+  });
 
   const failedByBot = useMemo(() => countByBot(daemon.failedDeliveries), [daemon.failedDeliveries]);
 
-  useDesktopShell(daemon.unreadBots, addToast);
+  useDesktopShell(daemon.unreadBots, pending.total, addToast);
 
   const setup = useFirstRunSetup(client, daemon.changeEndpoint);
 
@@ -140,6 +147,7 @@ export default function App(): ReactElement {
           failedByBot={failedByBot}
           nextRun={daemon.nextRun}
           activityByBot={daemon.activityByBot}
+          pendingDecisions={pending}
           selection={daemon.selection}
           canControl={canControl}
           onSelect={select}
@@ -157,6 +165,7 @@ export default function App(): ReactElement {
             addToast={addToast}
             onCreateProject={actions.createProjectWithBot}
             onRenameProject={actions.renameProject}
+            onSetProjectLead={actions.setProjectLead}
             onDeleteProject={actions.deleteProject}
           />
         </main>

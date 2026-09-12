@@ -13,6 +13,8 @@ export interface Prefs {
   readonly dockBadge: boolean;
   /** Global accelerator that shows or hides the window; empty means none. */
   readonly toggleWindowShortcut: string;
+  /** Raise a native notification for an urgent or nearly-due decision. */
+  readonly decisionNotifications: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -20,6 +22,7 @@ export const DEFAULT_PREFS: Prefs = {
   terminalFontFamily: '"SF Mono", "Menlo", "Monaco", monospace',
   dockBadge: true,
   toggleWindowShortcut: "",
+  decisionNotifications: true,
 };
 
 export const MIN_TERMINAL_FONT_SIZE = 9;
@@ -59,6 +62,10 @@ function prefsFrom(value: unknown): Prefs {
       typeof value["toggleWindowShortcut"] === "string"
         ? value["toggleWindowShortcut"]
         : DEFAULT_PREFS.toggleWindowShortcut,
+    decisionNotifications:
+      typeof value["decisionNotifications"] === "boolean"
+        ? value["decisionNotifications"]
+        : DEFAULT_PREFS.decisionNotifications,
   };
 }
 
@@ -94,7 +101,8 @@ export function updatePrefs(patch: Partial<Prefs>): void {
     next.terminalFontSize === current.terminalFontSize &&
     next.terminalFontFamily === current.terminalFontFamily &&
     next.dockBadge === current.dockBadge &&
-    next.toggleWindowShortcut === current.toggleWindowShortcut
+    next.toggleWindowShortcut === current.toggleWindowShortcut &&
+    next.decisionNotifications === current.decisionNotifications
   ) {
     return;
   }
@@ -129,4 +137,13 @@ function getDockBadge(): boolean {
 /** The dock-badge preference without rerendering for unrelated font changes. */
 export function useDockBadgePref(): boolean {
   return useSyncExternalStore(subscribePrefs, getDockBadge);
+}
+
+function getDecisionNotifications(): boolean {
+  return current.decisionNotifications;
+}
+
+/** Whether an urgent or nearly-due decision raises a native notification. */
+export function useDecisionNotificationsPref(): boolean {
+  return useSyncExternalStore(subscribePrefs, getDecisionNotifications);
 }

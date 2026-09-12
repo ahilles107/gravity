@@ -175,6 +175,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(shortcut::ToggleShortcut::default())
         .invoke_handler(tauri::generate_handler![
             read_client_token,

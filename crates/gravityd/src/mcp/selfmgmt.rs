@@ -18,6 +18,15 @@ use crate::db::Actor;
 
 use super::caller;
 
+/// The calling bot as an actor. Both halves come from the authenticated
+/// session, so nothing here is an argument a bot could get wrong.
+fn bot_actor<'a>(me: &'a Bot, bot_id: &'a str) -> Actor<'a> {
+    Actor::Bot {
+        id: bot_id,
+        project_id: &me.project_id,
+    }
+}
+
 /// Size limits on free-text identity fields. Generous for real use and small
 /// enough that a runaway bot cannot write a novel into its own prompt.
 const MAX_DESCRIPTION_BYTES: usize = 2 * 1024;
@@ -88,7 +97,7 @@ pub(super) fn update_self(
 ) -> anyhow::Result<Value> {
     let me = caller(app, bot_id)?;
     let edit = edit_from_args(args, false)?;
-    let updated = botmgmt::apply_identity_edit(app, &me, &edit, &Actor::Bot(bot_id))?;
+    let updated = botmgmt::apply_identity_edit(app, &me, &edit, &bot_actor(&me, bot_id))?;
     Ok(json!({
         "name": updated.name,
         "avatar": updated.avatar,
@@ -113,7 +122,7 @@ pub(super) fn rename_self(
         name: Some(name),
         ..Default::default()
     };
-    let updated = botmgmt::apply_identity_edit(app, &me, &edit, &Actor::Bot(bot_id))?;
+    let updated = botmgmt::apply_identity_edit(app, &me, &edit, &bot_actor(&me, bot_id))?;
     Ok(json!({
         "name": updated.name,
         "note": "Other bots in the project have been told your new name."
@@ -128,7 +137,13 @@ pub(super) fn create_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
     if edit.name.is_none() {
         anyhow::bail!("'name' is required");
     }
-    let created = botmgmt::create_bot(app, &me.project_id, &edit, Some(&me), &Actor::Bot(bot_id))?;
+    let created = botmgmt::create_bot(
+        app,
+        &me.project_id,
+        &edit,
+        Some(&me),
+        &bot_actor(&me, bot_id),
+    )?;
     // Bots are always-on, so there is no "created but not started" case.
     let mut note = "Created and started. You can send it a message now.".to_string();
     // Say when a charter was filled in, so the creator knows the new bot is
@@ -178,7 +193,7 @@ pub(super) fn update_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
     // `name` addresses the target here rather than renaming it; renaming a
     // child would silently change an address its own children may be using.
     let edit = edit_from_args(args, false)?;
-    let updated = botmgmt::apply_identity_edit(app, &target, &edit, &Actor::Bot(bot_id))?;
+    let updated = botmgmt::apply_identity_edit(app, &target, &edit, &bot_actor(&me, bot_id))?;
     Ok(json!({
         "name": updated.name,
         "avatar": updated.avatar,
@@ -195,7 +210,7 @@ pub(super) fn delete_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
     let me = caller(app, bot_id)?;
     let target = my_child(app, &me, args)?;
     let reason = args.get("reason").and_then(|v| v.as_str());
-    botmgmt::archive_bot(app, &target, &Actor::Bot(bot_id), reason)?;
+    botmgmt::archive_bot(app, &target, &bot_actor(&me, bot_id), reason)?;
     Ok(json!({
         "deleted": target.name,
         "bots_in_project": app.db.count_live_bots(&me.project_id)?,

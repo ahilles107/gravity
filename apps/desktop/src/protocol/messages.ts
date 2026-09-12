@@ -1,5 +1,6 @@
 // Server → client frames (protocol v2): replies carry `req_id`, pushes do not.
 
+import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
 import type {
   Bot,
   BotActivity,
@@ -119,7 +120,26 @@ export type ServerReply =
       readonly seq: number;
       /** Whether the requested cursor was still contiguous with the server ring. */
       readonly resumed: boolean;
-    });
+    })
+  | (ReplyBase & { readonly type: "decision"; readonly decision: Decision })
+  | (ReplyBase & {
+      readonly type: "decisions";
+      readonly decisions: readonly Decision[];
+    })
+  | (ReplyBase & {
+      readonly type: "decision_comment";
+      readonly comment: DecisionComment;
+    })
+  | (ReplyBase & {
+      readonly type: "pending_decisions";
+      readonly counts: PendingCounts;
+    })
+  | (ReplyBase & {
+      readonly type: "publish_result";
+      readonly results: readonly PublishResult[];
+    })
+  | (ReplyBase & { readonly type: "tag"; readonly tag: Tag })
+  | (ReplyBase & { readonly type: "tags"; readonly tags: readonly Tag[] });
 
 export type ServerReplyType = ServerReply["type"];
 
@@ -153,7 +173,12 @@ export type ServerPush =
       readonly level: NotifyLevel;
       readonly title: string;
       readonly body: string;
-    };
+      /** Set when the notice is about a decision, so it can open the record. */
+      readonly decision_id?: string;
+    }
+  | { readonly type: "decision_update"; readonly decision: Decision }
+  | { readonly type: "decision_deleted"; readonly decision_id: string }
+  | { readonly type: "decision_comment_new"; readonly comment: DecisionComment };
 
 export type ServerPushType = ServerPush["type"];
 

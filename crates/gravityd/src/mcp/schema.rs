@@ -2,19 +2,28 @@
 
 use serde_json::{json, Value};
 
+/// One tool manifest entry. Shared with the decision tools, which live in
+/// their own module so neither list has to be scrolled past to read the other.
+pub(super) fn tool(name: &str, desc: &str, props: Value, required: Vec<&str>) -> Value {
+    json!({
+        "name": name,
+        "description": desc,
+        "inputSchema": {
+            "type": "object",
+            "properties": props,
+            "required": required
+        }
+    })
+}
+
 pub(super) fn tool_list() -> Value {
-    let tool = |name: &str, desc: &str, props: Value, required: Vec<&str>| {
-        json!({
-            "name": name,
-            "description": desc,
-            "inputSchema": {
-                "type": "object",
-                "properties": props,
-                "required": required
-            }
-        })
-    };
-    json!({ "tools": [
+    let mut tools = core_tools();
+    tools.extend(super::schema_decisions::decision_tools());
+    json!({ "tools": tools })
+}
+
+fn core_tools() -> Vec<Value> {
+    vec![
         tool("send_message",
              "Send a message to another bot in your project. kind: task|reply|note. \
               The recipient acts on it directly — a 'task' is a work order, not a suggestion — \
@@ -59,7 +68,8 @@ pub(super) fn tool_list() -> Value {
         tool("check_inbox",
              "Fetch and acknowledge your unread messages. A message that delegated a task \
               to you carries its task_id. delegated_tasks lists the tasks you are still \
-              waiting on, with the ids complete_task and cancel_task take.",
+              waiting on, with the ids complete_task and cancel_task take. \
+              open_decisions lists what you have asked the owner and not yet heard back on.",
              json!({}), vec![]),
         tool("create_routine",
              "Schedule a routine for yourself. It is enabled and starts running immediately.",
@@ -145,8 +155,8 @@ pub(super) fn tool_list() -> Value {
                  "name": {"type": "string"},
                  "reason": {"type": "string"}
              }),
-             vec!["name"])
-    ]})
+             vec!["name"]),
+    ]
 }
 
 /// The accepted avatar forms, spelled out for the model.

@@ -192,6 +192,7 @@ async fn bus_survives_daemon_restart_with_pending_delivery() {
                 bus::MessageKind::Task,
                 "durable?",
                 None,
+                None,
             )
             .expect("msg");
         let delivery = app

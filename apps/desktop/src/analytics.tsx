@@ -12,6 +12,16 @@ interface AnalyticsEvents {
     readonly runtime: "browser" | "tauri";
   };
   readonly bot_created: Record<string, never>;
+  readonly control_center_opened: Record<string, never>;
+  readonly decision_answered: {
+    readonly picked_option: boolean;
+  };
+  readonly decision_deleted: Record<string, never>;
+  readonly decision_held: Record<string, never>;
+  readonly decision_published: {
+    readonly count: number;
+    readonly notified: number;
+  };
   readonly bot_deleted: Record<string, never>;
   readonly daemon_connected: {
     readonly can_control: boolean;
@@ -22,6 +32,9 @@ interface AnalyticsEvents {
   };
   readonly device_revoked: Record<string, never>;
   readonly project_created: Record<string, never>;
+  readonly project_lead_set: {
+    readonly cleared: boolean;
+  };
   readonly project_deleted: Record<string, never>;
   readonly project_renamed: Record<string, never>;
   readonly routine_created: {
@@ -48,6 +61,13 @@ export type ErrorOperation =
   | "bot_create"
   | "bot_delete"
   | "daemon_restart"
+  | "decision_answer"
+  | "decision_comment"
+  | "decision_delete"
+  | "decision_hold"
+  | "decision_list"
+  | "decision_publish"
+  | "decision_update"
   | "daemon_state_load"
   | "daemon_update"
   | "device_create"
@@ -55,12 +75,15 @@ export type ErrorOperation =
   | "device_revoke"
   | "project_create"
   | "project_delete"
+  | "project_lead_set"
   | "project_rename"
   | "routine_create"
   | "routine_list"
   | "routine_run"
   | "routine_toggle"
   | "setup_install"
+  | "tag_list"
+  | "tag_update"
   | "terminal_file_drop"
   | "window_shortcut";
 

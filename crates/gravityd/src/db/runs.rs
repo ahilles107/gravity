@@ -200,6 +200,7 @@ impl Db {
             kind: MessageKind::Task,
             body: body.to_string(),
             ref_message_id: None,
+            decision_id: None,
             created_at,
         };
         tx.execute(

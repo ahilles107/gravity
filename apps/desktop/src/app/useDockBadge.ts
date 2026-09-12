@@ -10,9 +10,19 @@ export function totalUnread(unreadBots: Readonly<Record<string, number>>): numbe
   return total;
 }
 
-/** Mirrors the unread total onto the dock icon whenever it moves. */
-export function useDockBadge(unreadBots: Readonly<Record<string, number>>, enabled: boolean): void {
-  const total = enabled ? totalUnread(unreadBots) : 0;
+/**
+ * Mirrors what wants the owner onto the dock icon whenever it moves.
+ *
+ * Pending decisions count alongside unread messages: a bot waiting on a ruling
+ * is asking for attention just as much as one that has said something, and the
+ * whole point of the registry is that such a question is never invisible.
+ */
+export function useDockBadge(
+  unreadBots: Readonly<Record<string, number>>,
+  pendingDecisions: number,
+  enabled: boolean,
+): void {
+  const total = enabled ? totalUnread(unreadBots) + pendingDecisions : 0;
   useEffect(() => {
     void setDockBadge(total);
   }, [total]);

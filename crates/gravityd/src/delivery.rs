@@ -55,7 +55,12 @@ impl DeliveryWorker {
                 .mark_delivery_retry(delivery_id, "message missing", chrono::Utc::now(), 0)?;
             return Ok(());
         };
-        let text = if msg.sender.kind == bus::SenderKind::Routine {
+        // A decision notice was already rendered by the registry, which owns
+        // its header and its phase. Wrapping it in `[msg #N …]` would bury the
+        // one thing that makes it authority: that it comes from the owner.
+        let text = if msg.decision_id.is_some() {
+            msg.body.clone()
+        } else if msg.sender.kind == bus::SenderKind::Routine {
             let run_id = self.db.run_id_for_delivery(delivery_id)?;
             render_routine(&msg.sender.name, msg.num, run_id.as_deref(), &msg.body)
         } else {
@@ -101,11 +106,11 @@ impl DeliveryWorker {
                     self.cfg.max_attempts,
                 )?;
                 if state == DeliveryState::Failed {
-                    self.events.push(Push::Notify {
-                        level: "error".to_string(),
-                        title: "Delivery failed".to_string(),
-                        body: format!("Message #{} to bot could not be delivered: {e}", msg.num),
-                    });
+                    self.events.push(Push::notice(
+                        "error",
+                        "Delivery failed",
+                        format!("Message #{} to bot could not be delivered: {e}", msg.num),
+                    ));
                 }
                 tracing::warn!(delivery_id, error = %e, state = state.as_str(), "delivery attempt failed");
             }

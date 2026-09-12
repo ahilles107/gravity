@@ -2,9 +2,11 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { usePinnedBots } from "../app/usePinnedBots";
 import type { ConnectionStatus, Endpoint } from "../protocol/connection";
+import type { PendingCounts } from "../protocol/decisions";
 import type { Bot, Project } from "../protocol/entities";
 import { PlusIcon, SearchIcon } from "./sidebar/icons";
 import NewProjectForm from "./sidebar/NewProjectForm";
+import ControlCenterRow from "./sidebar/ControlCenterRow";
 import ProjectSection from "./sidebar/ProjectSection";
 import SidebarFooter from "./sidebar/SidebarFooter";
 import type { SidebarTreeProps } from "./sidebar/tree";
@@ -16,6 +18,7 @@ type SidebarProps = Omit<SidebarTreeProps, "pinnedBotIds" | "onTogglePin" | "onC
   readonly projects: readonly Project[];
   readonly bots: readonly Bot[];
   readonly onOpenSearch: () => void;
+  readonly pendingDecisions: PendingCounts;
   readonly onCreateProject: (name: string) => Promise<unknown>;
   /** The tree gets the sidebar's wrapper around this, which tracks the request. */
   readonly onCreateBot: (projectId: string) => Promise<void>;
@@ -74,6 +77,12 @@ export default function Sidebar(props: SidebarProps): ReactElement {
           Search
         </button>
       </div>
+
+      <ControlCenterRow
+        counts={props.pendingDecisions}
+        selected={selection.kind === "control"}
+        onSelect={() => onSelect({ kind: "control" })}
+      />
 
       {creatingProject ? (
         <NewProjectForm onCreate={props.onCreateProject} onClose={closeForm} />

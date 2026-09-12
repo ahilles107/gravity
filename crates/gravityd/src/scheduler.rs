@@ -143,14 +143,12 @@ impl Scheduler {
     /// Best-effort expiry note; a failed send must not fail the sweep, or one
     /// archived conversation would wedge every later expiry.
     fn notify_task_end(&self, bot_id: &str, body: &str, ref_message_id: &str) {
+        let sender = crate::messaging::daemon_sender();
         if let Err(e) = crate::messaging::send_dm(
             &self.db,
             &self.events,
-            bot_id,
-            &crate::messaging::daemon_sender(),
-            bus::MessageKind::Note,
-            body,
-            Some(ref_message_id),
+            crate::messaging::Dm::new(bot_id, &sender, bus::MessageKind::Note, body)
+                .re(ref_message_id),
         ) {
             tracing::warn!(error = %e, bot_id, "task expiry note failed");
         }

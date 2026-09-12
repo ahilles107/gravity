@@ -1,0 +1,304 @@
+/* ---------- control center: shell, header, tray, waiting list ---------- */
+
+/* Sidebar row */
+
+.sidebar-control {
+  padding: 0 10px 6px;
+}
+
+.control-row {
+  height: 30px;
+  padding: 0 9px;
+  gap: 9px;
+  color: var(--text);
+}
+
+.control-row-ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  flex: none;
+}
+
+.control-row-name {
+  font-weight: 500;
+}
+
+.control-row-count {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.control-row-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.control-row-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--bg-active);
+  color: var(--text-dim);
+}
+
+.control-row-pill-urgent {
+  background: rgba(248, 113, 113, 0.16);
+  color: var(--red);
+}
+
+/* Shell */
+
+.control-center {
+  --cc-title: #e8e9ef;
+  --cc-body: #c3c6d1;
+  --cc-faint-border: #3a3f4d;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Zero specificity, so every class below can restyle a button. */
+:where(.control-center) button {
+  font: inherit;
+  color: inherit;
+}
+
+.control-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.cc-mono {
+  font-family: var(--mono);
+}
+
+.cc-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.cc-link:hover {
+  color: var(--text);
+}
+
+.cc-link-accent {
+  color: var(--accent);
+}
+
+.cc-link-accent:hover {
+  color: #a3bcf9;
+}
+
+.cc-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 14px;
+  flex: none;
+  white-space: nowrap;
+}
+
+.cc-badge-urgent {
+  color: var(--red);
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.cc-badge-draft {
+  color: var(--accent);
+  background: rgba(122, 162, 247, 0.12);
+  border: 1px solid rgba(122, 162, 247, 0.3);
+}
+
+.cc-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--bg-active);
+  color: var(--text-dim);
+}
+
+.cc-tag {
+  font: 11px var(--mono);
+  color: var(--text-dim);
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.cc-key {
+  font: 11px var(--mono);
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 17px;
+}
+
+.cc-tone-amber {
+  color: var(--amber);
+  font-weight: 500;
+}
+
+.cc-tone-red {
+  color: var(--red);
+}
+
+.cc-tone-dim {
+  color: var(--text-dim);
+}
+
+/* Notify chips */
+
+.cc-chip {
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cc-chip-on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(122, 162, 247, 0.12);
+}
+
+.cc-chip-locked {
+  cursor: default;
+  opacity: 0.9;
+}
+
+/* Header */
+
+.cc-header {
+  height: 46px;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cc-tabs {
+  display: flex;
+}
+
+.cc-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px;
+  margin-right: 18px;
+  margin-bottom: -1px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.cc-tab:hover {
+  color: var(--text);
+}
+
+.cc-tab-active {
+  color: var(--cc-title);
+  border-bottom-color: var(--accent);
+}
+
+.cc-tab-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 9px;
+  line-height: 17px;
+  color: var(--text-faint);
+}
+
+.cc-tab-active .cc-tab-count {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.cc-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-btn-green {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--green);
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.cc-btn-green:hover:not(:disabled),
+.cc-btn-green-active {
+  background: #6ee79a;
+}
+
+.cc-btn-green:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The button is a flex box, so the literal space between the spans collapses. */
+.cc-btn-green-count {
+  margin-left: 4px;
+}
+
+.cc-btn-green .cc-hint {
+  opacity: 0.65;
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.cc-btn-outline {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cc-btn-outline:hover {
+  color: var(--text);
+}

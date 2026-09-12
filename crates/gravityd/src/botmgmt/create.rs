@@ -10,7 +10,7 @@ use crate::app::AppState;
 use crate::config::RuntimeKind;
 use crate::db::Actor;
 use crate::events::Push;
-use crate::messaging::{self, daemon_sender};
+use crate::messaging::{self, daemon_sender, Dm};
 use crate::paths;
 
 use super::{charter, parse_avatar, provision_spec, validate_name, IdentityEdit};
@@ -120,11 +120,11 @@ pub fn create_bot(
     // Nothing gates creation, so this notice is how the user finds out. It is
     // a toast, not a prompt: ignorable, and the audit trail keeps the record.
     if let Some(c) = creator {
-        app.events.push(Push::Notify {
-            level: "info".to_string(),
-            title: "Bot created".to_string(),
-            body: format!("{} created a new bot, {name}.", c.name),
-        });
+        app.events.push(Push::notice(
+            "info",
+            "Bot created",
+            format!("{} created a new bot, {name}.", c.name),
+        ));
     }
 
     // Bots are always-on, so a new one runs immediately: a bot that builds a
@@ -141,18 +141,15 @@ pub fn create_bot(
     let charted = [edit.description, edit.instructions]
         .iter()
         .any(|field| field.is_some_and(|text| !text.trim().is_empty()));
+    let greeting = charter::introduction(&charter::Introduction {
+        creator: creator.map(|c| c.name.as_str()),
+        charted,
+        first: first_in_project,
+    });
     if let Err(e) = messaging::send_dm(
         &app.db,
         &app.events,
-        &bot.id,
-        &daemon_sender(),
-        MessageKind::Note,
-        &charter::introduction(&charter::Introduction {
-            creator: creator.map(|c| c.name.as_str()),
-            charted,
-            first: first_in_project,
-        }),
-        None,
+        Dm::new(&bot.id, &daemon_sender(), MessageKind::Note, &greeting),
     ) {
         tracing::warn!(bot_id = %bot.id, error = %e, "introduction prompt not queued");
     }

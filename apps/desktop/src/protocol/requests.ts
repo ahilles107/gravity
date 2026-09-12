@@ -1,8 +1,10 @@
 // Client → server frames (protocol v2).
 
+import type { DecisionRequestBody } from "./decisionRequests";
 import type { DeliveryState, DeviceCapability, OverlapPolicy, RoutineTrigger } from "./entities";
 
 export type ClientRequestBody =
+  | DecisionRequestBody
   | {
       readonly type: "hello";
       readonly protocol_version: number;

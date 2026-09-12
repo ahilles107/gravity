@@ -1,6 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as dfx from "../test/decisionFixtures";
 import * as fx from "../test/fixtures";
 import { renderSidebar } from "../test/sidebar";
 import { stubLocalStorage } from "../test/spies";
@@ -260,5 +261,27 @@ describe("Sidebar", () => {
     expect(screen.getByText(/connecting…/)).toBeInTheDocument();
     renderSidebar({ status: "auth_failed" });
     expect(screen.getByText(/auth failed/)).toBeInTheDocument();
+  });
+
+  it("badges the control center quietly when nothing is urgent", () => {
+    renderSidebar({ pendingDecisions: dfx.pendingCounts({ total: 3 }) });
+    const pill = screen.getByText("3", { selector: ".control-row-pill" });
+    expect(pill).not.toHaveClass("control-row-pill-urgent");
+    expect(document.querySelector(".control-row-dot")).toBeNull();
+  });
+
+  it("turns the control center red only for urgency", () => {
+    renderSidebar({ pendingDecisions: dfx.pendingCounts({ total: 3, urgent: 1, due_soon: 2 }) });
+    expect(screen.getByText("3", { selector: ".control-row-pill" })).toHaveClass(
+      "control-row-pill-urgent",
+    );
+    expect(document.querySelector(".control-row-dot")).not.toBeNull();
+    expect(screen.getByTitle("1 urgent, 2 due within a day")).toBeInTheDocument();
+  });
+
+  it("shows no control center count when nothing waits", () => {
+    renderSidebar();
+    expect(document.querySelector(".control-row-count")).toBeNull();
+    expect(screen.getByTitle("Decisions waiting on you")).toBeInTheDocument();
   });
 });

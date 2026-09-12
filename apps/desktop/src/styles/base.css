@@ -7,6 +7,10 @@
   --border: #262a35;
   --text: #d8dae2;
   --text-dim: #8b90a0;
+  /* One step brighter than --text: the owner's published words and headlines. */
+  --text-strong: #f2f3f7;
+  /* Below --text-dim: key hints, ages and separators. */
+  --text-faint: #5c6170;
   --accent: #7aa2f7;
   --green: #4ade80;
   --blue: #60a5fa;

@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use crate::app::AppState;
 use crate::events::Push;
 use crate::messaging;
+use crate::messaging::Dm;
 
 use super::{bot_sender, caller};
 
@@ -70,6 +71,7 @@ pub(super) fn complete_task(
         MessageKind::Done,
         &result,
         Some(&origin.id),
+        None,
     )?;
     app.events.push(Push::MessageNew {
         message: msg.clone(),
@@ -137,14 +139,11 @@ pub(super) fn cancel_task(
 
     let mut notified = false;
     if let Some(assignee) = app.db.get_live_bot(&task.to_bot_id)? {
+        let sender = bot_sender(&me);
         messaging::send_dm(
             &app.db,
             &app.events,
-            &assignee.id,
-            &bot_sender(&me),
-            MessageKind::Note,
-            &body,
-            Some(&task.origin_message_id),
+            Dm::new(&assignee.id, &sender, MessageKind::Note, &body).re(&task.origin_message_id),
         )?;
         notified = true;
     }

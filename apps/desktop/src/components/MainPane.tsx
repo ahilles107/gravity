@@ -6,6 +6,7 @@ import quietArt from "../assets/empty/quiet.png";
 import type { DaemonApi } from "../protocol/api";
 import { connectionStatusLabel } from "../protocol/connection";
 import BotView from "./BotView";
+import ControlCenterView from "./control/ControlCenterView";
 import ProjectView from "./ProjectView";
 import NewProjectForm from "./sidebar/NewProjectForm";
 
@@ -15,6 +16,7 @@ interface MainPaneProps {
   readonly addToast: AddToast;
   readonly onCreateProject: (name: string) => Promise<void>;
   readonly onRenameProject: (projectId: string, name: string) => Promise<void>;
+  readonly onSetProjectLead: (projectId: string, botId: string | null) => Promise<void>;
   readonly onDeleteProject: (projectId: string) => Promise<void>;
 }
 
@@ -66,6 +68,20 @@ export default function MainPane(props: MainPaneProps): ReactElement {
   const { client, daemon, addToast } = props;
   const { selection, bots, connected, canControl } = daemon;
 
+  if (selection.kind === "control") {
+    return (
+      <ControlCenterView
+        client={client}
+        projects={daemon.projects}
+        bots={bots}
+        connected={connected}
+        canControl={canControl}
+        decisionId={selection.decisionId}
+        onToast={addToast}
+      />
+    );
+  }
+
   if (selection.kind === "project") {
     const project = daemon.projects.find((item) => item.id === selection.projectId);
     return project === undefined ? (
@@ -78,6 +94,7 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         connected={connected}
         canControl={canControl}
         onRename={props.onRenameProject}
+        onSetLead={props.onSetProjectLead}
         onDelete={props.onDeleteProject}
       />
     );

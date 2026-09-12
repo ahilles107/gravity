@@ -61,8 +61,9 @@ Code's terminal interface inside the Tauri window.
 ## State ownership
 
 SQLite holds projects, bot identities and instructions, conversations, messages,
-deliveries, tasks, routines, run history, signals, device grants, and identity
-revisions. An FTS5 index supports searching stored message bodies.
+deliveries, tasks, routines, run history, signals, device grants, identity
+revisions, and the decision registry. FTS5 indexes support searching stored
+message bodies and decision records.
 
 Filesystem manifests describe provisioned projects and bots. The daemon
 generates `system.md` from the bot's identity, instructions, and bus guidance.
@@ -137,6 +138,22 @@ result back to the requester. Task deadlines, cancellation, hop accounting,
 origin chains, and reply budgets bound delegation and expose unfinished work.
 Shared project artifacts hold files; bus messages can carry summaries and paths.
 
+## Decisions
+
+Some questions only the owner can settle, and a bot that asks in its terminal
+asks somewhere the daemon cannot see. The decision registry gives that traffic
+a durable home: a bot raises a record with its context, options and a
+recommendation, and goes on with other work. The owner answers from one inbox
+across every project, and publishing turns the ruling into a bus delivery whose
+sender is the user rather than a peer — which is what makes it authority a
+working bot can act on.
+
+Settled rulings replace the hand-written ledgers each lead bot used to keep.
+They are never retained away, and retention spares the messages and tasks a
+decision cites, so the reason behind a ruling stays readable. A project may
+name a lead bot, which is told about every decision raised there; it cannot
+answer for the owner. See the [protocol](protocol.md#the-decision-registry).
+
 ## Routines and signals
 
 A routine belongs to one bot and combines a prompt with a cron, interval, or
@@ -174,8 +191,9 @@ The daemon serves four routes:
 
 The WebSocket protocol uses request IDs, structured errors, and unsolicited
 push events. The current protocol version is 2. Device grants distinguish
-read access from control access; `approve` is reserved. Browser connections
-also pass Origin validation.
+read access, control access, and `approve` — the grant that rules on a
+decision, held separately because running the fleet is not the same authority
+as answering for the owner. Browser connections also pass Origin validation.
 
 Clients load snapshots after connecting and then apply entity, activity,
 delivery, and routine-run pushes. Each terminal attachment receives sequenced

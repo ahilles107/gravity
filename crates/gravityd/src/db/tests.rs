@@ -38,7 +38,14 @@ fn delivery_is_idempotent_on_key() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Chat, "hi", None)
+        .insert_message(
+            &conv.id,
+            &user_sender(),
+            MessageKind::Chat,
+            "hi",
+            None,
+            None,
+        )
         .unwrap();
     let d1 = db.enqueue_delivery(&msg.id, &bot.id, "key-1").unwrap();
     let d2 = db.enqueue_delivery(&msg.id, &bot.id, "key-1").unwrap();
@@ -50,7 +57,14 @@ fn lease_and_retry_flow() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "do it", None)
+        .insert_message(
+            &conv.id,
+            &user_sender(),
+            MessageKind::Task,
+            "do it",
+            None,
+            None,
+        )
         .unwrap();
     db.enqueue_delivery(&msg.id, &bot.id, "k").unwrap();
 
@@ -81,7 +95,7 @@ fn delivery_fails_after_max_attempts() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "x", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "x", None, None)
         .unwrap();
     db.enqueue_delivery(&msg.id, &bot.id, "k").unwrap();
     for _ in 0..3 {
@@ -113,6 +127,7 @@ fn fts_search_finds_messages() {
         MessageKind::Chat,
         "quarterly revenue report",
         None,
+        None,
     )
     .unwrap();
     db.insert_message(
@@ -120,6 +135,7 @@ fn fts_search_finds_messages() {
         &user_sender(),
         MessageKind::Chat,
         "unrelated",
+        None,
         None,
     )
     .unwrap();
@@ -132,7 +148,7 @@ fn task_hop_limit_enforced() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
         .unwrap();
     let err = db.create_task(&msg.id, None, &bot.id, None, MAX_TASK_HOPS + 1, "");
     assert!(err.is_err());
@@ -143,7 +159,7 @@ fn reply_budget_is_an_atomic_gate() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
         .unwrap();
     let task = db.create_task(&msg.id, None, &bot.id, None, 1, "").unwrap();
     for _ in 0..MAX_TASK_REPLIES {
@@ -165,7 +181,7 @@ fn fanout_counts_open_children_per_chain_position() {
     let mut tasks = Vec::new();
     for i in 0..2 {
         let msg = db
-            .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+            .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
             .unwrap();
         let t = db
             .create_task(&msg.id, Some(&bot.id), &other.id, None, i, chain)
@@ -189,7 +205,7 @@ fn closing_a_task_succeeds_exactly_once() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
         .unwrap();
     let task = db.create_task(&msg.id, None, &bot.id, None, 1, "").unwrap();
     assert!(db.try_close_task(&task.id, TaskState::Cancelled).unwrap());
@@ -204,7 +220,7 @@ fn expiring_a_task_succeeds_exactly_once() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
         .unwrap();
     let deadline = now() - chrono::Duration::hours(1);
     let task = db
@@ -224,7 +240,7 @@ fn a_task_without_a_deadline_never_expires() {
     let (db, bot) = setup();
     let conv = db.dm_conversation(&bot.id).unwrap().unwrap();
     let msg = db
-        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None)
+        .insert_message(&conv.id, &user_sender(), MessageKind::Task, "t", None, None)
         .unwrap();
     db.create_task(&msg.id, None, &bot.id, None, 1, "").unwrap();
     assert!(db.overdue_open_tasks(now()).unwrap().is_empty());

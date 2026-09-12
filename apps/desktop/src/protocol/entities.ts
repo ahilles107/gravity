@@ -8,6 +8,12 @@ export interface Project {
   readonly dir_name: string;
   /** Set when archived: the row and its bots survive, the project does not. */
   readonly deleted_at?: string | null;
+  /**
+   * The bot told about every decision raised here. Not a gate — it cannot
+   * answer for the owner — but without it a lead's picture of its own project
+   * goes stale the moment a teammate asks directly.
+   */
+  readonly lead_bot_id?: string | null;
   readonly created_at: string;
 }
 
@@ -213,8 +219,16 @@ export interface DaemonConfig {
 /** Permission grants attached to a connection (from `hello_ok`) or a device. */
 export type Grant = "read" | "control" | "approve";
 
-/** Capabilities a client may request when creating a device (`approve` is reserved). */
-export type DeviceCapability = "read" | "control";
+/**
+ * Capabilities a client may request when creating a device.
+ *
+ * `approve` is what lets a device rule on a decision; `control` alone runs the
+ * fleet without being able to answer for the owner.
+ */
+export type DeviceCapability = Grant;
+
+/** Every capability, in the order the device form offers them. */
+export const DEVICE_CAPABILITIES: readonly DeviceCapability[] = ["read", "control", "approve"];
 
 export interface Device {
   readonly id: string;
