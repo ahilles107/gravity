@@ -71,11 +71,12 @@ impl Db {
             kind: MessageKind::parse(&kind).unwrap_or(MessageKind::Note),
             body: r.get(7)?,
             ref_message_id: r.get(8)?,
-            created_at: parse_ts(&r.get::<_, String>(9)?),
+            decision_id: r.get(9)?,
+            created_at: parse_ts(&r.get::<_, String>(10)?),
         })
     }
 
-    pub(super) const MSG_COLS: &'static str = "id, num, conversation_id, sender_kind, sender_bot_id, sender_name, kind, body, ref_message_id, created_at";
+    pub(super) const MSG_COLS: &'static str = "id, num, conversation_id, sender_kind, sender_bot_id, sender_name, kind, body, ref_message_id, decision_id, created_at";
 
     pub fn insert_message(
         &self,
@@ -84,6 +85,7 @@ impl Db {
         kind: MessageKind,
         body: &str,
         ref_message_id: Option<&str>,
+        decision_id: Option<&str>,
     ) -> anyhow::Result<Message> {
         let conn = self.lock();
         let num: i64 =
@@ -98,11 +100,12 @@ impl Db {
             kind,
             body: body.to_string(),
             ref_message_id: ref_message_id.map(|s| s.to_string()),
+            decision_id: decision_id.map(|s| s.to_string()),
             created_at: now(),
         };
         conn.execute(
-            "INSERT INTO message(id, num, conversation_id, sender_kind, sender_bot_id, sender_name, kind, body, ref_message_id, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO message(id, num, conversation_id, sender_kind, sender_bot_id, sender_name, kind, body, ref_message_id, decision_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 msg.id,
                 msg.num,
@@ -117,6 +120,7 @@ impl Db {
                 kind.as_str(),
                 msg.body,
                 msg.ref_message_id,
+                msg.decision_id,
                 ts(msg.created_at)
             ],
         )?;

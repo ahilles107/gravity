@@ -10,6 +10,8 @@ import type {
   ServerReply,
   ServerReplyType,
 } from "./messages";
+import type { PushHandlerSets } from "./push";
+import { dispatchPush, emptyHandlers } from "./push";
 import type { ClientRequestBody, FireBody, RequestBody } from "./requests";
 import { isReply, parseServerMessage, replyIs } from "./wire";
 
@@ -17,10 +19,6 @@ interface PendingRequest {
   readonly resolve: (reply: ServerReply) => void;
   readonly reject: (error: Error) => void;
 }
-
-type HandlerSets = {
-  readonly [K in ServerPushType]: Set<(push: PushOf<K>) => void>;
-};
 
 const MIN_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 15_000;
@@ -59,18 +57,7 @@ export class DaemonClient implements DaemonApi {
   private readonly pending = new Map<string, PendingRequest>();
   private readonly cursors = new Map<string, number>();
   private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
-  private readonly handlers: HandlerSets = {
-    term: new Set(),
-    bot_state: new Set(),
-    message_new: new Set(),
-    bot_updated: new Set(),
-    project_updated: new Set(),
-    activity_update: new Set(),
-    delivery_update: new Set(),
-    routine_run_update: new Set(),
-    approval_pending: new Set(),
-    notify: new Set(),
-  };
+  private readonly handlers: PushHandlerSets = emptyHandlers();
 
   connectionGeneration = 0;
   status: ConnectionStatus = "disconnected";
@@ -333,49 +320,12 @@ export class DaemonClient implements DaemonApi {
   }
 
   private dispatchPush(push: ServerPush): void {
-    switch (push.type) {
-      case "term":
-        this.cursors.set(push.bot_id, push.seq);
-        this.emit("term", push);
-        break;
-      case "bot_state":
-        this.emit("bot_state", push);
-        break;
-      case "message_new":
-        this.emit("message_new", push);
-        break;
-      case "bot_updated":
-        this.emit("bot_updated", push);
-        break;
-      case "activity_update":
-        this.emit("activity_update", push);
-        break;
-      case "delivery_update":
-        this.emit("delivery_update", push);
-        break;
-      case "routine_run_update":
-        this.emit("routine_run_update", push);
-        break;
-      case "approval_pending":
-        this.emit("approval_pending", push);
-        break;
-      case "project_updated":
-        this.emit("project_updated", push);
-        break;
-      case "notify":
-        this.emit("notify", push);
-        break;
-      default:
-        // Exhaustive: a new push type without a case here would be parsed and
-        // then dropped, which is exactly how `bot_updated` went missing.
-        push satisfies never;
+    // The replay cursor is the client's own state, so it is tracked here
+    // rather than in the shared router.
+    if (push.type === "term") {
+      this.cursors.set(push.bot_id, push.seq);
     }
-  }
-
-  private emit<K extends ServerPushType>(type: K, push: PushOf<K>): void {
-    for (const handler of this.handlers[type]) {
-      handler(push);
-    }
+    dispatchPush(this.handlers, push);
   }
 
   private failPending(error: Error): void {

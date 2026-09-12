@@ -6,6 +6,12 @@
 @import "./styles/sidebar-footer.css";
 @import "./styles/views.css";
 @import "./styles/panels.css";
+@import "./styles/control.css";
+@import "./styles/control-list.css";
+@import "./styles/control-reader.css";
+@import "./styles/control-composer.css";
+@import "./styles/control-registry.css";
+@import "./styles/control-tags.css";
 @import "./styles/bot-identity.css";
 @import "./styles/message.css";
 @import "./styles/overlays.css";

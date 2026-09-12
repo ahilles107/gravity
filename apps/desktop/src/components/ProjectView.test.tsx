@@ -9,6 +9,9 @@ function renderView(over: Partial<Parameters<typeof ProjectView>[0]> = {}) {
     Promise.resolve(),
   );
   const onDelete = vi.fn<(projectId: string) => Promise<void>>(() => Promise.resolve());
+  const onSetLead = vi.fn<(projectId: string, botId: string | null) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
   render(
     <ProjectView
       project={fx.project()}
@@ -16,11 +19,12 @@ function renderView(over: Partial<Parameters<typeof ProjectView>[0]> = {}) {
       connected
       canControl
       onRename={onRename}
+      onSetLead={onSetLead}
       onDelete={onDelete}
       {...over}
     />,
   );
-  return { onRename, onDelete };
+  return { onRename, onSetLead, onDelete };
 }
 
 describe("ProjectView", () => {
@@ -67,5 +71,19 @@ describe("ProjectView", () => {
 
     expect(screen.getByLabelText("Name")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Delete project" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the lead bot picker", () => {
+  it("names the bot that must know about every decision here", async () => {
+    const { onSetLead } = renderView();
+    await userEvent.selectOptions(screen.getByLabelText(/Lead bot/), "b1");
+    expect(onSetLead).toHaveBeenCalledWith("p1", "b1");
+  });
+
+  it("falls back to whoever hired the asking bot when cleared", async () => {
+    const { onSetLead } = renderView({ project: fx.project({ lead_bot_id: "b1" }) });
+    await userEvent.selectOptions(screen.getByLabelText(/Lead bot/), "");
+    expect(onSetLead).toHaveBeenCalledWith("p1", null);
   });
 });

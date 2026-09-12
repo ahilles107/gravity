@@ -1,7 +1,7 @@
 //! Internal event bus: server pushes fanned out to all connected clients and
 //! consumed internally (routine-run completion, activity previews).
 
-use bus::{Bot, BotState, Delivery, Message, Project, RoutineRun};
+use bus::{Bot, BotState, DecisionComment, DecisionView, Delivery, Message, Project, RoutineRun};
 use serde::Serialize;
 use tokio::sync::broadcast;
 
@@ -39,6 +39,18 @@ pub enum Push {
     RoutineRunUpdate {
         routine_run: RoutineRun,
     },
+    /// A decision was raised, edited, answered, held, published or withdrawn.
+    /// Boxed because a decision carries its body, and every other variant
+    /// would otherwise pay for the largest one.
+    DecisionUpdate {
+        decision: Box<DecisionView>,
+    },
+    DecisionDeleted {
+        decision_id: String,
+    },
+    DecisionCommentNew {
+        comment: DecisionComment,
+    },
     ApprovalPending {
         bot_id: String,
         detail: String,
@@ -47,7 +59,41 @@ pub enum Push {
         level: String,
         title: String,
         body: String,
+        /// Set when the notice is about a decision, so the client can raise a
+        /// native notification that opens the record rather than a toast the
+        /// owner has to go looking behind.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        decision_id: Option<String>,
     },
+}
+
+impl Push {
+    /// A toast: something happened the user should know about but need not act
+    /// on. `botmgmt` says it best — "a toast, not a prompt".
+    pub fn notice(level: &str, title: impl Into<String>, body: impl Into<String>) -> Self {
+        Push::Notify {
+            level: level.to_string(),
+            title: title.into(),
+            body: body.into(),
+            decision_id: None,
+        }
+    }
+
+    /// A notice about a decision. The client may raise this natively, because
+    /// an urgent ask or a deadline inside a day is exactly what the owner
+    /// cannot afford to find out about later.
+    pub fn decision_notice(
+        title: impl Into<String>,
+        body: impl Into<String>,
+        decision_id: &str,
+    ) -> Self {
+        Push::Notify {
+            level: "warn".to_string(),
+            title: title.into(),
+            body: body.into(),
+            decision_id: Some(decision_id.to_string()),
+        }
+    }
 }
 
 /// Internal-only events that are not client pushes.

@@ -1,0 +1,346 @@
+/* ---------- control center: options, thread, composer ---------- */
+
+/* Options */
+
+.cc-options {
+  margin-top: 22px;
+}
+
+.cc-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.cc-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  cursor: default;
+}
+
+.cc-option-pickable {
+  cursor: pointer;
+}
+
+.cc-option-pickable:hover {
+  background: var(--bg-hover);
+}
+
+.cc-option-picked,
+.cc-option-picked:hover {
+  border-color: var(--accent);
+  background: rgba(122, 162, 247, 0.08);
+}
+
+.cc-option-chosen {
+  border-color: var(--green);
+}
+
+.cc-option-passed {
+  opacity: 0.55;
+}
+
+/* Its own line above the label, so a long key is never truncated. */
+.cc-option-main > .cc-option-key {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cc-option-picked .cc-option-key,
+.cc-option-chosen .cc-option-key {
+  color: var(--cc-title);
+}
+
+.cc-option-main {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Inline flow, so "recommended" follows the last word of a wrapped label. */
+.cc-option-head {
+  line-height: 1.45;
+}
+
+.cc-option-label {
+  font-weight: 500;
+  color: var(--text);
+  margin-right: 8px;
+}
+
+.cc-option-picked .cc-option-label {
+  color: var(--cc-title);
+}
+
+.cc-option-rec {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.cc-option-chosen-mark {
+  font-size: 11px;
+  color: var(--green);
+}
+
+.cc-option-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.cc-option-num {
+  font: 11px var(--mono);
+  color: var(--cc-faint-border);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+  flex: none;
+}
+
+.cc-option-picked .cc-option-num {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Thread */
+
+.cc-thread {
+  margin-top: 26px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.cc-thread-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cc-thread-owner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: 9px;
+}
+
+.cc-thread-who {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.cc-thread-who strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cc-thread-text {
+  margin-top: 2px;
+  line-height: 1.55;
+  color: var(--cc-body);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+}
+
+.cc-delete {
+  margin-top: 28px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.cc-delete:hover {
+  color: var(--red);
+}
+
+/* Composer */
+
+.cc-composer {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.cc-composer-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 40px 22px;
+}
+
+.cc-composer-box {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.cc-composer-box:focus-within {
+  border-color: var(--accent);
+}
+
+.cc-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.cc-pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px;
+  border-radius: 9px;
+  background: rgba(122, 162, 247, 0.12);
+  color: var(--text);
+}
+
+.cc-pick-clear {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.cc-composer textarea {
+  width: 100%;
+  resize: none;
+  padding: 14px 14px 10px;
+  border: 0;
+  background: transparent;
+  line-height: 1.6;
+  font-size: 14px;
+  display: block;
+}
+
+.cc-composer textarea:focus {
+  border: 0;
+  outline: none;
+}
+
+.cc-composer textarea::placeholder,
+.cc-hold input::placeholder {
+  color: var(--text-faint);
+}
+
+.cc-hold {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+}
+
+.cc-hold-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.cc-hold input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.cc-hold-date {
+  width: 130px;
+}
+
+.cc-hold-note {
+  flex: 1;
+}
+
+.cc-hold-btn {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-active);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cc-hold-btn:hover:not(:disabled) {
+  background: #2a2f3d;
+}
+
+.cc-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.cc-composer-actions .cc-link {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.cc-link-ready {
+  color: var(--text);
+}
+
+.cc-composer-spacer {
+  margin-left: auto;
+}
+
+.cc-btn-rule {
+  height: 32px;
+  white-space: nowrap;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cc-btn-rule:hover:not(:disabled) {
+  background: #8fb0f8;
+}
+
+.cc-btn-rule:disabled {
+  background: var(--bg-hover);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.cc-btn-rule .cc-hint {
+  opacity: 0.6;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 500;
+}

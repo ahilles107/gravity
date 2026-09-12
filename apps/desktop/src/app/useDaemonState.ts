@@ -10,6 +10,7 @@ import type {
   Project,
   Routine,
 } from "../protocol/entities";
+import { useDecisionNotificationsPref } from "../prefs";
 import { errText } from "../util";
 import type { Selection } from "./selection";
 import { fetchActivity, fetchSnapshot } from "./snapshot";
@@ -94,6 +95,13 @@ export function useDaemonState(client: DaemonApi, addToast: AddToast): DaemonSta
     [botsRef],
   );
 
+  const openDecision = useCallback(
+    (decisionId: string): void => {
+      select({ kind: "control", decisionId });
+    },
+    [select],
+  );
+
   const refreshActivity = useCallback((): void => {
     void fetchActivity(client).then(entities.applyActivity);
     // `applyActivity` is stable.
@@ -109,6 +117,8 @@ export function useDaemonState(client: DaemonApi, addToast: AddToast): DaemonSta
     botName,
     onSelectBot: selectBot,
     refreshActivity,
+    onOpenDecision: openDecision,
+    decisionNotifications: useDecisionNotificationsPref(),
   });
 
   return {

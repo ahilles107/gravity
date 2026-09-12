@@ -394,5 +394,17 @@
       "file": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04.txt",
       "upstream_sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
     }
+  ],
+  "mac-notification-sys@0.6.15": [
+    {
+      "url": "https://raw.githubusercontent.com/h4llow3En/mac-notification-sys/deb559683962d314a7693478476bf8d052efa84e/LICENSE-Apache",
+      "file": "8dada3edaf50dbc082c9a125058f25def75e625a.txt",
+      "upstream_sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/h4llow3En/mac-notification-sys/deb559683962d314a7693478476bf8d052efa84e/LICENSE-MIT",
+      "file": "a6a98a84ac3f77aa01837efa8f4ddf70fa8f5b62.txt",
+      "upstream_sha256": "1299b4d9d15e9d67e4ac0e7d47ae9404887ca3cf0764aadeec7588d5a6e8e0cc"
+    }
   ]
 }

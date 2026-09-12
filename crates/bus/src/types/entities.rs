@@ -17,6 +17,11 @@ pub struct Project {
     pub dir_name: String,
     /// Set when archived: the row survives so its bots stay attributable.
     pub deleted_at: Option<DateTime<Utc>>,
+    /// The bot told about every decision raised in this project. Not a gate —
+    /// it cannot answer for the owner — but without it a lead's picture of its
+    /// own project goes stale the moment a teammate asks directly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lead_bot_id: Option<Id>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -141,6 +146,11 @@ pub struct Message {
     pub body: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ref_message_id: Option<Id>,
+    /// Set when this message is about a decision. `message.kind` is a CHECK
+    /// constraint SQLite cannot alter, so a ruling travels as a `note` and
+    /// carries its decision here, the way a reply carries `ref_message_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_id: Option<Id>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -277,15 +287,63 @@ pub const DEFAULT_TASK_DEADLINE_HOURS: i64 = 24;
 /// Maximum inbound message body size accepted from bots or events.
 pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
 
+/// Maximum decisions one bot may have open at once. A routine that raises on
+/// every run would otherwise bury the owner's inbox, and the point of the
+/// registry is that the inbox stays answerable.
+pub const MAX_OPEN_DECISIONS_PER_BOT: i64 = 10;
+
+/// Maximum options a bot may offer on one decision.
+pub const MAX_DECISION_OPTIONS: usize = 8;
+
+/// Maximum decision title length.
+pub const MAX_DECISION_TITLE_CHARS: usize = 200;
+
+/// Maximum decision body size. Same ceiling as a message body: the context and
+/// evidence behind an ask is the one thing that must not be truncated.
+pub const MAX_DECISION_BODY_BYTES: usize = 64 * 1024;
+
+/// Maximum comment length on a decision thread.
+pub const MAX_DECISION_COMMENT_BYTES: usize = 16 * 1024;
+
+/// Settled decisions a tag may carry before only the owner may retire it. A
+/// bot tidying the taxonomy should not be able to quietly unfile the history.
+pub const MAX_SETTLED_FOR_BOT_TAG_RETIRE: i64 = 10;
+
+/// Maximum tags one decision may carry. Filing is for finding things again; a
+/// record under thirty tags is under none.
+pub const MAX_DECISION_TAGS: usize = 8;
+
+/// Maximum characters in an option's key or label. The detail belongs in the
+/// option's `description`, and from there in the decision body.
+pub const MAX_DECISION_OPTION_CHARS: usize = 200;
+
+/// Maximum characters in a tag description.
+pub const MAX_TAG_DESCRIPTION_CHARS: usize = 500;
+
+/// Maximum bots one `record_decision` may notify. A relayed ruling goes to the
+/// bots whose record it contradicts, which is a handful, not a broadcast.
+pub const MAX_RECORD_NOTIFY_BOTS: usize = 16;
+
+/// Relayed records one bot may have awaiting the owner's confirmation. The
+/// same backpressure as [`MAX_OPEN_DECISIONS_PER_BOT`], for the tool that
+/// files rulings already given: those are born settled, so the open cap does
+/// not apply and without this there is no ceiling at all.
+pub const MAX_UNCONFIRMED_RELAYS_PER_BOT: i64 = 20;
+
 /// Capability grants carried by a device credential.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Capability {
     /// List, attach read-only, search, diagnostics.
     Read,
-    /// Everything: input, leases, CRUD, messaging, routines.
+    /// Running the fleet: input, leases, CRUD, messaging, routines.
     Control,
-    /// Reserved for the future custom approval bridge.
+    /// Ruling on a decision — answering, publishing, reopening, deleting.
+    ///
+    /// Separate from `Control` because the registry's whole premise is that
+    /// authority is legible: a credential that can start bots and send
+    /// messages is not thereby the owner, and a ruling published from one
+    /// would be indistinguishable from one they typed.
     Approve,
 }
 

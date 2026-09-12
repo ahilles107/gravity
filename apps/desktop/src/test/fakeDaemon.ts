@@ -8,6 +8,8 @@ import type {
   ServerReply,
   ServerReplyType,
 } from "../protocol/messages";
+import type { PushHandlerSets } from "../protocol/push";
+import { emptyHandlers } from "../protocol/push";
 import type { FireBody, RequestBody } from "../protocol/requests";
 import { replyIs } from "../protocol/wire";
 
@@ -19,25 +21,6 @@ export interface RecordedRequest {
 /** Answers one request type. Throw to simulate a daemon error. */
 type Responder = (body: RequestBody) => ServerReply;
 
-type HandlerSets = {
-  readonly [K in ServerPushType]: Set<(push: PushOf<K>) => void>;
-};
-
-function emptyHandlers(): HandlerSets {
-  return {
-    term: new Set(),
-    bot_state: new Set(),
-    message_new: new Set(),
-    bot_updated: new Set(),
-    project_updated: new Set(),
-    activity_update: new Set(),
-    delivery_update: new Set(),
-    routine_run_update: new Set(),
-    approval_pending: new Set(),
-    notify: new Set(),
-  };
-}
-
 /**
  * In-memory `DaemonApi` for component tests: requests are answered from a
  * per-type responder table and pushes can be emitted on demand. Replies are
@@ -46,7 +29,7 @@ function emptyHandlers(): HandlerSets {
 export class FakeDaemon implements DaemonApi {
   connectionGeneration = 0;
   status: ConnectionStatus = "connected";
-  capabilities: readonly string[] = ["terminal", "routines"];
+  capabilities: readonly string[] = ["terminal", "routines", "decisions"];
   serverVersion = "0.1.0-test";
   grants: readonly Grant[] = ["read", "control"];
   deviceId: string | null = null;
@@ -63,7 +46,7 @@ export class FakeDaemon implements DaemonApi {
   private endpoint: Endpoint = { host: "127.0.0.1", port: 7777 };
   private heldAttaches: (() => void)[] = [];
   private readonly responders = new Map<string, Responder>();
-  private readonly handlers: HandlerSets = emptyHandlers();
+  private readonly handlers: PushHandlerSets = emptyHandlers();
   private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
 
   /** Registers the reply for one request type; later calls replace earlier ones. */

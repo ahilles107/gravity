@@ -3,6 +3,7 @@ import { vi } from "vitest";
 import type { Selection } from "../app/selection";
 import type { SettingsCategory } from "../components/settings/categories";
 import Sidebar from "../components/Sidebar";
+import * as dfx from "./decisionFixtures";
 import * as fx from "./fixtures";
 
 /** Mocks are declared up front so their call signatures survive the spread. */
@@ -32,6 +33,7 @@ export function renderSidebar(over: Partial<Parameters<typeof Sidebar>[0]> = {})
     failedByBot: new Map<string, number>(),
     nextRun: {},
     activityByBot: {},
+    pendingDecisions: dfx.pendingCounts({ by_project: {}, total: 0 }),
     selection: { kind: "none" } as const,
     canControl: true,
     ...spies,

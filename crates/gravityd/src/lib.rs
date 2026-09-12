@@ -2,12 +2,14 @@
 //! the scheduler, runtime adapters, and the control plane.
 
 pub mod activity;
+pub mod actor;
 pub mod app;
 pub mod backup;
 pub mod botmgmt;
 pub mod channel;
 pub mod config;
 pub mod db;
+pub mod decisions;
 pub mod delivery;
 pub mod events;
 pub mod home;

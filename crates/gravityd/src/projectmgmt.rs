@@ -126,10 +126,10 @@ pub fn archive_project(
         .get_project(&project.id)?
         .ok_or_else(|| anyhow::anyhow!("project vanished during delete"))?;
     app.events.push(Push::ProjectUpdated { project: archived });
-    app.events.push(Push::Notify {
-        level: "info".to_string(),
-        title: "Project deleted".to_string(),
-        body: match bots.len() {
+    app.events.push(Push::notice(
+        "info",
+        "Project deleted",
+        match bots.len() {
             0 => format!("{} was deleted.", Db::display_project_name(project)),
             1 => format!(
                 "{} was deleted along with its bot.",
@@ -140,7 +140,7 @@ pub fn archive_project(
                 Db::display_project_name(project)
             ),
         },
-    });
+    ));
     tracing::info!(
         project_id = %project.id, name = %project.name, bots = bots.len(),
         by = %actor.as_stored(), "project archived"

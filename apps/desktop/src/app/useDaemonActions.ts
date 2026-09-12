@@ -10,6 +10,7 @@ export interface DaemonActions {
   /** Resolves to the new project's id, or undefined when creation failed. */
   readonly createProject: (name: string) => Promise<string | undefined>;
   readonly renameProject: (projectId: string, name: string) => Promise<void>;
+  readonly setProjectLead: (projectId: string, botId: string | null) => Promise<void>;
   readonly deleteProject: (projectId: string) => Promise<void>;
   readonly createBot: (projectId: string) => Promise<void>;
   /** Creates a project and its first bot, so a fresh install lands on a bot. */
@@ -58,6 +59,23 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
       } catch (error) {
         captureException(error, "project_rename");
         addToast("error", "Rename project failed", errText(error));
+      }
+    },
+    [addToast, client, refreshAll],
+  );
+
+  const setProjectLead = useCallback(
+    async (projectId: string, botId: string | null): Promise<void> => {
+      try {
+        await client.request(
+          { type: "set_project_lead", project_id: projectId, bot_id: botId },
+          "project",
+        );
+        capture("project_lead_set", { cleared: botId === null });
+        await refreshAll();
+      } catch (error) {
+        captureException(error, "project_lead_set");
+        addToast("error", "Failed to set the lead bot", errText(error));
       }
     },
     [addToast, client, refreshAll],
@@ -127,11 +145,20 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
     () => ({
       createProject,
       renameProject,
+      setProjectLead,
       deleteProject,
       createBot,
       createProjectWithBot,
       deleteBot,
     }),
-    [createBot, createProject, createProjectWithBot, deleteBot, deleteProject, renameProject],
+    [
+      createBot,
+      createProject,
+      createProjectWithBot,
+      deleteBot,
+      deleteProject,
+      renameProject,
+      setProjectLead,
+    ],
   );
 }

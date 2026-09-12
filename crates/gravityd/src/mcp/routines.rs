@@ -52,11 +52,11 @@ pub(super) fn create_routine(
         app.db
             .update_routine(&routine.id, None, None, None, None, limits)?;
     }
-    app.events.push(Push::Notify {
-        level: "info".to_string(),
-        title: "Routine created".to_string(),
-        body: format!("Bot {} scheduled routine \"{}\".", me.name, name),
-    });
+    app.events.push(Push::notice(
+        "info",
+        "Routine created",
+        format!("Bot {} scheduled routine \"{}\".", me.name, name),
+    ));
     Ok(json!({ "id": routine.id, "enabled": true }))
 }
 
@@ -158,11 +158,11 @@ pub(super) fn delete_routine(
     let me = caller(app, bot_id)?;
     let routine = my_routine(app, bot_id, args)?;
     app.db.delete_routine(&routine.id)?;
-    app.events.push(Push::Notify {
-        level: "info".to_string(),
-        title: "Routine deleted".to_string(),
-        body: format!("Bot {} deleted routine \"{}\".", me.name, routine.name),
-    });
+    app.events.push(Push::notice(
+        "info",
+        "Routine deleted",
+        format!("Bot {} deleted routine \"{}\".", me.name, routine.name),
+    ));
     Ok(json!({ "deleted": routine.name }))
 }
 

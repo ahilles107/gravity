@@ -8,10 +8,14 @@ vi.mock("../badge", () => ({ setDockBadge }));
 type Unread = Readonly<Record<string, number>>;
 
 /** Renders the hook so the caller can hand it a fresh set of counters. */
-function render(initialProps: Unread, enabled = true): { rerender: (next: Unread) => void } {
+function render(
+  initialProps: Unread,
+  enabled = true,
+  pending = 0,
+): { rerender: (next: Unread) => void } {
   return renderHook<void, Unread>(
     (unread) => {
-      useDockBadge(unread, enabled);
+      useDockBadge(unread, pending, enabled);
     },
     { initialProps },
   );
@@ -57,5 +61,19 @@ describe("useDockBadge", () => {
 
     expect(setDockBadge).toHaveBeenCalledWith(0);
     expect(setDockBadge).not.toHaveBeenCalledWith(2);
+  });
+});
+
+describe("the badge counts decisions alongside messages", () => {
+  it("adds pending decisions to the unread total", () => {
+    setDockBadge.mockClear();
+    render({ b1: 2 }, true, 3);
+    expect(setDockBadge).toHaveBeenLastCalledWith(5);
+  });
+
+  it("stays dark when the preference is off", () => {
+    setDockBadge.mockClear();
+    render({ b1: 2 }, false, 3);
+    expect(setDockBadge).toHaveBeenLastCalledWith(0);
   });
 });

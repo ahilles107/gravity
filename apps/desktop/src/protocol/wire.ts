@@ -26,6 +26,9 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   routine_run_update: true,
   approval_pending: true,
   notify: true,
+  decision_update: true,
+  decision_deleted: true,
+  decision_comment_new: true,
 };
 
 const REPLY_TYPES: ReadonlySet<string> = new Set(
@@ -54,6 +57,13 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     device: true,
     devices: true,
     attached: true,
+    decision: true,
+    decisions: true,
+    decision_comment: true,
+    pending_decisions: true,
+    publish_result: true,
+    tag: true,
+    tags: true,
   } satisfies Record<ServerReplyType, true>),
 );
 

@@ -16,6 +16,19 @@ use crate::supervisor::Supervisor;
 pub const PROTOCOL_VERSION: u32 = 2;
 pub const DAEMON_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Features this daemon serves, advertised in `hello_ok`. Informational: the
+/// client uses it to hide a panel it cannot fill, while authorisation stays
+/// with the connection's grants.
+pub const CAPABILITIES: &[&str] = &[
+    "terminal_attach",
+    "search",
+    "routines",
+    "devices",
+    "bot_self_management",
+    "config",
+    "decisions",
+];
+
 pub struct AppState {
     pub cfg: Config,
     pub db: Db,

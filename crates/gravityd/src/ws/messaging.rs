@@ -17,11 +17,7 @@ impl Conn {
         let msg = messaging::send_dm(
             &self.app.db,
             &self.app.events,
-            bot_id,
-            &sender,
-            MessageKind::Chat,
-            body,
-            None,
+            messaging::Dm::new(bot_id, &sender, MessageKind::Chat, body),
         )?;
         self.send(json!({ "type": "message", "req_id": req_id, "message": msg }));
         Ok(())

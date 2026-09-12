@@ -9,6 +9,7 @@ interface ProjectViewProps {
   readonly connected: boolean;
   readonly canControl: boolean;
   readonly onRename: (projectId: string, name: string) => Promise<void>;
+  readonly onSetLead: (projectId: string, botId: string | null) => Promise<void>;
   readonly onDelete: (projectId: string) => Promise<void>;
 }
 
@@ -23,7 +24,7 @@ export function deletionBody(project: Project, botCount: number): string {
 
 /** Project settings: the name, what it holds, and deletion. */
 export default function ProjectView(props: ProjectViewProps): ReactElement {
-  const { project, bots, connected, canControl, onRename, onDelete } = props;
+  const { project, bots, connected, canControl, onRename, onSetLead, onDelete } = props;
   const [name, setName] = useState(project.name);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -89,6 +90,30 @@ export default function ProjectView(props: ProjectViewProps): ReactElement {
             </button>
           </div>
         </form>
+
+        <label className="field">
+          <span className="field-label">Lead bot</span>
+          <select
+            value={project.lead_bot_id ?? ""}
+            disabled={!connected || !canControl}
+            onChange={(event) => {
+              const value = event.target.value;
+              void onSetLead(project.id, value === "" ? null : value);
+            }}
+          >
+            <option value="">Whoever hired the asking bot</option>
+            {bots.map((bot) => (
+              <option key={bot.id} value={bot.id}>
+                {bot.name}
+              </option>
+            ))}
+          </select>
+          <span className="field-hint">
+            Told about every decision raised here, and pre-selected when you publish one. It cannot
+            answer for you — this is so its picture of the project does not go stale when a teammate
+            asks you directly.
+          </span>
+        </label>
 
         <dl className="info-meta">
           <dt>Folder</dt>

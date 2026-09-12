@@ -342,11 +342,11 @@ impl Supervisor {
         // forever, and a bot that cannot start would otherwise toast on every
         // attempt.
         if crashes == 1 {
-            self.inner.events.push(Push::Notify {
-                level: "error".to_string(),
-                title: "Bot crashed".to_string(),
-                body: format!("bot {bot_id}: {reason}"),
-            });
+            self.inner.events.push(Push::notice(
+                "error",
+                "Bot crashed",
+                format!("bot {bot_id}: {reason}"),
+            ));
         }
     }
 }

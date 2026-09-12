@@ -18,7 +18,7 @@ const TOMBSTONE_SEP: char = '#';
 impl Db {
     // ---- projects ----
 
-    const PROJECT_COLS: &'static str = "id, name, dir_name, deleted_at, created_at";
+    const PROJECT_COLS: &'static str = "id, name, dir_name, deleted_at, lead_bot_id, created_at";
 
     fn project_from_row(r: &Row<'_>) -> rusqlite::Result<Project> {
         Ok(Project {
@@ -26,7 +26,8 @@ impl Db {
             name: r.get(1)?,
             dir_name: r.get(2)?,
             deleted_at: r.get::<_, Option<String>>(3)?.map(|s| parse_ts(&s)),
-            created_at: parse_ts(&r.get::<_, String>(4)?),
+            lead_bot_id: r.get(4)?,
+            created_at: parse_ts(&r.get::<_, String>(5)?),
         })
     }
 
@@ -36,6 +37,7 @@ impl Db {
             name: name.to_string(),
             dir_name: dir_name.to_string(),
             deleted_at: None,
+            lead_bot_id: None,
             created_at: now(),
         };
         self.lock().execute(
@@ -43,6 +45,42 @@ impl Db {
             params![p.id, p.name, p.dir_name, ts(p.created_at)],
         )?;
         Ok(p)
+    }
+
+    /// Name the bot that must know about every decision raised here.
+    ///
+    /// Not a gate: the lead cannot answer for the owner. It exists because a
+    /// lead whose teammates ask the owner directly has a picture of its own
+    /// project that silently goes stale.
+    pub fn set_project_lead(&self, project_id: &str, bot_id: Option<&str>) -> anyhow::Result<()> {
+        self.lock().execute(
+            "UPDATE project SET lead_bot_id = ?2 WHERE id = ?1",
+            params![project_id, bot_id],
+        )?;
+        Ok(())
+    }
+
+    /// The bot to tell about a decision in this project.
+    ///
+    /// Falls back to whoever created the raising bot — Chief of Staff hired
+    /// Auction, Argus created Rigger — so a project that never set a lead
+    /// still routes somewhere sensible rather than nowhere.
+    pub fn lead_for_project(
+        &self,
+        project_id: &str,
+        raised_by_bot_id: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let named: Option<String> = self.lock().query_row(
+            "SELECT lead_bot_id FROM project WHERE id = ?1",
+            params![project_id],
+            |r| r.get(0),
+        )?;
+        if named.is_some() {
+            return Ok(named);
+        }
+        Ok(self
+            .get_bot(raised_by_bot_id)?
+            .and_then(|b| b.created_by_bot_id))
     }
 
     /// Live projects only; archived ones keep their rows but leave the roster.

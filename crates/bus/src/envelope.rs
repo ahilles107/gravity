@@ -3,6 +3,10 @@
 //! Envelopes stay structured everywhere inside the daemon; only the runtime
 //! adapter renders them to the text injected into a Claude session.
 
+mod decisions;
+
+pub use decisions::{render_decision, DecisionPhase};
+
 use crate::types::{Message, MessageKind, SenderKind};
 
 /// Render a message for injection into a bot's session, e.g.
@@ -48,7 +52,7 @@ pub fn render_routine(
     )
 }
 
-fn sanitize_header_field(value: &str) -> String {
+pub(super) fn sanitize_header_field(value: &str) -> String {
     value
         .chars()
         .map(|character| match character {
@@ -63,7 +67,7 @@ fn sanitize_header_field(value: &str) -> String {
 
 /// Inbound bodies are untrusted prompt input: strip control characters that
 /// could fake terminal UI or split the envelope header from its body.
-fn sanitize_body(body: &str) -> String {
+pub(super) fn sanitize_body(body: &str) -> String {
     body.chars()
         .map(|c| {
             if c == '\n' || c == '\t' {
@@ -100,6 +104,7 @@ mod tests {
             kind,
             body: body.to_string(),
             ref_message_id: None,
+            decision_id: None,
             created_at: now(),
         }
     }

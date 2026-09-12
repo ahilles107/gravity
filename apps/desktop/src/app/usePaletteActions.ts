@@ -26,6 +26,14 @@ export function usePaletteActions(deps: PaletteDeps): readonly PaletteAction[] {
         },
       })),
       {
+        id: "open-control-center",
+        label: "Control center",
+        hint: "open view",
+        run: (): void => {
+          select({ kind: "control" });
+        },
+      },
+      {
         id: "open-settings",
         label: "Settings",
         hint: "open view",

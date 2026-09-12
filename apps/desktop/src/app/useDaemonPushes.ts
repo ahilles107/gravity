@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { MutableRefObject } from "react";
+import { notifyNatively } from "../notify";
 import type { DaemonApi } from "../protocol/api";
 import type { Conversation } from "../protocol/entities";
 import type { Selection } from "./selection";
@@ -19,6 +20,10 @@ export interface PushDeps {
   readonly onSelectBot: (botId: string) => void;
   /** Refetches the sidebar preview lines; a finished turn changes them. */
   readonly refreshActivity: () => void;
+  /** Opens the Control center, optionally straight onto one decision. */
+  readonly onOpenDecision: (decisionId: string) => void;
+  /** Whether an urgent or nearly-due decision may interrupt with a native notice. */
+  readonly decisionNotifications: boolean;
 }
 
 /** True when new activity on `botId` happened out of the user's sight. */
@@ -98,7 +103,25 @@ function subscribe(ref: MutableRefObject<PushDeps>): Array<() => void> {
       });
     }),
     client.on("notify", (push) => {
-      ref.current.addToast(push.level, push.title, push.body);
+      const deps = ref.current;
+      const decisionId = push.decision_id;
+      if (decisionId === undefined) {
+        deps.addToast(push.level, push.title, push.body);
+        return;
+      }
+      // A decision notice always offers the way to act on it: the failure this
+      // replaces was a question the owner could not find.
+      deps.addToast(push.level, push.title, push.body, {
+        action: {
+          label: "Open",
+          run: () => {
+            deps.onOpenDecision(decisionId);
+          },
+        },
+      });
+      if (deps.decisionNotifications) {
+        void notifyNatively(push.title, push.body);
+      }
     }),
   ];
 }

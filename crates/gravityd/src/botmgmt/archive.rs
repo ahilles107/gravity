@@ -22,7 +22,7 @@ use bus::{Bot, MessageKind, RevisionField, TaskState};
 use crate::app::AppState;
 use crate::db::Actor;
 use crate::events::Push;
-use crate::messaging::{self, daemon_sender};
+use crate::messaging::{self, daemon_sender, Dm};
 
 /// Archive a bot: stop it, revoke its credential, release everyone waiting on
 /// it, and mark the row deleted.
@@ -53,14 +53,14 @@ pub fn archive_bot(
         reason.unwrap_or("deleted"),
     )?;
 
-    app.events.push(Push::Notify {
-        level: "info".to_string(),
-        title: "Bot deleted".to_string(),
-        body: match reason {
+    app.events.push(Push::notice(
+        "info",
+        "Bot deleted",
+        match reason {
             Some(r) => format!("{} was deleted: {r}", bot.name),
             None => format!("{} was deleted.", bot.name),
         },
-    });
+    ));
     if let Some(archived) = app.db.get_bot(&bot.id)? {
         app.events.push(Push::BotUpdated { bot: archived });
     }
@@ -94,11 +94,8 @@ fn release_open_tasks(app: &Arc<AppState>, bot: &Bot) -> anyhow::Result<()> {
         messaging::send_dm(
             &app.db,
             &app.events,
-            requester_id,
-            &daemon_sender(),
-            MessageKind::Done,
-            &body,
-            Some(&task.origin_message_id),
+            Dm::new(requester_id, &daemon_sender(), MessageKind::Done, &body)
+                .re(&task.origin_message_id),
         )?;
     }
     Ok(())

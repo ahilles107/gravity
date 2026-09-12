@@ -295,6 +295,39 @@ impl Db {
         Ok(self.get_bot(bot_id)?.filter(|b| b.deleted_at.is_none()))
     }
 
+    /// Several bots by id, in one query per chunk.
+    ///
+    /// A page of decisions needs the raiser of every row and the author of
+    /// every comment. Resolving those one at a time is a query per row, which
+    /// is the cost `tags_for` and `comment_counts` already avoid; this is the
+    /// same shape for the third lookup. Archived bots are included, because
+    /// the callers render a name rather than address anything.
+    pub fn bots_by_id(
+        &self,
+        bot_ids: &[String],
+    ) -> anyhow::Result<std::collections::HashMap<String, Bot>> {
+        let mut out = std::collections::HashMap::new();
+        if bot_ids.is_empty() {
+            return Ok(out);
+        }
+        let conn = self.lock();
+        // SQLite caps bound parameters per statement; chunk rather than
+        // assume the caller's page is small enough.
+        for chunk in bot_ids.chunks(500) {
+            let placeholders = vec!["?"; chunk.len()].join(", ");
+            let mut stmt = conn.prepare(&format!(
+                "SELECT {} FROM bot WHERE id IN ({placeholders})",
+                Self::BOT_COLS
+            ))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(chunk), Self::bot_from_row)?;
+            for row in rows {
+                let bot = row?;
+                out.insert(bot.id.clone(), bot);
+            }
+        }
+        Ok(out)
+    }
+
     pub fn get_bot_by_name(&self, project_id: &str, name: &str) -> anyhow::Result<Option<Bot>> {
         let conn = self.lock();
         let sql = format!(

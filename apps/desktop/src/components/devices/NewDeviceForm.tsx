@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
+import { DEVICE_CAPABILITIES } from "../../protocol/entities";
 import type { DeviceCapability } from "../../protocol/entities";
 
 interface NewDeviceFormProps {
@@ -54,7 +55,7 @@ export default function NewDeviceForm({ onCreate, onClose }: NewDeviceFormProps)
       <div className="field">
         <span className="field-label">Capabilities</span>
         <div className="cap-checks">
-          {(["read", "control"] as const).map((capability) => (
+          {DEVICE_CAPABILITIES.map((capability) => (
             <label key={capability} className="member-option">
               <input
                 type="checkbox"
