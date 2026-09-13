@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/bus", "crates/gravityd"]
 
 [workspace.package]
-version = "0.12.5"
+version = "0.13.0"
 edition = "2021"
 license = "MIT"
 
