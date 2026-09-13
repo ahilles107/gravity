@@ -138,6 +138,32 @@
   background: none;
 }
 
+.control {
+  padding-top: clamp(120px, 17vh, 192px);
+  text-align: center;
+}
+
+.control h2 {
+  font-size: clamp(29px, 3.6vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.06;
+}
+
+.control-copy {
+  max-width: 620px;
+  margin: 18px auto 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.control-shot {
+  padding-inline: clamp(12px, 2vw, 24px);
+  margin-top: clamp(44px, 7vh, 72px);
+}
+
 .final-cta {
   display: flex;
   padding-block: clamp(132px, 19vh, 210px) clamp(96px, 14vh, 148px);
