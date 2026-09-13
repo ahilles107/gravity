@@ -1,14 +1,14 @@
 {
   "target": "aarch64-apple-darwin",
   "inputs": {
-    "Cargo.lock": "4e8dd6733cb9079bdcf0c59d458fdd3e1f167cf0bf4cbddf9ebf58cdaca8b1d6",
-    "Cargo.toml": "dd22fc940aa69d1991e1a06fb29f6141338a8d237a85d77ee21d9758ac956d25",
+    "Cargo.lock": "ed089d7f431124cb093bc49f5c54a6ca4cb0af573ce8be2f6386475d742fca84",
+    "Cargo.toml": "17f46fbe0ce2a8fab2e1b26a1b10435ac1968ae6f8150db33bb1e05c25fb7491",
     "crates/gravityd/Cargo.toml": "ae8213b9576b7ce6baa6efda1a6e8633dcbc0888bbd96f60383323ffa81702fd",
     "crates/bus/Cargo.toml": "c4c4f51131d78f8ae8cb6e96fcb918c245998d9c1e01312f513fb56dfc452910",
-    "apps/desktop/src-tauri/Cargo.lock": "1d103773e5d7ec6cac04ce53f012cde8e06aafc15330e5e13170ceff43a4918b",
-    "apps/desktop/src-tauri/Cargo.toml": "7f966e219ddcfdb434828ec9dd9257087e096e9be98a725db98811e34a5b0401",
-    "apps/desktop/src-tauri/tauri.conf.json": "cc5dd6744927b623253a432efae2a131146e893cba223d86e9399eb71196f06f",
-    "apps/desktop/package.json": "2c73e398853eea5eee93db68642f8abb73bfa98b778acb7bbf2f0fca52f09683",
+    "apps/desktop/src-tauri/Cargo.lock": "7c73bbce32b88bd02862bcf73cea344288764824065d4379787d9c0de7991474",
+    "apps/desktop/src-tauri/Cargo.toml": "421dc0d9bcf49e5d93eb01a987ef7b77b393e1e383be7eac64cabde2daf53702",
+    "apps/desktop/src-tauri/tauri.conf.json": "31de1253c6bd39ef8b1f3183ce31a5965ecf49400481c0d0219b8bc9be6340ad",
+    "apps/desktop/package.json": "e384b88dbaef1caa19f198a9c051f59f7b98823852968fb0d249fdae585be14e",
     "apps/desktop/pnpm-lock.yaml": "612e04de740dd11db246b0ea6646b66ccefc0aebcabf4b3b51673542a7ec46d2",
     "apps/desktop/vite.config.ts": "77f2fd4730e92ded079a31f0f857ef62d7a25f0b71acfe5db1eef34baccddd25",
     "apps/marketing/package.json": "40590a51129d5206b21bf0410fbfd8e1b5c2ee4b8c70f1249b5ea088d84169a9",
@@ -49,8 +49,8 @@
     "third-party/overrides/index.json": "688bb4e7bb9089487937265e38e3ad41c60a7f471c33f501a7a2cb426290491c"
   },
   "outputs": {
-    "third-party/DAEMON_NOTICES.txt": "16edad102976855d4f28dc80c079ffc6c0cc1226b13518ecfa711d88d7dad2f1",
-    "third-party/DESKTOP_NOTICES.txt": "ecc0405085baa7c72478ff6c842c0ed227212d57502ded763bc702e4c9beb85b",
+    "third-party/DAEMON_NOTICES.txt": "058aae41a7133efa04dea5641f58822456aa6b7c7b514dd8133795712a11868b",
+    "third-party/DESKTOP_NOTICES.txt": "5a5781d0b7d0fe4142bd2ef2911211601ed6b892530c24ca2ea980e5cc3f6f39",
     "apps/marketing/public/THIRD_PARTY_NOTICES.txt": "fc951fe31f6a54f577bfc136177bed747b4c36efc833b0a07413090fa19ad866"
   },
   "packages": [
@@ -13437,15 +13437,15 @@
     {
       "ecosystem": "Rust toolchain",
       "name": "standard-library",
-      "version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "version": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
       "license": "MIT OR Apache-2.0; upstream component exceptions below",
       "components": {
         "daemon": "runtime",
         "desktop": "runtime"
       },
-      "source": "https://static.rust-lang.org/dist/rustc-1.98.1-src.tar.xz",
-      "checksum": "be1816e7f6c40abb90245ad6e024bed2a7e88d7dda4561e4d5470207df616b9f",
-      "copyright_source": "https://static.rust-lang.org/dist/rustc-1.98.1-aarch64-apple-darwin.tar.xz",
+      "source": "https://static.rust-lang.org/dist/rustc-1.98.0-src.tar.xz",
+      "checksum": "271fa73d8174f53d713c46a8310da7bf7cfdcfb8b7cfd1c2b74b84a83ae9fb1e",
+      "copyright_source": "https://static.rust-lang.org/dist/rustc-1.98.0-aarch64-apple-darwin.tar.xz",
       "notices": [
         {
           "path": "COPYRIGHT-library.html",
