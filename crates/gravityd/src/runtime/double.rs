@@ -3,7 +3,9 @@
 //! cross-session messaging) and echoes delivered messages and typed input to
 //! its terminal output, so the full channel-delivery path is exercised.
 
+#[cfg(unix)]
 use std::io::{BufRead, BufReader};
+#[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -11,6 +13,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use super::{BotSpec, Capabilities, RuntimeAdapter, RuntimeSession, SessionEvent, StartedSession};
+#[cfg(unix)]
 use crate::channel::MsgSocket;
 
 /// Ctrl-D: ends the double session as an unsolicited exit.
@@ -51,16 +54,25 @@ impl RuntimeAdapter for DoubleAdapter {
         // Real inbox socket speaking the cross-session wire protocol. Unix
         // socket paths are capped at ~104 bytes on macOS, so keep it short:
         // /tmp + pid + a bot-id prefix.
+        #[cfg(unix)]
         let sock_dir = std::path::PathBuf::from(format!("/tmp/cbd-{}", std::process::id()));
+        #[cfg(unix)]
         std::fs::create_dir_all(&sock_dir)?;
+        #[cfg(unix)]
         let short_id: String = spec.bot_id.chars().take(8).collect();
+        #[cfg(unix)]
         let sock_path = sock_dir.join(format!("{short_id}.sock"));
+        #[cfg(unix)]
         let _ = std::fs::remove_file(&sock_path);
+        #[cfg(unix)]
         let listener = UnixListener::bind(&sock_path)?;
         let alive = Arc::new(AtomicBool::new(true));
 
+        #[cfg(unix)]
         let inbox_tx = tx.clone();
+        #[cfg(unix)]
         let inbox_alive = alive.clone();
+        #[cfg(unix)]
         std::thread::spawn(move || {
             for conn in listener.incoming() {
                 if !inbox_alive.load(Ordering::SeqCst) {
@@ -89,17 +101,25 @@ impl RuntimeAdapter for DoubleAdapter {
             }
         });
 
+        #[cfg(unix)]
+        let socket = MsgSocket {
+            path: sock_path,
+            token: None,
+        };
+        #[cfg(windows)]
+        let (socket, inbox_task) = super::inbox::start(tx.clone())?;
+
         Ok(StartedSession {
             session: Box::new(DoubleSession {
                 tx,
                 alive,
-                sock_path: sock_path.clone(),
+                #[cfg(unix)]
+                sock_path: socket.path.clone(),
+                #[cfg(windows)]
+                inbox_task,
             }),
             events: rx,
-            msg_socket: Some(MsgSocket {
-                path: sock_path,
-                token: None,
-            }),
+            msg_socket: Some(socket),
         })
     }
 
@@ -111,7 +131,10 @@ impl RuntimeAdapter for DoubleAdapter {
 struct DoubleSession {
     tx: mpsc::UnboundedSender<SessionEvent>,
     alive: Arc<AtomicBool>,
+    #[cfg(unix)]
     sock_path: std::path::PathBuf,
+    #[cfg(windows)]
+    inbox_task: tokio::task::AbortHandle,
 }
 
 impl RuntimeSession for DoubleSession {
@@ -153,7 +176,10 @@ impl RuntimeSession for DoubleSession {
 impl DoubleSession {
     fn end(&mut self, code: Option<i32>) {
         self.alive.store(false, Ordering::SeqCst);
+        #[cfg(unix)]
         let _ = std::fs::remove_file(&self.sock_path);
+        #[cfg(windows)]
+        self.inbox_task.abort();
         let _ = self.tx.send(SessionEvent::Exited { code });
     }
 }

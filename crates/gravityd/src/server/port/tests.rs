@@ -2,6 +2,17 @@ use super::*;
 
 const LOOPBACK: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
 
+#[test]
+fn recognizes_windows_reserved_ports_without_masking_other_errors() {
+    assert_eq!(
+        port_unavailable(&std::io::Error::from_raw_os_error(10013)),
+        cfg!(windows)
+    );
+    assert!(!port_unavailable(&std::io::Error::from(
+        std::io::ErrorKind::InvalidInput
+    )));
+}
+
 #[tokio::test]
 async fn keeps_the_configured_port_when_it_is_available() {
     let reserved = tokio::net::TcpListener::bind("127.0.0.1:0")

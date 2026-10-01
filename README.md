@@ -4,6 +4,8 @@ Always-on, multi-bot desktop app with Claude Code as the agent runtime. A Rust
 daemon (`gravityd`) runs on a Mac mini; the Tauri desktop client attaches
 from any machine. See the [architecture](docs/architecture.md) for the system
 design and the [control-plane protocol](docs/protocol.md) for client APIs.
+Native Windows x64 builds and local-daemon setup are described in
+[Windows build instructions](docs/windows.md).
 
 Builds and tests require no Linear, PostHog, or Cloudflare account. Running real
 bots requires your own Claude Code installation and authentication; the test

@@ -18,12 +18,17 @@ pub mod messaging;
 pub mod model;
 pub mod overrides;
 pub mod paths;
+mod permissions;
 pub mod projectmgmt;
 pub mod routine_validation;
 pub mod runtime;
 pub mod scheduler;
 pub mod secrets;
 pub mod server;
+#[cfg(not(windows))]
+pub mod service;
+#[cfg(windows)]
+#[path = "service/windows.rs"]
 pub mod service;
 pub mod supervisor;
 pub mod terminal;

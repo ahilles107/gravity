@@ -19,6 +19,7 @@
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
@@ -31,6 +32,8 @@ mod prompt;
 #[cfg(test)]
 mod tests;
 mod trust;
+#[cfg(windows)]
+mod windows_hooks;
 
 pub use prompt::system_md;
 pub use trust::trust_workspace;
@@ -234,7 +237,10 @@ pub fn write_hook_settings(
 ) -> anyhow::Result<()> {
     let dir = workspace.join(".claude");
     fs::create_dir_all(&dir)?;
+    #[cfg(unix)]
     let settings = hook_settings(daemon_port, bot_token_env);
+    #[cfg(windows)]
+    let settings = windows_hooks::settings(workspace, daemon_port, bot_token_env)?;
     atomic_write_json(&dir.join("settings.json"), &settings)
 }
 
@@ -258,6 +264,7 @@ pub fn artifacts_allow_rules(artifacts_dir: &Path) -> Vec<String> {
 /// events to the daemon; failures are swallowed (`|| true`) so a daemon
 /// hiccup never blocks the session, and hook failure is never interpreted as
 /// approval or denial.
+#[cfg(unix)]
 fn hook_settings(daemon_port: u16, bot_token_env: &str) -> serde_json::Value {
     let hook_cmd = |event: &str| {
         serde_json::json!([{
@@ -347,12 +354,14 @@ pub(super) fn atomic_write_private_json(
 ) -> anyhow::Result<()> {
     let tmp = path.with_extension(format!("json.tmp-{}", uuid::Uuid::new_v4()));
     let result = (|| -> anyhow::Result<()> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let mut file = options
             .open(&tmp)
             .with_context(|| format!("creating {}", tmp.display()))?;
+        crate::permissions::private(&tmp, false)?;
         serde_json::to_writer_pretty(&mut file, value)
             .with_context(|| format!("writing {}", tmp.display()))?;
         file.write_all(b"\n")

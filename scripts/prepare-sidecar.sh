@@ -8,10 +8,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
+EXT=""
+case "$TRIPLE" in
+  *-windows-*) EXT=".exe" ;;
+esac
 
 cargo build --release -p gravityd --manifest-path "$ROOT/Cargo.toml"
 
 DEST="$ROOT/apps/desktop/src-tauri/binaries"
 mkdir -p "$DEST"
-cp "$ROOT/target/release/gravityd" "$DEST/gravityd-$TRIPLE"
-echo "staged $DEST/gravityd-$TRIPLE"
+cp "$ROOT/target/release/gravityd$EXT" "$DEST/gravityd-$TRIPLE$EXT"
+echo "staged $DEST/gravityd-$TRIPLE$EXT"

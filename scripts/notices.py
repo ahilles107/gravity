@@ -7,12 +7,14 @@ from html.parser import HTMLParser
 import json
 import pathlib
 import re
+import shutil
 import subprocess
 import tomllib
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = "aarch64-apple-darwin"
+TARGETS = (TARGET, "x86_64-pc-windows-msvc")
 EXCLUDED = {"other-platform", "build tool (not shipped)"}
 INVENTORY = ROOT / "third-party/inventory.json"
 OVERRIDES = ROOT / "third-party/overrides"
@@ -31,7 +33,9 @@ INPUTS = [
     "apps/marketing/src/updater-proxy.ts", "apps/marketing/src/updater-bridge.ts",
     "apps/marketing/wrangler.updater-bridge.jsonc",
     ".github/workflows/release.yml", "scripts/prepare-sidecar.sh",
-    "scripts/notices.py", "third-party/README.md",
+    "scripts/notices.py", "third-party/README.md", "package.json",
+    "apps/desktop/src-tauri/tauri.windows.conf.json", "scripts/prepare-sidecar.ps1",
+    ".github/workflows/windows.yml",
 ]
 
 
@@ -44,12 +48,18 @@ def notice_text(data):
 
 
 def run(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True)
+    command = shutil.which(args[0]) or args[0]
+    return subprocess.check_output([command, *args[1:]], cwd=ROOT, text=True, encoding="utf-8")
+
+
+def tracked_bytes(path):
+    # Git text checkouts may use CRLF; inventory hashes describe committed LF.
+    return path.read_bytes().replace(b"\r\n", b"\n")
 
 
 def input_hashes():
     files = [ROOT / name for name in INPUTS] + sorted(OVERRIDES.rglob("*"))
-    return {str(p.relative_to(ROOT)): digest(p.read_bytes()) for p in files if p.is_file()}
+    return {p.relative_to(ROOT).as_posix(): digest(tracked_bytes(p)) for p in files if p.is_file()}
 
 
 def license_files(root):
@@ -93,13 +103,15 @@ def toolchain_package():
 def rust_packages(manifest, component):
     data = json.loads(run("cargo", "metadata", "--locked", "--format-version", "1",
                          "--manifest-path", manifest))
-    filtered = json.loads(run("cargo", "metadata", "--locked", "--format-version", "1",
-                             "--filter-platform", TARGET, "--manifest-path", manifest))
-    selected = {node["id"] for node in filtered["resolve"]["nodes"]}
-    runtime = run("cargo", "tree", "--locked", "--target", TARGET,
-                  "--manifest-path", manifest, "--edges", "normal,no-proc-macro",
-                  "--prefix", "none", "--format", "{p}").splitlines()
-    runtime = {line.removesuffix(" (*)") for line in runtime}
+    selected, runtime = set(), set()
+    for target in TARGETS:
+        filtered = json.loads(run("cargo", "metadata", "--locked", "--format-version", "1",
+                                 "--filter-platform", target, "--manifest-path", manifest))
+        selected.update(node["id"] for node in filtered["resolve"]["nodes"])
+        tree = run("cargo", "tree", "--locked", "--target", target,
+                   "--manifest-path", manifest, "--edges", "normal,no-proc-macro",
+                   "--prefix", "none", "--format", "{p}").splitlines()
+        runtime.update(line.removesuffix(" (*)") for line in tree)
     lock = tomllib.loads((ROOT / manifest).with_name("Cargo.lock").read_text())
     checksums = {(p["name"], p["version"]): p.get("checksum") for p in lock["package"]}
     for p in data["packages"]:
@@ -170,7 +182,7 @@ def generate():
         if included:
             for file in files if files is not None else license_files(root):
                 data = file.read_bytes()
-                name = str(file.relative_to(root))
+                name = file.relative_to(root).as_posix()
                 text = notice_text(data)
                 if file.suffix == ".html":
                     parser = LicenseHTML()
@@ -179,7 +191,7 @@ def generate():
                 texts.append(f"--- {name} ---\n" + text)
                 p["notices"].append({"path": name, "sha256": digest(data)})
             for extra in overrides.get(p["name"] + "@" + p["version"], []):
-                data = (OVERRIDES / extra["file"]).read_bytes()
+                data = tracked_bytes(OVERRIDES / extra["file"])
                 texts.append(f"--- {extra['url']} ---\n" + notice_text(data))
                 p["notices"].append({"url": extra["url"], "sha256": digest(data),
                                      "upstream_sha256": extra["upstream_sha256"]})
@@ -210,7 +222,7 @@ def generate():
     for component, name in OUTPUTS.items():
         content = (f"GRAVITY {component.upper()} THIRD-PARTY NOTICES\n\n"
                    "Gravity's MIT license is separate from these upstream terms.\n"
-                   f"Native inventory target: {TARGET}.\n"
+                   f"Native inventory targets: {', '.join(TARGETS)}.\n"
                    "Runtime dependency closures are conservative; tree-shaken code may be absent.\n"
                    "Build/test notices are included conservatively for generated code; their\n"
                    "presence does not mean the tools themselves are distributed.\n"
@@ -219,10 +231,10 @@ def generate():
                    + "".join(sections[component]))
         path = ROOT / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content.rstrip() + "\n")
+        path.write_text(content.rstrip() + "\n", encoding="utf-8", newline="\n")
         outputs[name] = digest(path.read_bytes())
-    INVENTORY.write_text(json.dumps({"target": TARGET, "inputs": input_hashes(),
-                                    "outputs": outputs, "packages": records}, indent=2) + "\n")
+    INVENTORY.write_text(json.dumps({"targets": TARGETS, "inputs": input_hashes(),
+                                    "outputs": outputs, "packages": records}, indent=2) + "\n", newline="\n")
     print(f"Generated {len(records)} inventory records and {len(outputs)} notice bundles.")
 
 
@@ -231,7 +243,7 @@ def check(check_toolchain=False):
     if inventory["inputs"] != input_hashes():
         raise ValueError("Notice inputs changed. Review scope and run pnpm notices:generate.")
     for name, expected in inventory["outputs"].items():
-        if digest((ROOT / name).read_bytes()) != expected:
+        if digest(tracked_bytes(ROOT / name)) != expected:
             raise ValueError("Notice bundle changed: " + name)
     if set(inventory["outputs"]) != set(OUTPUTS.values()):
         raise ValueError("Notice output inventory is incomplete")
