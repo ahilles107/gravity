@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
@@ -6,8 +5,9 @@ import ChatComposer from "./ChatComposer";
 import TurnView from "./TurnView";
 import { typeIntoTerminal, uploadAttachment } from "./upload";
 import { useChat } from "./useChat";
-import { matchTurns, useChatSearch } from "./useChatSearch";
+import { useChatSearch } from "./useChatSearch";
 import { usePendingMessages } from "./usePendingMessages";
+import { useStickToBottom } from "./useStickToBottom";
 import { ChatSearchBar, PendingMessages } from "./ChatPaneParts";
 
 interface ChatPaneProps {
@@ -24,39 +24,19 @@ interface ChatPaneProps {
   readonly note?: string;
 }
 
-/** How close to the bottom still counts as following the conversation. */
-const STICK_PX = 80;
-
 /** A bot's conversation read from its transcript, with a composer. */
 export default function ChatPane(props: ChatPaneProps): ReactElement {
   const { client, bot, connected } = props;
   const linked = bot.peer != null;
   const chat = useChat(client, bot.id, connected);
   const { pending, send } = usePendingMessages(client, bot.id, chat.turns);
-  const search = useChatSearch(props.active ?? true);
-  const scroller = useRef<HTMLDivElement | null>(null);
-  const stick = useRef(true);
-  const shown = matchTurns(chat.turns, search.query);
-
-  // Follow the bottom while the owner is there; leave them be once they scroll up.
-  useLayoutEffect(() => {
-    const element = scroller.current;
-    if (element !== null && stick.current) {
-      element.scrollTop = element.scrollHeight;
-    }
-    // New content is the trigger, not an input: the effect only reads the DOM.
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [chat.turns, pending]);
-
-  const onScroll = (): void => {
-    const element = scroller.current;
-    if (element !== null) {
-      stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < STICK_PX;
-    }
-  };
+  const { ref: scroller, onScroll, follow, release } = useStickToBottom(chat.turns, pending);
+  const search = useChatSearch(props.active ?? true, scroller, chat.turns);
+  // While searching, folded steps open so their text can be found.
+  const searching = search.open && search.query.trim() !== "";
 
   const onSend = async (text: string): Promise<void> => {
-    stick.current = true;
+    follow();
     // A slash command is the terminal's: type it there, as the owner would.
     if (text.startsWith("/") && !linked) {
       typeIntoTerminal(client, bot.id, text);
@@ -68,14 +48,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
   const empty = !chat.loading && chat.turns.length === 0 && pending.length === 0;
   return (
     <div className="chat-pane">
-      {search.open ? (
-        <ChatSearchBar
-          search={search}
-          shown={shown.length}
-          total={chat.turns.length}
-          hasMore={chat.hasMore}
-        />
-      ) : null}
+      {search.open ? <ChatSearchBar search={search} hasMore={chat.hasMore} /> : null}
       <div className="chat-scroll" ref={scroller} onScroll={onScroll}>
         {props.note === undefined ? null : <div className="chat-note">{props.note}</div>}
         {chat.hasMore ? (
@@ -83,7 +56,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
             type="button"
             className="btn btn-small chat-older"
             onClick={() => {
-              stick.current = false;
+              release();
               void chat.loadOlder();
             }}
           >
@@ -96,7 +69,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
             Nothing here yet. Messages you send, and everything {bot.name} does, show up here.
           </div>
         ) : null}
-        {shown.map((turn) => (
+        {chat.turns.map((turn) => (
           <TurnView
             key={turn.id}
             client={client}
@@ -104,6 +77,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
             connected={connected}
             onOpenFile={props.onOpenFile}
             onOpenDecision={props.onOpenDecision}
+            expandAll={searching}
           />
         ))}
         <PendingMessages pending={pending} />

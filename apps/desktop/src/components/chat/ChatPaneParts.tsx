@@ -1,17 +1,24 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ReactElement } from "react";
 import type { PendingMessage } from "./usePendingMessages";
 import type { ChatSearch } from "./useChatSearch";
 
 interface ChatSearchBarProps {
   readonly search: ChatSearch;
-  readonly shown: number;
-  readonly total: number;
+  /** Older turns exist that are not loaded, so not searched. */
   readonly hasMore: boolean;
 }
 
-/** The chat's search field and how many loaded turns match. */
-export function ChatSearchBar({ search, shown, total, hasMore }: ChatSearchBarProps): ReactElement {
-  const further = hasMore ? " · load earlier turns to search further" : "";
+function countLabel(search: ChatSearch): string {
+  if (search.query.trim() === "") {
+    return "";
+  }
+  return search.count === 0 ? "No matches" : `${search.current + 1} of ${search.count}`;
+}
+
+/** Find in the chat: the field, where you are among the matches, and the way between them. */
+export function ChatSearchBar({ search, hasMore }: ChatSearchBarProps): ReactElement {
+  const none = search.count === 0;
   return (
     <div className="chat-search">
       <input
@@ -26,15 +33,45 @@ export function ChatSearchBar({ search, shown, total, hasMore }: ChatSearchBarPr
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             search.toggle(false);
+          } else if (event.key === "Enter") {
+            event.preventDefault();
+            if (event.shiftKey) {
+              search.previous();
+            } else {
+              search.next();
+            }
           }
         }}
       />
-      <span className="chat-search-count">
-        {search.query.trim() === "" ? "" : `${shown} of ${total} loaded turns${further}`}
+      <span className="chat-search-count" aria-live="polite">
+        {countLabel(search)}
       </span>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="Previous match"
+        title="Previous match (⇧↩)"
+        disabled={none}
+        onClick={search.previous}
+      >
+        <ChevronUp size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="Next match"
+        title="Next match (↩)"
+        disabled={none}
+        onClick={search.next}
+      >
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
       <button type="button" className="btn btn-small" onClick={() => search.toggle(false)}>
         Done
       </button>
+      {hasMore && search.query.trim() !== "" ? (
+        <span className="chat-search-count">Only loaded turns are searched.</span>
+      ) : null}
     </div>
   );
 }

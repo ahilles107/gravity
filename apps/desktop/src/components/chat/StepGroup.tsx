@@ -15,12 +15,15 @@ interface StepGroupProps {
   readonly botId: string;
   readonly steps: readonly Step[];
   readonly turnOpen: boolean;
+  /** Shows the steps whatever the owner folded, e.g. while searching. */
+  readonly expandAll?: boolean;
 }
 
 /** A run of tool steps, folded to one summary line once it gets long. */
 export default function StepGroup(props: StepGroupProps): ReactElement {
   const { client, botId, steps } = props;
-  const [open, setOpen] = useState(() => groupStartsOpen(steps, props.turnOpen));
+  const [folded, setOpen] = useState(() => groupStartsOpen(steps, props.turnOpen));
+  const open = folded || props.expandAll === true;
   const images = steps.flatMap((step) => step.images ?? []);
   return (
     <div className="chat-steps">

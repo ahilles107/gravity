@@ -40,19 +40,23 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  width: 100%;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.task-more {
+  margin-top: 2px;
   padding: 0;
   font: inherit;
-  font-size: 12px;
-  text-align: left;
-  color: var(--text);
+  font-size: 11px;
+  color: var(--accent);
   background: none;
   border: 0;
   cursor: pointer;
 }
 
-.task-upcoming .task-row-head {
-  cursor: default;
+.task-more:hover {
+  text-decoration: underline;
 }
 
 .task-who {

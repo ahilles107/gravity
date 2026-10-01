@@ -15,6 +15,8 @@ interface TurnViewProps {
   readonly onOpenFile: (path: string) => void;
   readonly connected: boolean;
   readonly onOpenDecision?: (decisionId: string) => void;
+  /** Opens every folded step group, e.g. while searching. */
+  readonly expandAll?: boolean;
 }
 
 /** One turn: what woke the bot, what it did, and how it ended. */
@@ -49,6 +51,7 @@ export default function TurnView(props: TurnViewProps): ReactElement {
           onOpenFile={onOpenFile}
           connected={props.connected}
           onOpenDecision={props.onOpenDecision}
+          expandAll={props.expandAll}
         />
       ))}
       {turn.open ? <div className="chat-working">Working…</div> : null}
@@ -65,12 +68,21 @@ interface BlockProps {
   readonly onOpenFile: (path: string) => void;
   readonly connected: boolean;
   readonly onOpenDecision?: (decisionId: string) => void;
+  readonly expandAll?: boolean;
 }
 
 function Block(props: BlockProps): ReactElement {
   const { client, botId, turnOpen, block, onOpenFile } = props;
   if (block.kind === "steps") {
-    return <StepGroup client={client} botId={botId} steps={block.steps} turnOpen={turnOpen} />;
+    return (
+      <StepGroup
+        client={client}
+        botId={botId}
+        steps={block.steps}
+        turnOpen={turnOpen}
+        expandAll={props.expandAll}
+      />
+    );
   }
   const { item } = block;
   switch (item.type) {

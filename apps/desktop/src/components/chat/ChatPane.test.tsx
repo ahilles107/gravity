@@ -221,24 +221,35 @@ describe("ChatPane commands and search", () => {
     expect(client.requests.some((r) => r.body.type === "send_user_message")).toBe(false);
   });
 
-  it("narrows the turns to a search with ⌘F", async () => {
+  it("finds matches in place and steps through them with ⌘F", async () => {
     renderPane(
       daemon([
         turn({ id: "a", items: [text("Built the installer.", "x")] }),
         turn({
           id: "b",
           started_at: "2026-10-01T11:00:00Z",
-          items: [text("Signed the MSI.", "y")],
+          items: [text("Signed the installer.", "y")],
         }),
       ]),
     );
     expect(await screen.findByText("Built the installer.")).toBeInTheDocument();
     await userEvent.keyboard("{Meta>}f{/Meta}");
-    await userEvent.type(screen.getByRole("textbox", { name: "Search this chat" }), "msi");
-    expect(screen.queryByText("Built the installer.")).not.toBeInTheDocument();
-    expect(screen.getByText("Signed the MSI.")).toBeInTheDocument();
-    expect(screen.getByText("1 of 2 loaded turns")).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
+    const field = screen.getByRole("textbox", { name: "Search this chat" });
+    await userEvent.type(field, "installer");
     expect(screen.getByText("Built the installer.")).toBeInTheDocument();
+    expect(screen.getByText("Signed the installer.")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    await userEvent.clear(field);
+    await userEvent.type(field, "nowhere");
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next match" })).toBeDisabled();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox", { name: "Search this chat" })).not.toBeInTheDocument();
   });
 });

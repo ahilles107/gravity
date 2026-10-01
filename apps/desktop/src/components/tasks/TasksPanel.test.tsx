@@ -24,8 +24,13 @@ describe("TasksPanel", () => {
     render(<TasksPanel client={tasksDaemon()} bot={fx.bot()} connected />);
     const row = await screen.findByText("Review the installer changes.");
     expect(screen.queryByText("Reviewed — two nits, both fixed.")).not.toBeInTheDocument();
-    await userEvent.click(row.closest("li")?.querySelector("button") ?? row);
+    const more = within(row.closest("li") ?? document.body).getByRole("button", {
+      name: "Show more",
+    });
+    await userEvent.click(more);
     expect(screen.getByText("Reviewed — two nits, both fixed.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.queryByText("Reviewed — two nits, both fixed.")).not.toBeInTheDocument();
   });
 
   it("refreshes after bus traffic and says when there is nothing", async () => {

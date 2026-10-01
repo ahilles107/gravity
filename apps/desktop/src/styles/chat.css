@@ -307,3 +307,13 @@
   gap: 6px;
   margin-top: 8px;
 }
+
+/* Find in the chat: every match, and the one on screen. */
+::highlight(chat-search) {
+  background-color: color-mix(in srgb, var(--amber) 35%, transparent);
+}
+
+::highlight(chat-search-current) {
+  background-color: var(--amber);
+  color: #000;
+}
