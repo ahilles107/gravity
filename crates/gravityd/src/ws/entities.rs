@@ -155,6 +155,8 @@ impl Conn {
 
     pub(super) fn create_bot(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
         let project_id = Self::str_field(req, "project_id")?;
+        let runtime =
+            super::runtime::requested_runtime(req)?.unwrap_or(self.app.cfg.default_bot_runtime);
         // An explicit `null` is how a client with no name to give says so, so
         // it takes the placeholder path rather than failing as a bad string.
         let supplied = match req.get("name") {
@@ -187,7 +189,14 @@ impl Conn {
                 instructions: req.get("instructions").and_then(|v| v.as_str()),
                 avatar: req.get("avatar").and_then(|v| v.as_str()),
             };
-            match botmgmt::create_bot(&self.app, project_id, &edit, None, &Actor::User) {
+            match botmgmt::create_bot_with_runtime(
+                &self.app,
+                project_id,
+                &edit,
+                None,
+                &Actor::User,
+                runtime,
+            ) {
                 Ok(created) => {
                     self.send(json!({
                         "type": "bot", "req_id": req_id,

@@ -7,6 +7,7 @@ use gravityd::runtime::{BotSpec, RuntimeAdapter, SessionEvent};
 #[tokio::test]
 async fn windows_inbox_delivers_authenticated_unicode_messages() {
     let spec = BotSpec {
+        codex: None,
         bot_id: "windows-inbox".into(),
         bot_name: "Inbox".into(),
         workspace: std::env::temp_dir(),

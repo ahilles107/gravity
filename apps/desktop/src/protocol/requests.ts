@@ -1,7 +1,13 @@
 // Client → server frames (protocol v2).
 
 import type { DecisionRequestBody } from "./decisionRequests";
-import type { DeliveryState, DeviceCapability, OverlapPolicy, RoutineTrigger } from "./entities";
+import type {
+  BotRuntime,
+  DeliveryState,
+  DeviceCapability,
+  OverlapPolicy,
+  RoutineTrigger,
+} from "./entities";
 
 export type ClientRequestBody =
   | DecisionRequestBody
@@ -22,6 +28,7 @@ export type ClientRequestBody =
   | { readonly type: "list_bots"; readonly project_id?: string }
   | {
       readonly type: "create_bot";
+      readonly runtime?: BotRuntime;
       readonly project_id: string;
       /** Omit for an automatically numbered "New Bot" placeholder. */
       readonly name?: string;
@@ -36,6 +43,11 @@ export type ClientRequestBody =
       readonly description?: string;
       readonly instructions?: string;
       readonly avatar?: string;
+    }
+  | {
+      readonly type: "set_bot_runtime";
+      readonly bot_id: string;
+      readonly runtime: BotRuntime;
     }
   | {
       readonly type: "delete_bot";

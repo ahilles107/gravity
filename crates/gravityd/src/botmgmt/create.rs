@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use anyhow::bail;
-use bus::{Bot, MessageKind, RevisionField};
+use bus::{Bot, BotRuntime, MessageKind, RevisionField};
 use rand::seq::SliceRandom;
 
 use crate::app::AppState;
@@ -51,6 +51,26 @@ pub fn create_bot(
     creator: Option<&Bot>,
     actor: &Actor<'_>,
 ) -> anyhow::Result<Created> {
+    create_bot_with_runtime(
+        app,
+        project_id,
+        edit,
+        creator,
+        actor,
+        creator
+            .map(|b| b.runtime)
+            .unwrap_or(app.cfg.default_bot_runtime),
+    )
+}
+
+pub fn create_bot_with_runtime(
+    app: &Arc<AppState>,
+    project_id: &str,
+    edit: &IdentityEdit<'_>,
+    creator: Option<&Bot>,
+    actor: &Actor<'_>,
+    runtime: BotRuntime,
+) -> anyhow::Result<Created> {
     let raw_name = edit.name.unwrap_or_default();
     let name = validate_name(app, project_id, raw_name, None)?;
     // A caller that says nothing about the avatar gets one anyway: "create a
@@ -89,7 +109,7 @@ pub fn create_bot(
     let description = charter::description(edit.description);
     let instructions = charter::instructions(edit.instructions, creator.map(|c| c.name.as_str()));
 
-    let bot = app.db.create_bot(
+    let bot = app.db.create_bot_with_runtime(
         project_id,
         &name,
         &description,
@@ -98,13 +118,14 @@ pub fn create_bot(
         &workspace.display().to_string(),
         &dir_name,
         creator.map(|c| c.id.as_str()),
+        runtime,
     )?;
 
     // Issuing the token before provisioning means the runtime can authenticate
     // as soon as the files land.
     app.secrets.bot_token(&bot.id)?;
     let dirs = paths::provision_bot(&app.cfg, &provision_spec(app, &project, &bot))?;
-    if app.cfg.runtime == RuntimeKind::Pty {
+    if app.cfg.runtime == RuntimeKind::Pty && bot.runtime == BotRuntime::ClaudeCode {
         if let Err(error) = paths::trust_workspace(&app.cfg.user_home, &dirs.workspace) {
             tracing::warn!(bot_id = %bot.id, %error, "could not trust new bot workspace");
         }

@@ -22,7 +22,7 @@ mod create;
 mod revert;
 
 pub use archive::{archive_bot, prune_archived_workspaces};
-pub use create::{create_bot, Created};
+pub use create::{create_bot, create_bot_with_runtime, Created};
 pub use revert::revert_revision;
 
 /// Fields that may change on a bot. `None` leaves the stored value alone,

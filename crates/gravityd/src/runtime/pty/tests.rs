@@ -109,6 +109,7 @@ async fn a_real_pty_burst_is_merged_into_few_frames() {
         "i=0; while [ $i -lt {WRITES} ]; do printf '\\033[2K\\033[1A%04d' $i; i=$((i+1)); done"
     );
     let spec = BotSpec {
+        codex: None,
         bot_id: "pty-test".into(),
         bot_name: "pty".into(),
         workspace: std::env::temp_dir(),
@@ -128,6 +129,7 @@ async fn a_real_pty_burst_is_merged_into_few_frames() {
                 bytes += data.len();
             }
             SessionEvent::Exited { .. } => break,
+            SessionEvent::Lifecycle { .. } => {}
         }
     }
     // Each write is two 4-byte escape sequences plus 4 digits.

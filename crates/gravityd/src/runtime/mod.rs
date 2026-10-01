@@ -4,9 +4,11 @@
 //! Bus deliveries never go through the PTY: they are posted to the session's
 //! inbox socket (see `channel`). The PTY carries only terminal I/O.
 
+pub mod codex;
 pub mod double;
 #[cfg(windows)]
 mod inbox;
+pub mod mixed;
 pub mod pty;
 
 use std::path::PathBuf;
@@ -30,6 +32,7 @@ pub struct Capabilities {
 /// Everything an adapter needs to start one bot session.
 #[derive(Debug, Clone)]
 pub struct BotSpec {
+    pub codex: Option<codex::CodexSpec>,
     pub bot_id: String,
     pub bot_name: String,
     pub workspace: PathBuf,
@@ -44,7 +47,14 @@ pub struct BotSpec {
 #[derive(Debug)]
 pub enum SessionEvent {
     Output(Vec<u8>),
-    Exited { code: Option<i32> },
+    Exited {
+        code: Option<i32>,
+    },
+    Lifecycle {
+        event: &'static str,
+        detail: Option<String>,
+        transcript: Option<String>,
+    },
 }
 
 /// A freshly started runtime session.
@@ -59,6 +69,10 @@ pub struct StartedSession {
 /// A live runtime session for one bot. Terminal I/O only — deliveries go
 /// through the inbox socket, never through here.
 pub trait RuntimeSession: Send {
+    /// A structured transport, when supported. Never writes terminal input.
+    fn deliver(&mut self, _text: &str) -> Option<anyhow::Result<()>> {
+        None
+    }
     /// Raw user keystrokes forwarded from the attached terminal.
     fn send_input(&mut self, bytes: &[u8]) -> anyhow::Result<()>;
     fn resize(&mut self, cols: u16, rows: u16) -> anyhow::Result<()>;

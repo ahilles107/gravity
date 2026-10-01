@@ -36,7 +36,7 @@ cargo build --workspace
 ./scripts/dev.sh
 ```
 
-Real bots require your own Claude Code installation and authentication. Use
+Real bots require your own Claude Code or Codex CLI installation and authentication. Use
 `GRAVITY_RUNTIME=double ./scripts/dev.sh` to run the deterministic test runtime
 without Claude credentials. Development state stays under `.dev/`.
 

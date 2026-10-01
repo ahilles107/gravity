@@ -24,6 +24,7 @@ mod dispatch;
 mod entities;
 mod messaging;
 mod routines;
+mod runtime;
 mod terminal;
 mod views;
 

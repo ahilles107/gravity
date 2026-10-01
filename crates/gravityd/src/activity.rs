@@ -161,7 +161,11 @@ fn assistant_text(entry: &Value) -> Option<String> {
 /// has no transcript yet (never started, or never spoke).
 pub fn from_transcript(home: &Path, workspace: &Path) -> Option<Activity> {
     let path = newest_transcript(&transcript_dir(home, workspace))?;
-    for line in tail_lines(&path, SCAN_LINES) {
+    from_transcript_file(&path)
+}
+
+fn from_transcript_file(path: &Path) -> Option<Activity> {
+    for line in tail_lines(path, SCAN_LINES) {
         let Ok(entry) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
@@ -200,7 +204,13 @@ fn from_bus(db: &Db, bot_id: &str) -> Option<Activity> {
 /// One preview line for a bot: the newer of its last Claude Code turn and its
 /// last bus message. None when the bot has said nothing yet.
 pub fn for_bot(db: &Db, home: &Path, bot_id: &str, workspace: &Path) -> Option<Activity> {
-    newer(from_transcript(home, workspace), from_bus(db, bot_id))
+    let transcript = match db.get_bot(bot_id).ok().flatten().map(|bot| bot.runtime) {
+        Some(bus::BotRuntime::CodexCli) => {
+            from_transcript_file(&crate::runtime::codex::transcript_path(workspace))
+        }
+        _ => from_transcript(home, workspace),
+    };
+    newer(transcript, from_bus(db, bot_id))
 }
 
 /// Collapses whitespace and caps the length, so one preview stays one line.

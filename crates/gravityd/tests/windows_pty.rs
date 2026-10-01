@@ -7,6 +7,7 @@ use gravityd::runtime::{BotSpec, RuntimeAdapter, SessionEvent};
 #[tokio::test]
 async fn conpty_streams_a_native_process_and_reports_exit() {
     let spec = BotSpec {
+        codex: None,
         bot_id: "windows-pty".into(),
         bot_name: "PTY".into(),
         workspace: std::env::temp_dir(),
@@ -30,6 +31,7 @@ async fn conpty_streams_a_native_process_and_reports_exit() {
                     assert_eq!(code, Some(0));
                     return bytes;
                 }
+                SessionEvent::Lifecycle { .. } => {}
             }
         }
         panic!("process must report exit");

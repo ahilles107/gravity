@@ -29,6 +29,9 @@ impl Supervisor {
                 }
             }
             "UserPromptSubmit" => self.set_state(bot_id, BotState::Working, "prompt submitted"),
+            "TurnInterrupted" => {
+                self.set_state(bot_id, BotState::Ready, "turn interrupted or failed")
+            }
             // Answering a permission prompt fires no hook of its own, so a bot
             // that was approved and carried on used to sit on "waiting for
             // approval" until its turn ended. A completed tool call is the

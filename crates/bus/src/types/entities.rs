@@ -33,6 +33,8 @@ pub struct Bot {
     pub description: String,
     pub avatar: String,
     pub instructions: String,
+    #[serde(default)]
+    pub runtime: BotRuntime,
     pub state: BotState,
     pub state_reason: String,
     pub unread_count: i64,
@@ -50,6 +52,23 @@ pub struct Bot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BotRuntime {
+    #[default]
+    ClaudeCode,
+    CodexCli,
+}
+
+impl BotRuntime {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ClaudeCode => "claude_code",
+            Self::CodexCli => "codex_cli",
+        }
+    }
 }
 
 /// One field-level change to a bot's identity: the audit trail that makes

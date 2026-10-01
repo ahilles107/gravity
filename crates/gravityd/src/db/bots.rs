@@ -31,6 +31,10 @@ impl Db {
             dir_name: r.get(8)?,
             created_by_bot_id: r.get(9)?,
             deleted_at: r.get::<_, Option<String>>(10)?.map(|s| parse_ts(&s)),
+            runtime: match r.get::<_, String>(11)?.as_str() {
+                "codex_cli" => BotRuntime::CodexCli,
+                _ => BotRuntime::ClaudeCode,
+            },
             // Runtime fields are overlaid by the supervisor.
             state: BotState::Stopped,
             state_reason: String::new(),
@@ -39,66 +43,10 @@ impl Db {
     }
 
     const BOT_COLS: &'static str = "id, project_id, name, description, avatar, instructions, \
-         workspace_path, created_at, dir_name, created_by_bot_id, deleted_at";
+         workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime";
 
     /// Restricts a query to bots that still exist for addressing purposes.
     const LIVE: &'static str = "deleted_at IS NULL";
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_bot(
-        &self,
-        project_id: &str,
-        name: &str,
-        description: &str,
-        instructions: &str,
-        avatar: &str,
-        workspace_path: &str,
-        dir_name: &str,
-        created_by_bot_id: Option<&str>,
-    ) -> anyhow::Result<Bot> {
-        let bot = Bot {
-            id: new_id(),
-            project_id: project_id.to_string(),
-            name: name.to_string(),
-            description: description.to_string(),
-            avatar: avatar.to_string(),
-            instructions: instructions.to_string(),
-            state: BotState::Stopped,
-            state_reason: String::new(),
-            unread_count: 0,
-            workspace_path: workspace_path.to_string(),
-            dir_name: dir_name.to_string(),
-            created_by_bot_id: created_by_bot_id.map(|s| s.to_string()),
-            deleted_at: None,
-            created_at: now(),
-        };
-        let conn = self.lock();
-        conn.execute(
-            "INSERT INTO bot(id, project_id, name, description, avatar, instructions,
-                             workspace_path, created_at, dir_name, created_by_bot_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                bot.id,
-                bot.project_id,
-                bot.name,
-                bot.description,
-                bot.avatar,
-                bot.instructions,
-                bot.workspace_path,
-                ts(bot.created_at),
-                bot.dir_name,
-                bot.created_by_bot_id
-            ],
-        )?;
-        // A DM conversation exists for every bot from creation.
-        let conv_id = new_id();
-        conn.execute(
-            "INSERT INTO conversation(id, project_id, kind, bot_id, title, created_at)
-             VALUES (?1, ?2, 'dm', ?3, ?4, ?5)",
-            params![conv_id, bot.project_id, bot.id, bot.name, ts(now())],
-        )?;
-        Ok(bot)
-    }
 
     /// Record that the bot's workspace now holds a Claude Code conversation,
     /// so later starts resume it instead of opening a blank session.
