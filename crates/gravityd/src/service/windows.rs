@@ -98,6 +98,20 @@ fn run_task(args: &[&str]) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn stop_daemon(pid: u32, executable: &Path) -> anyhow::Result<()> {
+    // A missing process leaves PowerShell's implicit exit status at 1 even
+    // with SilentlyContinue. An absent or reused PID needs no termination.
+    let script = format!(
+        "$p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p -and $p.Path -eq {}) {{ & taskkill.exe /PID {pid} /T /F | Out-Null; exit $LASTEXITCODE }}; exit 0",
+        quote(executable)
+    );
+    let out = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .output()?;
+    anyhow::ensure!(out.status.success(), "could not stop managed daemon");
+    Ok(())
+}
+
 fn stop(paths: &ServicePaths) -> anyhow::Result<()> {
     let name = task_name(paths)?;
     // Ending an idle task returns an error; the home lock below verifies stop.
@@ -107,14 +121,7 @@ fn stop(paths: &ServicePaths) -> anyhow::Result<()> {
     if let Ok(pid) = std::fs::read_to_string(paths.pid_path()) {
         let pid: u32 = pid.trim().parse().context("invalid managed daemon PID")?;
         // Never kill a reused PID belonging to another executable.
-        let script = format!(
-            "$p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p -and $p.Path -eq {}) {{ & taskkill.exe /PID {pid} /T /F | Out-Null; exit $LASTEXITCODE }}",
-            quote(&paths.bin_path())
-        );
-        let out = Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .output()?;
-        anyhow::ensure!(out.status.success(), "could not stop managed daemon");
+        stop_daemon(pid, &paths.bin_path())?;
         std::fs::remove_file(paths.pid_path())?;
     }
     // /end returns before Task Scheduler has finished ending the launcher.
@@ -218,6 +225,14 @@ pub fn status(paths: &ServicePaths, configured_port: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stopping_an_absent_or_reused_pid_is_a_no_op() {
+        let root = tempfile::tempdir().expect("temporary home");
+        let executable = root.path().join("gravityd.exe");
+        stop_daemon(i32::MAX as u32, &executable).expect("absent process");
+        stop_daemon(std::process::id(), &executable).expect("unrelated process is preserved");
+    }
 
     #[test]
     fn uninstall_without_an_installed_daemon_is_a_no_op() {
