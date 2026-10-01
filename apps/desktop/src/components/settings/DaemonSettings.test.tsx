@@ -61,7 +61,7 @@ describe("DaemonSettings", () => {
     expect(screen.getByLabelText("Auto-compact window")).toHaveValue("250000");
   });
 
-  it("flags a negotiated port as the compromise it is", async () => {
+  it("explains an unavailable port without assuming a process or platform", async () => {
     const daemon = new FakeDaemon().onRequest("get_config", () => ({
       type: "config" as const,
       req_id: "1",
@@ -70,7 +70,12 @@ describe("DaemonSettings", () => {
     renderPane(daemon);
 
     expect(await screen.findByText("50123 (not 49777)")).toBeInTheDocument();
-    expect(screen.getByText(/bot bus moved with it/)).toBeInTheDocument();
+    expect(screen.getByText(/Port 49777 was unavailable at startup/)).toHaveTextContent(
+      /Gravity is using 50123 for the app and bot bus/,
+    );
+    expect(screen.getByText(/operating-system reservation/)).toHaveTextContent(
+      /choose an available port in gravityd.toml and restart the daemon/,
+    );
   });
 
   it("saves a new auto-compact window", async () => {

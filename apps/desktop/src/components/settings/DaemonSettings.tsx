@@ -180,11 +180,11 @@ function DaemonLaunchConfig({ config }: { readonly config: DaemonConfig }): Reac
           <div className="settings-row-help">Also serves the bot bus at /mcp.</div>
           {negotiated ? (
             <div className="settings-row-error">
-              Port {config.configured_port} was in use at startup, so the daemon took {config.port}.
-              The bot bus moved with it: a Mac whose Claude Code policy allowlists only the
-              configured /mcp URL drops the bus without saying so. Free {config.configured_port} and
-              the app-managed daemon restarts onto it within a minute, or set negotiate_port = false
-              in gravityd.toml to make a collision fail loudly instead.
+              Port {config.configured_port} was unavailable at startup. Gravity is using{" "}
+              {config.port} for the app and bot bus. Another process or an operating-system
+              reservation can block a port. To use a fixed port, choose an available port in
+              gravityd.toml and restart the daemon. Remote clients and MCP URL allowlists must use
+              the active port.
             </div>
           ) : null}
         </div>

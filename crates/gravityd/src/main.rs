@@ -116,8 +116,8 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(
             configured_port = cfg.configured_port,
             port = cfg.port,
-            "serving on a negotiated port: the bot bus is no longer at the \
-             configured /mcp URL, which a policy-managed Mac silently drops"
+            "configured port unavailable; app and bot bus are using the active port; \
+             remote clients and MCP URL allowlists must use this port"
         );
     }
     let home = cfg.home.clone();
