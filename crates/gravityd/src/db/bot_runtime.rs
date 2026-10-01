@@ -57,6 +57,8 @@ impl Db {
             dir_name: dir_name.to_string(),
             created_by_bot_id: created_by_bot_id.map(|s| s.to_string()),
             deleted_at: None,
+            peer_id: None,
+            remote_bot_id: None,
             created_at: now(),
         };
         let conn = self.lock();

@@ -7,11 +7,15 @@ mod decision_enums;
 mod decisions;
 mod entities;
 mod enums;
+mod peers;
+mod revisions;
 
 pub use decision_enums::*;
 pub use decisions::*;
 pub use entities::*;
 pub use enums::*;
+pub use peers::*;
+pub use revisions::*;
 
 pub type Id = String;
 

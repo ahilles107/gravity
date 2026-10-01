@@ -83,6 +83,12 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_devices` | – | `devices` |
 | `create_device` | `name, capabilities` (array of `"read"`/`"control"`/`"approve"`) | `device` (includes `token`, shown once) |
 | `revoke_device` | `device_id` | `device` |
+| `list_peers` | – | `peers` |
+| `create_peer_invite` | `name, url?` (defaults to the first non-loopback bind address) | `peer` plus `invite` (holds the link token, shown once) |
+| `add_peer` | `name, invite` | `peer`; the daemon starts dialing it |
+| `revoke_peer` | `peer_id` | `peer` |
+| `list_peer_bots` | `peer_id` | `peer_bots` (`bots`: id, name, description, avatar, runtime, project) |
+| `link_peer_bot` | `peer_id, remote_bot_id, project_id` | `bot` (a linked bot; `peer` is set on it) |
 | `list_decisions` | `project_id?, state?, tag?, bot_id?, query?, before?, limit?` | `decisions` |
 | `get_decision` | `decision_id` | `decision` (with comments, tags, notifications) |
 | `count_pending_decisions` | – | `pending_decisions` |

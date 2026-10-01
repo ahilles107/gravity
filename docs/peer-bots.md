@@ -1,6 +1,9 @@
 # Peer bots: one team across two machines
 
-Status: design, not yet implemented.
+Status: the daemon side (pairing, linking, forwarding, task mirroring and
+artifact transfer) is implemented and covered by `crates/gravityd/tests/peer_bots.rs`.
+The desktop UI is not built yet; pair and link with `gravityd peer …` until
+it is. Requests are listed in [protocol.md](protocol.md).
 
 A team can span two Gravity daemons. The motivating case is an app built for
 macOS and Windows: a lead and a Mac developer run on the Mac, a Windows
@@ -11,6 +14,30 @@ or fetch files.
 Each bot still runs, with its own terminal and runtime, on the machine that
 owns it. What crosses machines is the bus: messages, tasks, results, and the
 artifacts those results attach.
+
+## Setting it up
+
+On the Windows PC, add its Tailscale address to `bind` in `gravityd.toml`
+(next to `127.0.0.1`) and restart the daemon. Then create an invite for the
+Mac:
+
+```sh
+gravityd peer invite mac
+```
+
+On the Mac, add the PC with that invite, check that the link is up, and link
+the Windows bot into the project the lead works in:
+
+```sh
+gravityd peer add win-pc "ws://100.x.y.z:49777/peer#…"
+gravityd peer list
+gravityd peer bots win-pc
+gravityd peer link win-pc windev --project my-app
+```
+
+The lead can now `send_message(to: "windev", kind: "task", …)`. The first
+message creates a linked `lead` in the Windows bot's project, so its answers
+come back without any setup on the PC.
 
 ## Assumptions
 
