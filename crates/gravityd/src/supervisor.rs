@@ -29,6 +29,7 @@ use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession, SessionEvent};
 use crate::secrets::Secrets;
 use crate::terminal::TermBuffer;
 
+mod claim;
 mod hooks;
 mod lifecycle;
 mod restart;
@@ -116,6 +117,9 @@ struct BotHandle {
     /// crash and the reconciler leaves the bot alone.
     stopping: bool,
     restart_pending: bool,
+    /// Set while one `start_bot` call is bringing the runtime up, so a second
+    /// caller does not launch another runtime against the same conversation.
+    starting: bool,
     consecutive_crashes: u32,
     last_start: Instant,
     /// Earliest time the reconciler may start this bot again; set while a
@@ -146,6 +150,7 @@ impl BotHandle {
             repaint_generation: 0,
             stopping: false,
             restart_pending: false,
+            starting: false,
             consecutive_crashes: 0,
             last_start: Instant::now(),
             next_start_at: None,

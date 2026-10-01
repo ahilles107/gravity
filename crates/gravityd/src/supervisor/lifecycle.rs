@@ -10,14 +10,12 @@ impl Supervisor {
     pub fn start_bot(&self, bot_id: &str) -> anyhow::Result<()> {
         let bot = self.inner.db.get_bot(bot_id)?.context("bot not found")?;
 
-        {
-            let bots = self.lock_bots();
-            if let Some(h) = bots.get(bot_id) {
-                if h.session.is_some() && h.state.is_running() {
-                    return Ok(()); // already running
-                }
-            }
-        }
+        // Creation and the supervision tick can both start a new bot. Held
+        // until this call returns, so a second start finds the claim and
+        // backs off instead of fighting this one over the same conversation.
+        let Some(_claim) = self.claim_start(bot_id) else {
+            return Ok(()); // already running, or another start is in flight
+        };
         let token = self.inner.secrets.bot_token(bot_id)?;
         let workspace = std::path::PathBuf::from(&bot.workspace_path);
         let bot_root = workspace.parent().map(|p| p.to_path_buf());
@@ -318,6 +316,7 @@ impl Supervisor {
             None => true,
             Some(h) => {
                 h.session.is_none()
+                    && !h.starting
                     && !h.stopping
                     && h.next_start_at.is_none_or(|at| Instant::now() >= at)
             }
