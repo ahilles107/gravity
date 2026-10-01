@@ -1,7 +1,8 @@
 # Peer bots: one team across two machines
 
-Status: the daemon side (pairing, linking, forwarding, task mirroring and
-artifact transfer) is implemented and covered by `crates/gravityd/tests/peer_bots.rs`.
+Status: the daemon side (pairing, linking, forwarding, task mirroring,
+artifact transfer and linked projects) is implemented and covered by
+`crates/gravityd/tests/peer_bots.rs` and `crates/gravityd/tests/linked_projects.rs`.
 The desktop UI is not built yet; pair and link with `gravityd peer …` until
 it is. Requests are listed in [protocol.md](protocol.md).
 
@@ -80,7 +81,12 @@ back.
    the URL and token (`secrets/peer-<id>.token`), dials, and both sides
    record each other's `daemon_id` and name.
 3. Revoking a peer on either side deletes its token, and that side's linked
-   bots stop accepting deliveries (they fail with "peer revoked").
+   bots stop accepting deliveries (they fail with "peer revoked"). It also
+   unlinks every project linked through the peer, on both sides while the
+   link is still up (see [Linked projects](#linked-projects)). A revoked
+   peer's name is tombstoned and its `daemon_id` released, as an archived
+   bot's name is, so the same two machines can pair again under the same
+   names.
 
 The dialing side holds one long-lived WebSocket to `/peer` on the other, and
 traffic flows both ways over it. Only the listening daemon needs to be
@@ -88,8 +94,10 @@ reachable. The dialer reconnects with backoff, and `last_seen_at` drives the
 online/offline badge.
 
 A peer token authenticates only the `/peer` route. It carries no control-plane
-grants: a peer cannot list projects, attach terminals, rule on decisions, or
-reach a bot that has not been linked to it.
+grants: a peer cannot attach terminals, rule on decisions, or reach a bot that
+has not been linked to it. It can list projects (names and bot counts) and
+propose a link, because pairing is the owner's consent for either side to do
+that; everything else it does in a project needs a link through it.
 
 ## Linking a bot
 
@@ -105,6 +113,81 @@ one bot to the peer, and nothing else in its project.
 
 Unlinking archives the linked bot locally, like deleting any bot: its open
 tasks are cancelled and its history is kept.
+
+## Linked projects
+
+Linking a bot is one bot at a time. Linking a project makes two projects, one
+on each daemon, a single team: every bot on either side appears on the other,
+and stays that way as the team changes.
+
+- **One team, mirrored.** On link, every live bot that runs on either side is
+  exposed to the peer and gets a stand-in (a linked bot) in the other side's
+  project. While linked, a bot created, renamed, edited (description, avatar,
+  runtime) or archived on either side is mirrored to its stand-in.
+- **Recorded on both daemons.** A `project_link` row on each side holds the
+  other side's project id and name. A project links with at most one project
+  per peer, and a peer's project with at most one project here.
+- **Names stay unique.** Bots address each other by name, so a link whose
+  two rosters share a name is refused with `conflict`, naming the clashing
+  bots. A bot created or renamed later into a name the other side holds is
+  stood in as `<name>-<peer>` instead, with a warning in the log.
+- **Stand-ins do not count** towards `max_bots_per_project`; only bots that
+  run on a daemon count there.
+- **Unlinking**, from either side, archives the stand-ins on both sides
+  (their open tasks are cancelled, as when a bot is deleted), stops the peer
+  delivering to the project's bots, and removes the link on both sides.
+  History is kept. If the peer is offline, it drops its half when the link
+  next comes up. Revoking a peer unlinks every project linked through it.
+  Archiving a linked project unlinks it.
+
+Linking: the owner calls `link_project` on one daemon. It sends the peer a
+`link_project` frame with its project's id, name and roster. The peer checks
+everything first (already linked, name clash, a project to create already
+existing), then creates the project if asked, records its half, exposes its
+bots, stands the sender's bots in, and answers with its own project and
+roster. The sender checks the clash from its side too, records its half and
+stands the peer's bots in; if that fails it takes the peer's half back with
+`unlink_project`. The peer logs each link it accepts.
+
+Mirroring: any change to a bot in a linked project pushes `bot_updated`; a
+watcher on the daemon's own pushes then sends the project's whole roster as a
+`project_roster` event. The receiver reconciles its stand-ins against it:
+creates the missing, updates the changed, archives the ones no longer listed.
+A whole roster rather than a diff, so a lost event is repaired by the next
+one. Events on a link are applied in the order they were sent. Every link-up
+resends all rosters, after a `project_links` event listing the links the
+sender holds, so a link unlinked while the two could not talk is dropped on
+the other side too.
+
+Creating on the other machine: `create_bot` with `peer_id` (control plane) or
+MCP `create_bot` with `machine` asks the peer to create a real bot in the
+linked project, with `runtime` or else the peer's `default_bot_runtime`. The
+reply's bot becomes the stand-in here at once, without waiting for the roster.
+A bot that created a bot there is its creator on both sides, so its
+`update_bot` and `delete_bot` are forwarded and the peer holds them to the
+same rule as a local bot: only bots it created. The owner's `update_bot`,
+`set_bot_runtime` and `delete_bot` on a stand-in in a linked project are
+forwarded to its machine too; changing only the stand-in would be undone by
+the next roster.
+
+Peer frames (ids are the sender's own, except `bot_id` on `update_bot` and
+`delete_bot`, which is the receiver's):
+
+| Frame | Fields | Result |
+|---|---|---|
+| `list_projects` | – | `projects: [{ id, name, bot_count, linked_project_id? }]` |
+| `link_project` | `project: { project_id, project_name, bots }`, `remote_project_id?`, `remote_name?` | the receiver's `{ project_id, project_name, bots }` |
+| `unlink_project` | `project_id` | `{}`; also used to take back a half-made link |
+| `create_bot` | `project_id, name, description?, instructions?, avatar?, runtime?, as_bot_id?` | `bot` (a `RemoteBot`) |
+| `update_bot` | `bot_id, description?, instructions?, avatar?, runtime?, name?, as_bot_id?` | `bot` |
+| `delete_bot` | `bot_id, reason?, as_bot_id?` | `{}` |
+| `project_roster` (event) | `project: { project_id, project_name, bots }` | – |
+| `project_links` (event) | `links: [{ project_id, remote_project_id }]` | – |
+
+A peer acts only on projects linked through it, except `list_projects` and
+`link_project`. A refusal carries a `code` (`conflict`, `not_linked`,
+`not_found`, `runtime_unavailable`) that the asking daemon passes to its
+client.
 
 ## Message flow
 
@@ -189,7 +272,10 @@ would read a local one.
   never the user's, unless the frame came from the owner (`kind: user`).
 - The system prompt's bus section says a linked bot runs on another machine
   and that paths it mentions outside a transferred artifact are not readable
-  here.
+  here. In a linked project it also names the machines the project is linked
+  with, and that `create_bot` with `machine` creates a bot there.
+- `create_bot` takes an optional `machine`, allowed only when the bot's
+  project is linked through that peer.
 
 ## Desktop app (minimum for this version)
 
@@ -249,6 +335,23 @@ CREATE TABLE peer_task (            -- the two halves of a mirrored task
     PRIMARY KEY (peer_id, remote_task_id)
 );
 ```
+
+Linked projects add one more (migration 16):
+
+```sql
+CREATE TABLE project_link (
+    project_id          TEXT NOT NULL REFERENCES project(id),
+    peer_id             TEXT NOT NULL REFERENCES peer(id),
+    remote_project_id   TEXT NOT NULL,
+    remote_project_name TEXT NOT NULL,
+    linked_at           TEXT NOT NULL,
+    PRIMARY KEY (project_id, peer_id)
+);
+CREATE UNIQUE INDEX idx_project_link_remote ON project_link(peer_id, remote_project_id);
+```
+
+Migration 15 tombstones the names of peers revoked before it, and releases
+their `daemon_id`, so they can pair again.
 
 ## Delivery plan
 

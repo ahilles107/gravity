@@ -17,8 +17,14 @@ Server replies:
 ```json
 { "type": "hello_ok", "req_id": "1", "protocol_version": 2, "server_version": "0.1.0",
   "capabilities": ["terminal_attach", "search", "routines", "devices", "config", "decisions"],
-  "grants": ["read", "control", "approve"], "device_id": null }
+  "grants": ["read", "control", "approve"], "device_id": null, "daemon_id": "…" }
 ```
+
+`daemon_id` is the daemon's stable id, the one its peers learn (`Peer.daemon_id`).
+A client connected to two daemons uses it to tell which peer row is which
+daemon. `capabilities` includes `linked_projects` when the daemon supports
+linked projects (`list_peer_projects`, `link_project`, `unlink_project`,
+`create_bot` with `peer_id`, and `links` on projects).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -59,10 +65,10 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `delete_project` | `project_id` | `ok` — archives the project and every bot in it; see Semantics |
 | `list_bots` | `project_id?` | `bots` |
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
-| `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?` | `bot` (starts running immediately) |
+| `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?, peer_id?` | `bot` (starts running immediately). With `peer_id`, the peer creates the bot in the project linked with this one (`runtime` defaults to the peer's `default_bot_runtime`), and the reply is its stand-in here, with `peer` set; `not_linked` when the project is not linked through that peer, `unavailable` when it is offline |
 | `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
-| `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot` |
-| `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics |
+| `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot`; on a stand-in in a linked project, forwarded to its machine |
+| `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics. On a stand-in in a linked project, deletes the bot on its machine |
 | `list_bot_revisions` | `bot_id, limit?` | `bot_revisions` |
 | `revert_bot_revision` | `revision_id` | `bot` |
 | `attach` | `bot_id, after_seq?` (number) | `attached` then `term` pushes |
@@ -94,6 +100,9 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `revoke_peer` | `peer_id` | `peer` |
 | `list_peer_bots` | `peer_id` | `peer_bots` (`bots`: id, name, description, avatar, runtime, project) |
 | `link_peer_bot` | `peer_id, remote_bot_id, project_id` | `bot` (a linked bot; `peer` is set on it) |
+| `list_peer_projects` | `peer_id` | `peer_projects`: `peer_id`, `projects: [{ id, name, bot_count, linked_project_id? }]`; `linked_project_id` is the project here it is already linked with. `unavailable` when the peer is offline. Requires `read` |
+| `link_project` | `project_id, peer_id, remote_project_id?, remote_name?` | `project` with its `links`. With `remote_project_id`, links that project on the peer; without, the peer creates one named like this project (or `remote_name`). Errors: `not_found`, `unavailable`, `conflict` (bot names clash, naming them, or either project is already linked through that peer). See [peer-bots.md](peer-bots.md#linked-projects) |
+| `unlink_project` | `project_id, peer_id` | `project`; archives the stand-ins on both sides. `not_linked` when there is no such link |
 | `list_chat` | `bot_id, before?` (a turn id), `limit?` (default 30, max 200) | `chat` (`turns` oldest first, `has_more`) |
 | `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
 | `get_chat_image` | `bot_id, image_id` | `file` |
@@ -184,7 +193,7 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 - `bot_state`: `{ "bot_id", "state", "reason", "at" }` — state ∈ `starting|ready|working|waiting_for_user|waiting_for_approval|rate_limited|auth_failed|crashed|stopping|stopped`.
 - `message_new`: `{ "message": {...} }` — any new bus message visible to the user.
 - `bot_updated`: `{ "bot": {...} }` — a bot was created, edited, or archived. Bots edit themselves unprompted, so clients must not cache identity across this push.
-- `project_updated`: `{ "project": {...} }` — a project was created, renamed, or archived. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
+- `project_updated`: `{ "project": {...} }` — a project was created, renamed, archived, or linked or unlinked through a peer. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
 - `activity_update`: `{ "activity": { "bot_id", "from", "text", "at" } }` — a bot's preview
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
   the `ready` state; see Semantics.
@@ -211,7 +220,9 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 ## Entity shapes (JSON)
 
 ```jsonc
-Project  { "id", "name", "created_at" }
+Project  { "id", "name", "dir_name", "lead_bot_id"?, "links", "deleted_at"?, "created_at" }
+ProjectLink { "peer_id", "peer_name", "online", "remote_project_id",
+           "remote_project_name", "linked_at" }
 Bot      { "id", "project_id", "name", "description", "avatar", "instructions",
            "state", "state_reason", "unread_count", "workspace_path", "dir_name",
            "created_by_bot_id"?, "deleted_at"?, "created_at" }
@@ -256,7 +267,10 @@ PublishResult { "decision_id", "notified": ["<bot name>"],
            "skipped": [{"bot","reason"}] }
 ```
 
-`Project` gains `lead_bot_id?`; `Message` gains `decision_id?`.
+`Project` gains `lead_bot_id?`; `Message` gains `decision_id?`. `links` is
+always present (empty when the project is not linked); `project_updated` is
+pushed whenever a project's links change. A bot standing in for one on a peer
+carries `peer: { id, name, online }`.
 
 Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
 
