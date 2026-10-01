@@ -38,6 +38,7 @@ const READ_ONLY: &[&str] = &[
     "list_artifacts",
     "read_file",
     "list_permissions",
+    "list_tasks",
 ];
 
 /// Requests that exercise the owner's ruling authority.
@@ -150,6 +151,7 @@ impl Conn {
             "list_artifacts" => self.list_artifacts(&req_id, req),
             "read_file" => self.read_file(&req_id, req),
             "list_permissions" => self.list_permissions(&req_id, req),
+            "list_tasks" => self.list_tasks(&req_id, req),
             "answer_permission" => self.answer_permission(&req_id, req),
             other => {
                 self.reply_err(

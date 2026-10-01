@@ -9,6 +9,7 @@ import type {
   StepDetail,
 } from "./chat";
 import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
+import type { BotTask } from "./tasks";
 import type {
   Bot,
   BotActivity,
@@ -167,6 +168,12 @@ export type ServerReply =
       readonly permissions: readonly PermissionRequest[];
     })
   | (ReplyBase & { readonly type: "permission"; readonly permission: PermissionRequest })
+  | (ReplyBase & {
+      readonly type: "tasks";
+      readonly bot_id: string;
+      /** Newest first. */
+      readonly tasks: readonly BotTask[];
+    })
   | (ReplyBase & {
       readonly type: "artifacts";
       readonly project_id: string;

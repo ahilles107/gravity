@@ -98,6 +98,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
 | `get_chat_image` | `bot_id, image_id` | `file` |
 | `list_artifacts` | `project_id` | `artifacts` (newest first) |
+| `list_tasks` | `bot_id, limit?` (default 100) | `tasks`: newest first, each with `state`, `role` (`assigned` \| `delegated`), `other` (`name`, `machine?`), `request`, `result?`, `deadline_at?`, `closed_at?` |
 | `list_permissions` | `bot_id?` | `permissions` (prompts waiting on the owner) |
 | `answer_permission` | `request_id, decision` (`allow_once` \| `allow_session` \| `deny`), `reason?` | `permission`; `control` grant |
 | `read_file` | `path` and `bot_id` (its directory and its project's artifacts) or `project_id` (artifacts only) | `file` (`text` or `base64`, capped at 16 MiB) |

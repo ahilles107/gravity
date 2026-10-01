@@ -28,6 +28,7 @@ mod peers;
 mod permissions;
 mod routines;
 mod runtime;
+mod tasks;
 mod terminal;
 mod views;
 

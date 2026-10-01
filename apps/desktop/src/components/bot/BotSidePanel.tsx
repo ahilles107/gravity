@@ -4,10 +4,17 @@ import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import FilesPanel from "../files/FilesPanel";
 import InfoPanel from "../InfoPanel";
+import TasksPanel from "../tasks/TasksPanel";
 
-export type SideTab = "info" | "files";
+export type SideTab = "info" | "tasks" | "files";
 
-const SIDE_TABS: readonly SideTab[] = ["info", "files"];
+const SIDE_TABS: readonly SideTab[] = ["info", "tasks", "files"];
+
+const SIDE_LABEL: Readonly<Record<SideTab, string>> = {
+  info: "Info",
+  tasks: "Tasks",
+  files: "Files",
+};
 
 interface BotSidePanelProps {
   readonly client: DaemonApi;
@@ -37,7 +44,7 @@ export default function BotSidePanel(props: BotSidePanelProps): ReactElement {
               onSide(name);
             }}
           >
-            {name === "info" ? "Info" : "Files"}
+            {SIDE_LABEL[name]}
           </button>
         ))}
       </nav>
@@ -50,7 +57,9 @@ export default function BotSidePanel(props: BotSidePanelProps): ReactElement {
           onBotUpdated={props.onBotUpdated}
           onToast={props.onToast}
         />
-      ) : (
+      ) : null}
+      {side === "tasks" ? <TasksPanel client={client} bot={bot} connected={connected} /> : null}
+      {side === "files" ? (
         <FilesPanel
           client={client}
           bot={bot}
@@ -58,7 +67,7 @@ export default function BotSidePanel(props: BotSidePanelProps): ReactElement {
           selected={props.openFile}
           onSelect={props.onOpenFile}
         />
-      )}
+      ) : null}
     </>
   );
 }

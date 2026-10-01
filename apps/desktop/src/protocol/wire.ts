@@ -73,6 +73,7 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     artifacts: true,
     permissions: true,
     permission: true,
+    tasks: true,
   } satisfies Record<ServerReplyType, true>),
 );
 
