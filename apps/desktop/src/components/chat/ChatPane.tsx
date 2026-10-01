@@ -3,6 +3,7 @@ import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import ChatComposer from "./ChatComposer";
 import TurnView from "./TurnView";
+import { nativeDictation } from "../../dictation";
 import { typeIntoTerminal, uploadAttachment } from "./upload";
 import { useChat } from "./useChat";
 import { useChatSearch } from "./useChatSearch";
@@ -88,6 +89,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
         slashHint={linked ? null : "Runs in the terminal, as if you typed it there."}
         onAttach={linked ? undefined : (file) => uploadAttachment(client, bot.project_id, file)}
         onSend={onSend}
+        dictation={nativeDictation}
       />
     </div>
   );

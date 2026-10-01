@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import ChatComposer, { withAttachments } from "./ChatComposer";
+import ChatComposer from "./ChatComposer";
+import { withAttachments } from "./useAttachments";
 
 describe("ChatComposer", () => {
   it("attaches files and sends their paths with the message", async () => {

@@ -8,9 +8,9 @@
     "Cargo.toml": "17f46fbe0ce2a8fab2e1b26a1b10435ac1968ae6f8150db33bb1e05c25fb7491",
     "crates/gravityd/Cargo.toml": "e948b84372298a104eba4ea6dd4e76cd75e2c16278587dae0a51368943d4c2a7",
     "crates/bus/Cargo.toml": "c4c4f51131d78f8ae8cb6e96fcb918c245998d9c1e01312f513fb56dfc452910",
-    "apps/desktop/src-tauri/Cargo.lock": "7c73bbce32b88bd02862bcf73cea344288764824065d4379787d9c0de7991474",
-    "apps/desktop/src-tauri/Cargo.toml": "421dc0d9bcf49e5d93eb01a987ef7b77b393e1e383be7eac64cabde2daf53702",
-    "apps/desktop/src-tauri/tauri.conf.json": "31de1253c6bd39ef8b1f3183ce31a5965ecf49400481c0d0219b8bc9be6340ad",
+    "apps/desktop/src-tauri/Cargo.lock": "693ce0885264cdd40e82317bc61636d27d245827053358fb4803e3ff31f4b739",
+    "apps/desktop/src-tauri/Cargo.toml": "900f2f57061d91608e0eb256d9c62537d892c8fe04309373135cb010dd5ec17c",
+    "apps/desktop/src-tauri/tauri.conf.json": "c59a6b0a43a310537526ef00ca240c79e8c1470294a240f9bed425f2c28bf919",
     "apps/desktop/package.json": "e384b88dbaef1caa19f198a9c051f59f7b98823852968fb0d249fdae585be14e",
     "apps/desktop/pnpm-lock.yaml": "612e04de740dd11db246b0ea6646b66ccefc0aebcabf4b3b51673542a7ec46d2",
     "apps/desktop/vite.config.ts": "77f2fd4730e92ded079a31f0f857ef62d7a25f0b71acfe5db1eef34baccddd25",
@@ -54,11 +54,11 @@
     "third-party/overrides/de9a7e660e173136b351982a34f715af424ff812.txt": "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73",
     "third-party/overrides/e68a7ab37c8accca023db5f1505d48e4375d4324.txt": "0d17b75c1867fd568bcbb735f329d0d4253846c4b756a65e4d440c1e4bd59187",
     "third-party/overrides/f433b1a53f5b830a205fd2df78e2b34974656c7b.txt": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
-    "third-party/overrides/index.json": "688bb4e7bb9089487937265e38e3ad41c60a7f471c33f501a7a2cb426290491c"
+    "third-party/overrides/index.json": "d81f9641498570e58a26701fd68b72fcf5ba88d8102ef2ce34942f2b55278c72"
   },
   "outputs": {
     "third-party/DAEMON_NOTICES.txt": "2306e39d572db813bfe0139114f3cd70b4a478dae33b62299191285d750862c9",
-    "third-party/DESKTOP_NOTICES.txt": "0f1503f1ce5284fdba04876c576c7216f9df2443041dba0c0d3c596763070492",
+    "third-party/DESKTOP_NOTICES.txt": "e9c70433f185f63dddc175a80862a9d566a527c31c4fabb30e81c4ffbb2c30f9",
     "apps/marketing/public/THIRD_PARTY_NOTICES.txt": "fe0e343d06cefa62f499f856b77f463d6ef41f7a42f2be4d9726895fc39657a8"
   },
   "packages": [
@@ -7343,6 +7343,42 @@
     },
     {
       "ecosystem": "Rust",
+      "name": "objc2-audio-toolbox",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "runtime"
+      },
+      "source": "https://static.crates.io/crates/objc2-audio-toolbox/objc2-audio-toolbox-0.3.2.crate",
+      "checksum": "6948501a91121d6399b79abaa33a8aa4ea7857fe019f341b8c23ad6e81b79b08",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
+    },
+    {
+      "ecosystem": "Rust",
+      "name": "objc2-avf-audio",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "runtime"
+      },
+      "source": "https://static.crates.io/crates/objc2-avf-audio/objc2-avf-audio-0.3.2.crate",
+      "checksum": "13a380031deed8e99db00065c45937da434ca987c034e13b87e4441f9e4090be",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
+    },
+    {
+      "ecosystem": "Rust",
       "name": "objc2-cloud-kit",
       "version": "0.3.2",
       "license": "Zlib OR Apache-2.0 OR MIT",
@@ -7352,6 +7388,42 @@
       "source": "https://static.crates.io/crates/objc2-cloud-kit/objc2-cloud-kit-0.3.2.crate",
       "checksum": "73ad74d880bb43877038da939b7427bba67e9dd42004a18b809ba7d87cee241c",
       "notices": []
+    },
+    {
+      "ecosystem": "Rust",
+      "name": "objc2-core-audio",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "build/test"
+      },
+      "source": "https://static.crates.io/crates/objc2-core-audio/objc2-core-audio-0.3.2.crate",
+      "checksum": "e1eebcea8b0dbff5f7c8504f3107c68fc061a3eb44932051c8cf8a68d969c3b2",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
+    },
+    {
+      "ecosystem": "Rust",
+      "name": "objc2-core-audio-types",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "runtime"
+      },
+      "source": "https://static.crates.io/crates/objc2-core-audio-types/objc2-core-audio-types-0.3.2.crate",
+      "checksum": "5a89f2ec274a0cf4a32642b2991e8b351a404d290da87bb6a9a9d8632490bd1c",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
     },
     {
       "ecosystem": "Rust",
@@ -7427,6 +7499,24 @@
     },
     {
       "ecosystem": "Rust",
+      "name": "objc2-core-media",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "runtime"
+      },
+      "source": "https://static.crates.io/crates/objc2-core-media/objc2-core-media-0.3.2.crate",
+      "checksum": "05ec576860167a15dd9fce7fbee7512beb4e31f532159d3482d1f9c6caedf31d",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
+    },
+    {
+      "ecosystem": "Rust",
       "name": "objc2-core-text",
       "version": "0.3.2",
       "license": "Zlib OR Apache-2.0 OR MIT",
@@ -7436,6 +7526,24 @@
       "source": "https://static.crates.io/crates/objc2-core-text/objc2-core-text-0.3.2.crate",
       "checksum": "0cde0dfb48d25d2b4862161a4d5fcc0e3c24367869ad306b0c9ec0073bfed92d",
       "notices": []
+    },
+    {
+      "ecosystem": "Rust",
+      "name": "objc2-core-video",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "build/test"
+      },
+      "source": "https://static.crates.io/crates/objc2-core-video/objc2-core-video-0.3.2.crate",
+      "checksum": "d425caf1df73233f29fd8a5c3e5edbc30d2d4307870f802d18f00d83dc5141a6",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
     },
     {
       "ecosystem": "Rust",
@@ -7538,6 +7646,24 @@
       "source": "https://static.crates.io/crates/objc2-quartz-core/objc2-quartz-core-0.3.2.crate",
       "checksum": "96c1358452b371bf9f104e21ec536d37a650eb10f7ee379fff67d2e08d537f1f",
       "notices": []
+    },
+    {
+      "ecosystem": "Rust",
+      "name": "objc2-speech",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "components": {
+        "desktop": "runtime"
+      },
+      "source": "https://static.crates.io/crates/objc2-speech/objc2-speech-0.3.2.crate",
+      "checksum": "f9eb609f9d2a25e0f8b76954f3acaa58348ce2a91285fe867643b2224ac4d263",
+      "notices": [
+        {
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "upstream_sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        }
+      ]
     },
     {
       "ecosystem": "Rust",

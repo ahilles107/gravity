@@ -1,4 +1,5 @@
 mod daemon;
+mod dictation;
 mod shortcut;
 mod updater;
 
@@ -186,6 +187,9 @@ pub fn run() {
             daemon::restart_local_daemon,
             daemon::local_daemon_port,
             daemon::daemon_log_tail,
+            dictation::dictation_available,
+            dictation::start_dictation,
+            dictation::stop_dictation,
             updater::check_for_update,
             updater::install_update,
             updater::relaunch_app

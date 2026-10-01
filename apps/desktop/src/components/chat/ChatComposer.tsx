@@ -1,7 +1,9 @@
-import { Paperclip } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent, ReactElement } from "react";
-import { errText } from "../../util";
+import type { Dictation } from "../../dictation";
+import { AttachButton, AttachmentChips, MicButton } from "./ComposerParts";
+import { useAttachments, withAttachments } from "./useAttachments";
+import { useDictation } from "./useDictation";
 
 interface ChatComposerProps {
   /** Why the owner cannot write, or null when they can. */
@@ -12,68 +14,33 @@ interface ChatComposerProps {
   readonly onAttach?: (file: File) => Promise<string>;
   /** Shown under a draft that starts with `/`, or null when slash commands are not special. */
   readonly slashHint?: string | null;
+  /** On-device dictation; the mic button shows only where it is available. */
+  readonly dictation?: Dictation;
 }
 
-interface Attachment {
-  readonly key: number;
-  readonly name: string;
-  /** Null while it uploads. */
-  readonly path: string | null;
-  readonly error?: string;
-}
-
-/** The message text with the attached files' paths appended. */
-export function withAttachments(text: string, attachments: readonly Attachment[]): string {
-  const paths = attachments.flatMap((a) => (a.path === null ? [] : [a.path]));
-  if (paths.length === 0) {
-    return text;
-  }
-  const listing = paths.map((path) => `- ${path}`).join("\n");
-  return text === "" ? `Attached files:\n${listing}` : `${text}\n\nAttached files:\n${listing}`;
-}
+const LISTENING = "Listening… press the stop button when you are done.";
 
 /** Enter sends, Shift+Enter adds a line. A failed send keeps the draft. */
 export default function ChatComposer(props: ChatComposerProps): ReactElement {
   const { disabledReason, onSend, onAttach } = props;
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [attachments, setAttachments] = useState<readonly Attachment[]>([]);
   const field = useRef<HTMLTextAreaElement | null>(null);
-  const picker = useRef<HTMLInputElement | null>(null);
-  const nextKey = useRef(0);
   const disabled = disabledReason !== null;
-  const uploading = attachments.some((a) => a.path === null && a.error === undefined);
-  const ready = attachments.filter((a) => a.path !== null);
-
-  const attach = (files: readonly File[]): void => {
-    if (onAttach === undefined) {
-      return;
-    }
-    for (const file of files) {
-      const key = nextKey.current++;
-      setAttachments((current) => [...current, { key, name: file.name, path: null }]);
-      void onAttach(file)
-        .then((path) => {
-          setAttachments((current) => current.map((a) => (a.key === key ? { ...a, path } : a)));
-          return path;
-        })
-        .catch((failure: unknown) => {
-          const error = errText(failure);
-          setAttachments((current) => current.map((a) => (a.key === key ? { ...a, error } : a)));
-        });
-    }
-  };
+  const attachments = useAttachments(onAttach);
+  const voice = useDictation(props.dictation, draft, setDraft);
+  const empty = draft.trim() === "" && attachments.ready.length === 0;
+  const blocked = disabled || sending || attachments.uploading || empty;
 
   const send = async (): Promise<void> => {
-    const text = draft.trim();
-    if ((text === "" && ready.length === 0) || disabled || sending || uploading) {
+    if (blocked) {
       return;
     }
     setSending(true);
     try {
-      await onSend(withAttachments(text, ready));
+      await onSend(withAttachments(draft.trim(), attachments.ready));
       setDraft("");
-      setAttachments([]);
+      attachments.clear();
     } finally {
       setSending(false);
       field.current?.focus();
@@ -91,66 +58,22 @@ export default function ChatComposer(props: ChatComposerProps): ReactElement {
     const files = [...event.clipboardData.files];
     if (files.length > 0 && onAttach !== undefined) {
       event.preventDefault();
-      attach(files);
+      attachments.attach(files);
     }
   };
 
-  const hint =
+  const slash =
     props.slashHint != null && draft.trimStart().startsWith("/") ? props.slashHint : null;
+  const hint = voice.error ?? (voice.listening ? LISTENING : slash);
   return (
     <div className="chat-composer-wrap">
-      {attachments.length === 0 ? null : (
-        <div className="chat-attachments">
-          {attachments.map((a) => (
-            <span
-              key={a.key}
-              className={`chat-file-chip${a.error === undefined ? "" : " chat-file-chip-error"}`}
-              title={a.error ?? a.path ?? ""}
-            >
-              {a.name}
-              {a.path === null && a.error === undefined ? " · uploading…" : ""}
-              {a.error === undefined ? "" : " · failed"}
-              <button
-                type="button"
-                className="chat-file-chip-remove"
-                aria-label={`Remove ${a.name}`}
-                onClick={() => {
-                  setAttachments((current) => current.filter((other) => other.key !== a.key));
-                }}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <AttachmentChips attachments={attachments} />
       {hint === null ? null : <div className="chat-composer-hint">{hint}</div>}
       <div className="chat-composer">
         {onAttach === undefined ? null : (
-          <>
-            <button
-              type="button"
-              className="icon-btn chat-attach"
-              aria-label="Attach files"
-              title="Attach files (or paste them)"
-              disabled={disabled}
-              onClick={() => picker.current?.click()}
-            >
-              <Paperclip size={16} aria-hidden="true" />
-            </button>
-            <input
-              ref={picker}
-              type="file"
-              multiple
-              hidden
-              aria-label="Files to attach"
-              onChange={(event) => {
-                attach([...(event.target.files ?? [])]);
-                event.target.value = "";
-              }}
-            />
-          </>
+          <AttachButton attachments={attachments} disabled={disabled} />
         )}
+        {voice.available ? <MicButton voice={voice} disabled={disabled} /> : null}
         <textarea
           ref={field}
           className="chat-composer-field"
@@ -169,7 +92,7 @@ export default function ChatComposer(props: ChatComposerProps): ReactElement {
         <button
           type="button"
           className="btn btn-primary chat-composer-send"
-          disabled={disabled || sending || uploading || (draft.trim() === "" && ready.length === 0)}
+          disabled={blocked}
           onClick={() => void send()}
         >
           Send

@@ -4,6 +4,7 @@ import { useLoadOnConnect } from "../../hooks/useLoadOnConnect";
 import type { DaemonApi } from "../../protocol/api";
 import type { Bot, BusMessage } from "../../protocol/entities";
 import { errText, fmtTimestamp } from "../../util";
+import { nativeDictation } from "../../dictation";
 import ChatComposer from "./ChatComposer";
 import ChatMarkdown from "./ChatMarkdown";
 
@@ -93,6 +94,7 @@ export default function LinkedChat({
       </div>
       <ChatComposer
         disabledReason={writeBlocked}
+        dictation={nativeDictation}
         placeholder={`Message ${bot.name} on ${machine}`}
         onSend={async (text) => {
           await client.request(

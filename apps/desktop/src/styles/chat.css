@@ -317,3 +317,18 @@
   background-color: var(--amber);
   color: #000;
 }
+
+.chat-mic {
+  align-self: center;
+}
+
+.chat-mic-on {
+  color: var(--red);
+  animation: chat-mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes chat-mic-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
