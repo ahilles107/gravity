@@ -58,3 +58,5 @@ Windows supplies Bash for the visual script. Set up the checkout with LF
 line endings, as specified in `.gitattributes`, to match the formatting and notice
 checks. The shared dependency notice inventory covers macOS ARM64 and Windows
 x64; Windows release signing and publication require separate maintainer setup.
+
+![Windows first-run setup](images/windows-setup.png)
