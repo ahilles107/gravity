@@ -1,7 +1,8 @@
 //! On-device dictation for the chat composer. The operating system's own
 //! speech recognizer turns the microphone into text, so audio never goes to
 //! Gravity or a third party: Apple's Speech framework on macOS, set to
-//! recognize on the device whenever the Mac supports it.
+//! recognize on the device whenever the Mac supports it, and SAPI's
+//! in-process recognizer on Windows, which always runs on the PC.
 //!
 //! The composer starts and stops a session; partial and final transcripts
 //! arrive as `dictation` events.
@@ -11,6 +12,8 @@ use tauri::{AppHandle, Emitter};
 
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(windows)]
+mod sapi;
 
 /// The event the composer listens to.
 const EVENT: &str = "dictation";
@@ -36,7 +39,14 @@ pub(crate) fn emit(app: &AppHandle, event: DictationEvent) {
 /// Whether this platform can dictate.
 #[tauri::command]
 pub fn dictation_available() -> bool {
-    cfg!(target_os = "macos")
+    #[cfg(windows)]
+    {
+        sapi::available()
+    }
+    #[cfg(not(windows))]
+    {
+        cfg!(target_os = "macos")
+    }
 }
 
 /// Starts listening, asking for speech and microphone permission the first
@@ -49,7 +59,13 @@ pub async fn start_dictation(app: AppHandle) -> Result<(), String> {
             .await
             .map_err(|e| e.to_string())?
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        tauri::async_runtime::spawn_blocking(move || sapi::start(app))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = app;
         Err("Dictation is not available on this platform yet.".to_string())
@@ -61,4 +77,6 @@ pub async fn start_dictation(app: AppHandle) -> Result<(), String> {
 pub fn stop_dictation() {
     #[cfg(target_os = "macos")]
     macos::stop();
+    #[cfg(windows)]
+    sapi::stop();
 }

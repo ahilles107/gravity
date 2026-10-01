@@ -69,6 +69,14 @@ should be configured explicitly. Missing CLIs are rejected before the current
 bot session is stopped; later startup failures appear in the bot state and
 terminal. Switching providers clears the previous provider's terminal screen.
 
+The chat composer's microphone dictates with Windows' built-in SAPI desktop
+recognizer, which runs entirely on the PC; audio is not sent to Microsoft or
+Gravity. It uses the recognizer selected in Control Panel › Speech Recognition,
+and the button stays hidden when none is installed. Desktop apps must be
+allowed to use the microphone in Settings › Privacy & security › Microphone.
+Windows' newer online dictation is not used, so the setting for Online speech
+recognition does not matter.
+
 For development without model credentials, set `runtime = "double"` in a private
 `gravityd.toml` and run `cargo run -p gravityd -- --config <path>`. The double uses
 an authenticated named pipe and exercises the same message-delivery path.
