@@ -1,5 +1,6 @@
 // Server → client frames (protocol v2): replies carry `req_id`, pushes do not.
 
+import type { Artifact, ChatTurn, FileBody, StepDetail } from "./chat";
 import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
 import type {
   Bot,
@@ -139,7 +140,26 @@ export type ServerReply =
       readonly results: readonly PublishResult[];
     })
   | (ReplyBase & { readonly type: "tag"; readonly tag: Tag })
-  | (ReplyBase & { readonly type: "tags"; readonly tags: readonly Tag[] });
+  | (ReplyBase & { readonly type: "tags"; readonly tags: readonly Tag[] })
+  | (ReplyBase & {
+      readonly type: "chat";
+      readonly bot_id: string;
+      /** Oldest first. */
+      readonly turns: readonly ChatTurn[];
+      readonly has_more: boolean;
+    })
+  | (ReplyBase & {
+      readonly type: "chat_step";
+      readonly bot_id: string;
+      readonly item_id: string;
+      readonly detail: StepDetail;
+    })
+  | (ReplyBase & { readonly type: "file"; readonly file: FileBody })
+  | (ReplyBase & {
+      readonly type: "artifacts";
+      readonly project_id: string;
+      readonly artifacts: readonly Artifact[];
+    });
 
 export type ServerReplyType = ServerReply["type"];
 
@@ -178,7 +198,13 @@ export type ServerPush =
     }
   | { readonly type: "decision_update"; readonly decision: Decision }
   | { readonly type: "decision_deleted"; readonly decision_id: string }
-  | { readonly type: "decision_comment_new"; readonly comment: DecisionComment };
+  | { readonly type: "decision_comment_new"; readonly comment: DecisionComment }
+  | {
+      readonly type: "chat_turns";
+      readonly bot_id: string;
+      /** New or changed turns of a loaded chat, oldest first. */
+      readonly turns: readonly ChatTurn[];
+    };
 
 export type ServerPushType = ServerPush["type"];
 

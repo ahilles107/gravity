@@ -83,7 +83,8 @@ export type ClientRequestBody =
   | {
       readonly type: "list_messages";
       readonly conversation_id: string;
-      readonly before_id?: string;
+      /** Messages numbered below this one. */
+      readonly before_num?: number;
       readonly limit?: number;
     }
   | { readonly type: "list_bot_activity"; readonly project_id?: string }
@@ -141,7 +142,25 @@ export type ClientRequestBody =
       readonly name: string;
       readonly capabilities: readonly DeviceCapability[];
     }
-  | { readonly type: "revoke_device"; readonly device_id: string };
+  | { readonly type: "revoke_device"; readonly device_id: string }
+  | {
+      readonly type: "list_chat";
+      readonly bot_id: string;
+      /** A turn id: the page ends just before it. */
+      readonly before?: string;
+      readonly limit?: number;
+    }
+  | { readonly type: "get_chat_step"; readonly bot_id: string; readonly item_id: string }
+  | { readonly type: "get_chat_image"; readonly bot_id: string; readonly image_id: string }
+  | { readonly type: "list_artifacts"; readonly project_id: string }
+  | {
+      readonly type: "read_file";
+      readonly path: string;
+      /** The bot's directory and its project's artifacts. */
+      readonly bot_id?: string;
+      /** The project's artifacts only. */
+      readonly project_id?: string;
+    };
 
 /**
  * Requests eligible for the request/response helper: everything but the

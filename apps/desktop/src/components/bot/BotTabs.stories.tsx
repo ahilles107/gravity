@@ -5,5 +5,5 @@ import BotTabs from "./BotTabs";
 
 export const Interactive: Story = () => {
   const [active, setActive] = useState<BotTab>("terminal");
-  return <BotTabs active={active} onSelect={setActive} />;
+  return <BotTabs tabs={["terminal", "routines"]} active={active} onSelect={setActive} />;
 };

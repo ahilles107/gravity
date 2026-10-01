@@ -1,7 +1,8 @@
 # Chat pane: the default bot surface
 
 Issue: [ahilles107/gravity#13](https://github.com/ahilles107/gravity/issues/13).
-Status: phase 1 (daemon chat model) implemented. Branch: `codex/chat-pane`
+Status: phases 1 (daemon chat model) and 2 (desktop chat) implemented. Branch:
+`codex/chat-pane`
 (stacked on `codex/peer-bots`).
 
 Opening a bot today shows its terminal. The terminal is the truth, but it is a

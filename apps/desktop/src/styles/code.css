@@ -1,0 +1,90 @@
+/* Code blocks, highlighting and diffs, shared by the chat and file previews. */
+
+.code-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #101116;
+}
+
+.code-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 8px 3px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.code-block-copy {
+  font: inherit;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.code-block-copy:hover {
+  color: var(--text);
+}
+
+.code-block-body {
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  max-height: 480px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tok-keyword {
+  color: #c792ea;
+}
+
+.tok-string {
+  color: #a5d6a7;
+}
+
+.tok-comment {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.tok-number {
+  color: #f8bd7f;
+}
+
+.diff-view {
+  margin: 0;
+  max-height: 480px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #101116;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diff-line {
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.diff-add {
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  color: #b9f6ca;
+}
+
+.diff-del {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: #ffcdd2;
+}
+
+.diff-hunk {
+  color: var(--blue);
+  background: var(--bg-raised);
+}

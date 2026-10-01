@@ -29,6 +29,7 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   decision_update: true,
   decision_deleted: true,
   decision_comment_new: true,
+  chat_turns: true,
 };
 
 const REPLY_TYPES: ReadonlySet<string> = new Set(
@@ -64,6 +65,10 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     publish_result: true,
     tag: true,
     tags: true,
+    chat: true,
+    chat_step: true,
+    file: true,
+    artifacts: true,
   } satisfies Record<ServerReplyType, true>),
 );
 

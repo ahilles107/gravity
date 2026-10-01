@@ -1,0 +1,239 @@
+/* Chat pane: a bot's turns, folded steps, cards and the composer. */
+
+.chat-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.chat-older {
+  align-self: center;
+}
+
+.chat-empty {
+  margin: auto;
+  max-width: 360px;
+  text-align: center;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.chat-turn,
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.chat-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.chat-turn-head-own,
+.chat-message-own .chat-turn-head {
+  justify-content: flex-end;
+}
+
+.chat-turn-label {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.chat-turn-meta,
+.chat-turn-stats,
+.chat-pending-state {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.chat-turn-open .chat-turn-label::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  vertical-align: middle;
+}
+
+.chat-bubble {
+  border-radius: 12px;
+  padding: 8px 12px;
+  line-height: 1.5;
+  max-width: 78%;
+  overflow-wrap: anywhere;
+}
+
+.chat-bubble-own {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-raised));
+  color: var(--text-strong);
+  white-space: pre-wrap;
+}
+
+.chat-bubble-in {
+  align-self: flex-start;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+}
+
+.chat-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.chat-text {
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.chat-markdown p {
+  margin: 0 0 8px;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.md-inline-code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-active);
+}
+
+.chat-working {
+  color: var(--blue);
+  font-size: 12px;
+}
+
+.chat-note {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.chat-note-incoming {
+  font-style: normal;
+  border-left: 2px solid var(--amber);
+  padding-left: 8px;
+}
+
+.chat-error {
+  color: var(--red);
+  font-style: normal;
+}
+
+/* Bus traffic and results: labelled, never styled as the owner. */
+.chat-aside {
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+
+.chat-aside-label,
+.chat-card-label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.chat-aside-body {
+  white-space: pre-wrap;
+  color: var(--text);
+}
+
+.chat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+}
+
+.chat-completed {
+  border-color: color-mix(in srgb, var(--green) 40%, var(--border));
+}
+
+.chat-decision {
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
+}
+
+.chat-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-file-chip {
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.chat-file-chip:hover {
+  border-color: var(--accent);
+}
+
+/* The composer. */
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 20px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-composer-field {
+  flex: 1;
+  min-height: 38px;
+  max-height: 200px;
+  resize: vertical;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  line-height: 1.4;
+}
+
+.chat-composer-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.chat-composer-field:disabled {
+  opacity: 0.6;
+}

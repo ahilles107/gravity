@@ -52,7 +52,16 @@ export interface Bot {
   readonly created_by_bot_id?: string | null;
   /** Set when archived: the row and its history survive, the bot does not. */
   readonly deleted_at?: string | null;
+  /** Set on a linked bot: one that runs on a paired peer daemon. */
+  readonly peer?: BotPeer | null;
   readonly created_at: string;
+}
+
+/** The peer daemon a linked bot runs on. */
+interface BotPeer {
+  readonly id: string;
+  readonly name: string;
+  readonly online: boolean;
 }
 
 /**

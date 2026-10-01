@@ -20,6 +20,7 @@ export function emptyHandlers(): PushHandlerSets {
     decision_update: new Set(),
     decision_deleted: new Set(),
     decision_comment_new: new Set(),
+    chat_turns: new Set(),
   };
 }
 
@@ -80,6 +81,9 @@ export function dispatchPush(handlers: PushHandlerSets, push: ServerPush): void 
       break;
     case "decision_comment_new":
       emitPush(handlers, "decision_comment_new", push);
+      break;
+    case "chat_turns":
+      emitPush(handlers, "chat_turns", push);
       break;
     default:
       push satisfies never;
