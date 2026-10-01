@@ -105,3 +105,19 @@ describe("BotView with chat", () => {
     expect(screen.getByRole("button", { name: "Terminal" })).toHaveClass("tab-active");
   });
 });
+
+describe("BotView for a linked bot on a daemon with peer chat", () => {
+  beforeEach(() => {
+    stubLocalStorage();
+  });
+
+  it("reads its real chat from its machine", async () => {
+    const client = chatDaemon();
+    client.capabilities = ["chat", "peer_chat"];
+    renderView(client, fx.bot({ peer: { id: "x", name: "win-pc", online: false } }));
+    expect(await screen.findByText("Ported.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/runs on win-pc; its chat is read from there\. It is offline/),
+    ).toBeInTheDocument();
+  });
+});

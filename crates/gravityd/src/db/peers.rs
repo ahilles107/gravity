@@ -168,6 +168,18 @@ impl Db {
             .optional()?)
     }
 
+    /// Every live linked bot standing in for `remote_bot_id`, in any project.
+    pub fn linked_bots_for(&self, peer_id: &str, remote_bot_id: &str) -> anyhow::Result<Vec<Bot>> {
+        let conn = self.lock();
+        let sql = format!(
+            "SELECT {} FROM bot WHERE peer_id = ?1 AND remote_bot_id = ?2 AND deleted_at IS NULL",
+            Self::BOT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![peer_id, remote_bot_id], Self::bot_from_row)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// A bot row standing in for a bot that runs on `peer_id`. It gets a DM
     /// conversation like any bot, an empty workspace path, and a directory
     /// name no local bot can have, so nothing ever provisions files for it.

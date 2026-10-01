@@ -30,6 +30,7 @@ pub const CAPABILITIES: &[&str] = &[
     "bot_runtime",
     "chat",
     "permissions",
+    "peer_chat",
 ];
 
 pub struct AppState {

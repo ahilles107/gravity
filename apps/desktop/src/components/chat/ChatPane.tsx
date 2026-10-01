@@ -14,6 +14,8 @@ interface ChatPaneProps {
   /** Why the owner cannot write to this bot, or null when they can. */
   readonly writeBlocked: string | null;
   readonly onOpenFile: (path: string) => void;
+  /** A line above the conversation, e.g. which machine a linked bot runs on. */
+  readonly note?: string;
 }
 
 /** How close to the bottom still counts as following the conversation. */
@@ -48,6 +50,7 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
   return (
     <div className="chat-pane">
       <div className="chat-scroll" ref={scroller} onScroll={onScroll}>
+        {props.note === undefined ? null : <div className="chat-note">{props.note}</div>}
         {chat.hasMore ? (
           <button
             type="button"

@@ -2,10 +2,10 @@
 //! `docs/superpowers/specs/2026-09-16-chat-pane-design.md`.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// One turn: what woke the bot, and everything it did until it stopped.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatTurn {
     /// The transcript id of the record that opened the turn.
     pub id: String,
@@ -21,7 +21,7 @@ pub struct ChatTurn {
     pub stats: Stats,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Trigger {
     /// The owner: from the app's composer, or typed into the terminal.
@@ -50,14 +50,14 @@ pub enum Trigger {
     Background { text: String },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OwnerVia {
     Chat,
     Terminal,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatItem {
     Text {
@@ -93,7 +93,7 @@ pub enum ChatItem {
     },
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Step {
     /// The tool call's id.
     pub id: String,
@@ -108,11 +108,11 @@ pub struct Step {
     pub added: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub removed: Option<u32>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<ImageRef>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StepStatus {
     Running,
@@ -120,7 +120,7 @@ pub enum StepStatus {
     Error,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AsideKind {
     /// The context was compacted.
@@ -132,20 +132,20 @@ pub enum AsideKind {
 }
 
 /// An image a step produced or looked at, fetched with `get_chat_image`.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ImageRef {
     pub id: String,
     pub mime: String,
 }
 
 /// A file a result names, opened with `read_file`.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FileRef {
     pub path: String,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Stats {
     pub commands: u32,
     pub reads: u32,
@@ -158,7 +158,7 @@ pub struct Stats {
 }
 
 /// The heavy half of a step, loaded when the owner opens it.
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StepDetail {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<String>,

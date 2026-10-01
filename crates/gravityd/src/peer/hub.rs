@@ -1,7 +1,7 @@
 //! Live peer links. Each paired daemon has at most one connection, whichever
 //! side dialed it; requests go out over it and wait for the matching response.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -48,6 +48,8 @@ struct Link {
 pub struct PeerHub {
     links: Arc<Mutex<HashMap<String, Link>>>,
     counter: Arc<AtomicU64>,
+    /// Local bot id → peers that have its chat open and want its turns.
+    chat_watchers: Arc<Mutex<HashMap<String, HashSet<String>>>>,
 }
 
 impl PeerHub {
@@ -57,6 +59,35 @@ impl PeerHub {
 
     pub fn is_online(&self, peer_id: &str) -> bool {
         self.lock().contains_key(peer_id)
+    }
+
+    /// Sends an event frame: no `req_id`, and no answer expected.
+    pub fn notify(&self, peer_id: &str, frame: Value) {
+        if let Some(link) = self.lock().get(peer_id) {
+            let _ = link.out.send(frame);
+        }
+    }
+
+    /// Remembers that a peer has this bot's chat open.
+    pub fn watch_chat(&self, peer_id: &str, bot_id: &str) {
+        self.chat_watchers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(bot_id.to_string())
+            .or_default()
+            .insert(peer_id.to_string());
+    }
+
+    /// The online peers watching this bot's chat.
+    pub fn chat_watchers(&self, bot_id: &str) -> Vec<String> {
+        let watchers = self.chat_watchers.lock().unwrap_or_else(|e| e.into_inner());
+        watchers
+            .get(bot_id)
+            .into_iter()
+            .flatten()
+            .filter(|peer| self.is_online(peer))
+            .cloned()
+            .collect()
     }
 
     /// Drops the peer's link, if any. Used when the peer is revoked.
@@ -140,6 +171,12 @@ impl PeerHub {
                 if let Some(tx) = id.and_then(|id| lock_pending(&pending).remove(&id)) {
                     let _ = tx.send(frame);
                 }
+                continue;
+            }
+            // An event: news from the peer, answered by nothing.
+            if frame.get("req_id").is_none() {
+                let (app, peer_id) = (app.clone(), peer_id.clone());
+                tokio::task::spawn_blocking(move || super::inbound::event(&app, &peer_id, &frame));
                 continue;
             }
             // Handled off the read loop, so one slow request (a result with

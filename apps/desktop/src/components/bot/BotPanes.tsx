@@ -35,6 +35,14 @@ function writeBlockedReason(connected: boolean, canControl: boolean, bot: Bot): 
   return isStopped(bot) ? `${bot.name} is stopped` : null;
 }
 
+/** Where a linked bot runs, said above its chat. */
+function machineNote(bot: Bot): string {
+  const machine = bot.peer?.name ?? "another machine";
+  const offline =
+    bot.peer?.online === false ? " It is offline, so its chat loads once it is back." : "";
+  return `${bot.name} runs on ${machine}; its chat is read from there.${offline}`;
+}
+
 function paneClass(shown: boolean): string {
   return shown ? "tab-pane" : "tab-pane tab-pane-hidden";
 }
@@ -55,7 +63,7 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
       <div className="bot-view-body">
         {tabs.includes("chat") ? (
           <div className={paneClass(active === "chat")}>
-            {linked ? (
+            {linked && !client.capabilities.includes("peer_chat") ? (
               <LinkedChat
                 client={client}
                 bot={bot}
@@ -69,6 +77,7 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
                 connected={connected}
                 writeBlocked={writeBlocked}
                 onOpenFile={props.onOpenFile}
+                note={linked ? machineNote(bot) : undefined}
               />
             )}
           </div>

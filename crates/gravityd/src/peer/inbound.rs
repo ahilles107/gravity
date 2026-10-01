@@ -18,12 +18,20 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
         "ping" => Ok(json!({})),
         "list_bots" => list_bots(app),
         "link" => link(app, &peer, frame),
+        "chat" | "chat_step" | "chat_image" | "read_file" => super::chat::serve(app, &peer, frame),
         "message" => {
             let message = serde_json::from_value(frame["message"].clone())?;
             let received = super::receive::receive(app, &peer, message)?;
             Ok(serde_json::to_value(received)?)
         }
         other => anyhow::bail!("unknown peer request '{other}'"),
+    }
+}
+
+/// News a peer sends without asking anything back.
+pub(super) fn event(app: &Arc<AppState>, peer_id: &str, frame: &Value) {
+    if frame["type"] == "chat_turns" {
+        super::chat::receive_turns(app, peer_id, frame);
     }
 }
 
