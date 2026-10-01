@@ -18,7 +18,13 @@ use serde_json::{json, Value};
 fn transcript_dir(user_home: &Path, workspace: &str) -> PathBuf {
     let mangled: String = workspace
         .chars()
-        .map(|c| if c == '/' || c == '.' { '-' } else { c })
+        .map(|c| {
+            if c == '/' || c == '.' || cfg!(windows) && (c == '\\' || c == ':') {
+                '-'
+            } else {
+                c
+            }
+        })
         .collect();
     user_home.join(".claude").join("projects").join(mangled)
 }

@@ -4,7 +4,12 @@
 //! Bus deliveries never go through the PTY: they are posted to the session's
 //! inbox socket (see `channel`). The PTY carries only terminal I/O.
 
+pub mod codex;
 pub mod double;
+mod executable;
+#[cfg(windows)]
+mod inbox;
+pub mod mixed;
 pub mod pty;
 
 use std::path::PathBuf;
@@ -28,6 +33,7 @@ pub struct Capabilities {
 /// Everything an adapter needs to start one bot session.
 #[derive(Debug, Clone)]
 pub struct BotSpec {
+    pub codex: Option<codex::CodexSpec>,
     pub bot_id: String,
     pub bot_name: String,
     pub workspace: PathBuf,
@@ -42,7 +48,34 @@ pub struct BotSpec {
 #[derive(Debug)]
 pub enum SessionEvent {
     Output(Vec<u8>),
-    Exited { code: Option<i32> },
+    Exited {
+        code: Option<i32>,
+    },
+    Lifecycle {
+        event: &'static str,
+        detail: Option<String>,
+        transcript: Option<String>,
+    },
+    /// The runtime asks to run something only the owner can allow. `key`
+    /// names it when answering through `RuntimeSession::answer_permission`.
+    Permission {
+        key: u64,
+        tool: String,
+        input: serde_json::Value,
+    },
+    /// A permission request stopped waiting without Gravity's answer, e.g.
+    /// it was answered in the runtime's own terminal.
+    PermissionGone {
+        key: u64,
+    },
+}
+
+/// The owner's answer to a runtime's permission request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionAnswer {
+    Once,
+    Session,
+    Deny,
 }
 
 /// A freshly started runtime session.
@@ -57,6 +90,15 @@ pub struct StartedSession {
 /// A live runtime session for one bot. Terminal I/O only — deliveries go
 /// through the inbox socket, never through here.
 pub trait RuntimeSession: Send {
+    /// A structured transport, when supported. Never writes terminal input.
+    fn deliver(&mut self, _text: &str) -> Option<anyhow::Result<()>> {
+        None
+    }
+    /// Answers a permission request the session raised as
+    /// `SessionEvent::Permission`.
+    fn answer_permission(&mut self, _key: u64, _answer: PermissionAnswer) -> anyhow::Result<()> {
+        anyhow::bail!("this runtime takes permission answers in its terminal")
+    }
     /// Raw user keystrokes forwarded from the attached terminal.
     fn send_input(&mut self, bytes: &[u8]) -> anyhow::Result<()>;
     fn resize(&mut self, cols: u16, rows: u16) -> anyhow::Result<()>;
@@ -64,6 +106,10 @@ pub trait RuntimeSession: Send {
 }
 
 pub trait RuntimeAdapter: Send + Sync {
+    /// Check the configured CLI before changing a bot's saved provider.
+    fn check_available(&self, _runtime: bus::BotRuntime) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn capabilities(&self) -> Capabilities;
     /// Start a session. Output and exit events arrive on the returned channel.
     fn start(&self, spec: &BotSpec) -> anyhow::Result<StartedSession>;

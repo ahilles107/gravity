@@ -64,11 +64,23 @@ impl Scheduler {
         let db = self.db.clone();
         let events = self.events.clone();
         tokio::spawn(async move {
-            while let Ok(Internal::BotDone {
-                bot_id,
-                transcript_path,
-            }) = internal.recv().await
-            {
+            use tokio::sync::broadcast::error::RecvError;
+            // Every internal event arrives here, not just finished turns: the
+            // loop must outlive the others, and a lagged burst, or routine
+            // runs stop completing for the rest of the daemon's life.
+            loop {
+                let (bot_id, transcript_path) = match internal.recv().await {
+                    Ok(Internal::BotDone {
+                        bot_id,
+                        transcript_path,
+                    }) => (bot_id, transcript_path),
+                    Ok(_) => continue,
+                    Err(RecvError::Lagged(skipped)) => {
+                        tracing::warn!(skipped, "routine completion watcher lagged");
+                        continue;
+                    }
+                    Err(RecvError::Closed) => break,
+                };
                 if let Err(e) = dispatch::complete_finished_turn(
                     &db,
                     &events,

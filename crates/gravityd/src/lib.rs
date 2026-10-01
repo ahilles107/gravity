@@ -4,9 +4,11 @@
 pub mod activity;
 pub mod actor;
 pub mod app;
+pub mod approval;
 pub mod backup;
 pub mod botmgmt;
 pub mod channel;
+pub mod chat;
 pub mod config;
 pub mod db;
 pub mod decisions;
@@ -18,12 +20,18 @@ pub mod messaging;
 pub mod model;
 pub mod overrides;
 pub mod paths;
+pub mod peer;
+mod permissions;
 pub mod projectmgmt;
 pub mod routine_validation;
 pub mod runtime;
 pub mod scheduler;
 pub mod secrets;
 pub mod server;
+#[cfg(not(windows))]
+pub mod service;
+#[cfg(windows)]
+#[path = "service/windows.rs"]
 pub mod service;
 pub mod supervisor;
 pub mod terminal;

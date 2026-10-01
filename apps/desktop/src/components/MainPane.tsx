@@ -115,6 +115,9 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         onBotUpdated={daemon.applyBotUpdate}
         onRoutinesChanged={daemon.updateBotRoutines}
         onToast={addToast}
+        onOpenDecision={(decisionId) => {
+          daemon.select({ kind: "control", decisionId });
+        }}
       />
     );
   }

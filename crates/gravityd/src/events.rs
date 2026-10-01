@@ -36,6 +36,21 @@ pub enum Push {
     DeliveryUpdate {
         delivery: Delivery,
     },
+    /// A bot's tool is waiting on the owner's answer.
+    PermissionRequest {
+        request: crate::approval::PermissionRequest,
+    },
+    /// A permission prompt stopped waiting: answered, expired or abandoned.
+    PermissionResolved {
+        request_id: String,
+        bot_id: String,
+        outcome: crate::approval::Outcome,
+    },
+    /// Turns of a bot's chat that are new or changed, oldest first.
+    ChatTurns {
+        bot_id: String,
+        turns: Vec<crate::chat::model::ChatTurn>,
+    },
     RoutineRunUpdate {
         routine_run: RoutineRun,
     },
@@ -105,6 +120,15 @@ pub enum Internal {
         bot_id: String,
         transcript_path: Option<String>,
     },
+    /// A bot's runtime asks the owner's permission (Codex approvals).
+    RuntimePermission {
+        bot_id: String,
+        key: u64,
+        tool: String,
+        input: serde_json::Value,
+    },
+    /// That request no longer waits on Gravity's answer.
+    RuntimePermissionGone { bot_id: String, key: u64 },
 }
 
 #[derive(Clone)]

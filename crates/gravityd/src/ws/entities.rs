@@ -21,11 +21,13 @@ impl Conn {
 
     /// Allocate the friendly placeholder used by one-click bot creation.
     ///
-    /// Only live bots hold a name and a project holds at most
-    /// `max_bots_per_project` of them, so one of the `max + 1` candidates is
-    /// always free — the loop cannot fall through while both of those hold.
-    fn default_bot_name(&self, project_id: &str) -> anyhow::Result<String> {
-        for number in 1..=self.app.cfg.max_bots_per_project.saturating_add(1) {
+    /// Only live bots hold a name, so with `n` of them in the project one of
+    /// `n + 1` candidates is always free and the loop cannot fall through.
+    /// Linked bots hold names too, without counting towards the cap, so the
+    /// bound is the bots actually there rather than the cap.
+    pub(super) fn default_bot_name(&self, project_id: &str) -> anyhow::Result<String> {
+        let live = self.app.db.list_bots(Some(project_id))?.len();
+        for number in 1..=live.saturating_add(1) {
             let candidate = if number == 1 {
                 "New Bot".to_string()
             } else {
@@ -49,7 +51,7 @@ impl Conn {
             .db
             .list_projects()?
             .iter()
-            .map(super::project_view)
+            .map(|project| super::project_view(&self.app, project))
             .collect();
         self.send(json!({ "type": "projects", "req_id": req_id, "projects": projects }));
         Ok(())
@@ -61,7 +63,7 @@ impl Conn {
             Ok(project) => {
                 self.send(json!({
                     "type": "project", "req_id": req_id,
-                    "project": super::project_view(&project)
+                    "project": super::project_view(&self.app, &project)
                 }));
             }
             Err(e) => self.reply_err(req_id, "invalid_request", &e.to_string()),
@@ -80,7 +82,7 @@ impl Conn {
             Ok(renamed) => {
                 self.send(json!({
                     "type": "project", "req_id": req_id,
-                    "project": super::project_view(&renamed)
+                    "project": super::project_view(&self.app, &renamed)
                 }));
             }
             Err(e) => self.reply_err(req_id, "invalid_request", &e.to_string()),
@@ -154,7 +156,11 @@ impl Conn {
     }
 
     pub(super) fn create_bot(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        if let Some(peer_id) = req.get("peer_id").and_then(Value::as_str) {
+            return self.create_bot_on_peer(req_id, req, peer_id);
+        }
         let project_id = Self::str_field(req, "project_id")?;
+        let runtime = botmgmt::requested_runtime(req)?.unwrap_or(self.app.cfg.default_bot_runtime);
         // An explicit `null` is how a client with no name to give says so, so
         // it takes the placeholder path rather than failing as a bad string.
         let supplied = match req.get("name") {
@@ -187,7 +193,14 @@ impl Conn {
                 instructions: req.get("instructions").and_then(|v| v.as_str()),
                 avatar: req.get("avatar").and_then(|v| v.as_str()),
             };
-            match botmgmt::create_bot(&self.app, project_id, &edit, None, &Actor::User) {
+            match botmgmt::create_bot_with_runtime(
+                &self.app,
+                project_id,
+                &edit,
+                None,
+                &Actor::User,
+                runtime,
+            ) {
                 Ok(created) => {
                     self.send(json!({
                         "type": "bot", "req_id": req_id,
@@ -220,6 +233,10 @@ impl Conn {
             .db
             .get_live_bot(bot_id)?
             .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
+        if crate::peer::remote_bots::is_mirrored(&self.app, &bot) {
+            self.update_bot_on_peer(req_id, req, bot);
+            return Ok(());
+        }
         let edit = IdentityEdit {
             name: req.get("name").and_then(|v| v.as_str()),
             description: req.get("description").and_then(|v| v.as_str()),
@@ -246,6 +263,10 @@ impl Conn {
             self.reply_err(req_id, "not_found", "bot not found or already deleted");
             return Ok(());
         };
+        if crate::peer::remote_bots::is_mirrored(&self.app, &bot) {
+            self.delete_bot_on_peer(req_id, req, bot);
+            return Ok(());
+        }
         botmgmt::archive_bot(&self.app, &bot, &Actor::User, reason)?;
         self.send(json!({ "type": "ok", "req_id": req_id }));
         Ok(())

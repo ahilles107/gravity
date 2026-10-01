@@ -17,11 +17,22 @@ Server replies:
 ```json
 { "type": "hello_ok", "req_id": "1", "protocol_version": 2, "server_version": "0.1.0",
   "capabilities": ["terminal_attach", "search", "routines", "devices", "config", "decisions"],
-  "grants": ["read", "control", "approve"], "device_id": null }
+  "grants": ["read", "control", "approve"], "device_id": null, "daemon_id": "…" }
 ```
+
+`daemon_id` is the daemon's stable id, the one its peers learn (`Peer.daemon_id`).
+A client connected to two daemons uses it to tell which peer row is which
+daemon. `capabilities` includes `linked_projects` when the daemon supports
+linked projects (`list_peer_projects`, `link_project`, `unlink_project`,
+`create_bot` with `peer_id`, and `links` on projects).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
+
+A client may add `"features": ["permission_cards"]` to `hello`: it shows bots'
+permission prompts and can answer them (`answer_permission`). The daemon only holds
+a Claude Code prompt for the app while at least one such client with the `control`
+grant is connected; otherwise the prompt stays in the bot's terminal.
 
 Two credential kinds are accepted as `token`:
 
@@ -54,9 +65,10 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `delete_project` | `project_id` | `ok` — archives the project and every bot in it; see Semantics |
 | `list_bots` | `project_id?` | `bots` |
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
-| `create_bot` | `project_id, name?, description?, instructions?, avatar?` | `bot` (starts running immediately) |
-| `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot` |
-| `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics |
+| `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?, peer_id?` | `bot` (starts running immediately). With `peer_id`, the peer creates the bot in the project linked with this one (`runtime` defaults to the peer's `default_bot_runtime`), and the reply is its stand-in here, with `peer` set; `not_linked` when the project is not linked through that peer, `unavailable` when it is offline |
+| `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
+| `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot`; on a stand-in in a linked project, forwarded to its machine |
+| `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics. On a stand-in in a linked project, deletes the bot on its machine |
 | `list_bot_revisions` | `bot_id, limit?` | `bot_revisions` |
 | `revert_bot_revision` | `revision_id` | `bot` |
 | `attach` | `bot_id, after_seq?` (number) | `attached` then `term` pushes |
@@ -82,6 +94,25 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_devices` | – | `devices` |
 | `create_device` | `name, capabilities` (array of `"read"`/`"control"`/`"approve"`) | `device` (includes `token`, shown once) |
 | `revoke_device` | `device_id` | `device` |
+| `list_peers` | – | `peers` |
+| `create_peer_invite` | `name, url?` (defaults to the first non-loopback bind address) | `peer` plus `invite` (holds the link token, shown once) |
+| `add_peer` | `name, invite` | `peer`; the daemon starts dialing it |
+| `revoke_peer` | `peer_id` | `peer` |
+| `list_peer_bots` | `peer_id` | `peer_bots` (`bots`: id, name, description, avatar, runtime, project) |
+| `link_peer_bot` | `peer_id, remote_bot_id, project_id` | `bot` (a linked bot; `peer` is set on it) |
+| `list_peer_projects` | `peer_id` | `peer_projects`: `peer_id`, `projects: [{ id, name, bot_count, linked_project_id? }]`; `linked_project_id` is the project here it is already linked with. `unavailable` when the peer is offline. Requires `read` |
+| `link_project` | `project_id, peer_id, remote_project_id?, remote_name?` | `project` with its `links`. With `remote_project_id`, links that project on the peer; without, the peer creates one named like this project (or `remote_name`). Errors: `not_found`, `unavailable`, `conflict` (bot names clash, naming them, or either project is already linked through that peer). See [peer-bots.md](peer-bots.md#linked-projects) |
+| `unlink_project` | `project_id, peer_id` | `project`; archives the stand-ins on both sides. `not_linked` when there is no such link |
+| `list_chat` | `bot_id, before?` (a turn id), `limit?` (default 30, max 200) | `chat` (`turns` oldest first, `has_more`) |
+| `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
+| `get_chat_image` | `bot_id, image_id` | `file` |
+| `list_artifacts` | `project_id` | `artifacts` (newest first) |
+| `write_artifact` | `project_id, name, base64` (one chunk, up to ~512 KB), `upload_id?` (from the first chunk's reply), `last` | `upload` (`upload_id`, and `path` once the last chunk is in); `control` grant. Files land in the project's `artifacts/uploads/`, up to 16 MB |
+| `list_tasks` | `bot_id, limit?` (default 100) | `tasks`: newest first, each with `state`, `role` (`assigned` \| `delegated`), `other` (`name`, `machine?`), `request` and `result?` as previews (`request_truncated`, `result_truncated` say when they were cut), `deadline_at?`, `closed_at?` |
+| `get_task` | `bot_id, task_id` | `task`: the same shape with the whole request and result |
+| `list_permissions` | `bot_id?` | `permissions` (prompts waiting on the owner) |
+| `answer_permission` | `request_id, decision` (`allow_once` \| `allow_session` \| `deny`), `reason?` | `permission`; `control` grant |
+| `read_file` | `path` and `bot_id` (its directory and its project's artifacts) or `project_id` (artifacts only) | `file` (`text` or `base64`, capped at 16 MiB) |
 | `list_decisions` | `project_id?, state?, tag?, bot_id?, query?, before?, limit?` | `decisions` |
 | `get_decision` | `decision_id` | `decision` (with comments, tags, notifications) |
 | `count_pending_decisions` | – | `pending_decisions` |
@@ -107,6 +138,13 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 When `create_bot` omits `name` — or sends it as `null` — the daemon allocates the first
 available placeholder in the project: `New Bot`, `New Bot 2`, and so on, retrying if another
 client claims the same one first. Explicitly named bot creation is unchanged.
+
+Daemons advertising `bot_runtime` include `runtime: "claude_code" | "codex_cli"`
+in bot objects. Older daemons omit it and use Claude Code. `create_bot` defaults
+to the configured `default_bot_runtime`; bot-authored children inherit their
+creator's runtime. `set_bot_runtime` preserves the workspace and provider histories,
+interrupts the current turn, and restarts through the supervisor. Setting the
+current value is a no-op. Existing bots migrate to `claude_code`.
 
 `trigger` is `{ "kind": "cron", "expr": "0 0 9 * * MON", "tz": "Europe/Warsaw" }`,
 `{ "kind": "interval", "seconds": 3600 }`, or
@@ -155,11 +193,20 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 - `bot_state`: `{ "bot_id", "state", "reason", "at" }` — state ∈ `starting|ready|working|waiting_for_user|waiting_for_approval|rate_limited|auth_failed|crashed|stopping|stopped`.
 - `message_new`: `{ "message": {...} }` — any new bus message visible to the user.
 - `bot_updated`: `{ "bot": {...} }` — a bot was created, edited, or archived. Bots edit themselves unprompted, so clients must not cache identity across this push.
-- `project_updated`: `{ "project": {...} }` — a project was created, renamed, or archived. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
+- `project_updated`: `{ "project": {...} }` — a project was created, renamed, archived, or linked or unlinked through a peer. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
 - `activity_update`: `{ "activity": { "bot_id", "from", "text", "at" } }` — a bot's preview
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
   the `ready` state; see Semantics.
 - `delivery_update`: `{ "delivery": {...} }`.
+- `permission_request`: `{ "request": { "id", "bot_id", "tool", "summary", "input", "created_at", "expires_at" } }`
+  — a bot's tool waits on the owner. Unanswered by `expires_at` (config
+  `permission_timeout_seconds`, default 600) it is denied.
+- `permission_resolved`: `{ "request_id", "bot_id", "outcome" }` — outcome ∈
+  `allowed_once|allowed_session|denied|expired|abandoned` (the hook went away first).
+- `chat_turns`: `{ "bot_id", "turns": [...] }` — turns of a loaded chat that are new or
+  changed, usually the open one. Merge by turn `id`. Only bots whose chat a client has
+  listed are followed. The turn model is described in
+  [the chat pane design](superpowers/specs/2026-09-16-chat-pane-design.md).
 - `routine_run_update`: `{ "routine_run": {...} }`.
 - `approval_pending`: `{ "bot_id", "detail" }` — bot is waiting on its native permission prompt.
 - `notify`: `{ "level": "info|warn|error", "title", "body", "decision_id"? }` —
@@ -173,7 +220,9 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 ## Entity shapes (JSON)
 
 ```jsonc
-Project  { "id", "name", "created_at" }
+Project  { "id", "name", "dir_name", "lead_bot_id"?, "links", "deleted_at"?, "created_at" }
+ProjectLink { "peer_id", "peer_name", "online", "remote_project_id",
+           "remote_project_name", "linked_at" }
 Bot      { "id", "project_id", "name", "description", "avatar", "instructions",
            "state", "state_reason", "unread_count", "workspace_path", "dir_name",
            "created_by_bot_id"?, "deleted_at"?, "created_at" }
@@ -218,7 +267,10 @@ PublishResult { "decision_id", "notified": ["<bot name>"],
            "skipped": [{"bot","reason"}] }
 ```
 
-`Project` gains `lead_bot_id?`; `Message` gains `decision_id?`.
+`Project` gains `lead_bot_id?`; `Message` gains `decision_id?`. `links` is
+always present (empty when the project is not linked); `project_updated` is
+pushed whenever a project's links change. A bot standing in for one on a peer
+carries `peer: { id, name, online }`.
 
 Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
 

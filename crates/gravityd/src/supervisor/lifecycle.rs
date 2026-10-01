@@ -9,15 +9,16 @@ use super::*;
 impl Supervisor {
     pub fn start_bot(&self, bot_id: &str) -> anyhow::Result<()> {
         let bot = self.inner.db.get_bot(bot_id)?.context("bot not found")?;
-
-        {
-            let bots = self.lock_bots();
-            if let Some(h) = bots.get(bot_id) {
-                if h.session.is_some() && h.state.is_running() {
-                    return Ok(()); // already running
-                }
-            }
+        if bot.is_linked() {
+            return Ok(()); // runs on its peer; nothing to start here
         }
+
+        // Creation and the supervision tick can both start a new bot. Held
+        // until this call returns, so a second start finds the claim and
+        // backs off instead of fighting this one over the same conversation.
+        let Some(_claim) = self.claim_start(bot_id) else {
+            return Ok(()); // already running, or another start is in flight
+        };
         let token = self.inner.secrets.bot_token(bot_id)?;
         let workspace = std::path::PathBuf::from(&bot.workspace_path);
         let bot_root = workspace.parent().map(|p| p.to_path_buf());
@@ -39,7 +40,9 @@ impl Supervisor {
             // provisioned before trust marking existed (or whose entry in
             // `~/.claude.json` was lost) would otherwise greet every daemon
             // restart with Claude Code's trust dialog.
-            if self.inner.cfg.runtime == crate::config::RuntimeKind::Pty {
+            if self.inner.cfg.runtime == crate::config::RuntimeKind::Pty
+                && bot.runtime == bus::BotRuntime::ClaudeCode
+            {
                 if let Err(e) = crate::paths::trust_workspace(&self.inner.cfg.user_home, &workspace)
                 {
                     tracing::warn!(bot_id, error = %e, "could not trust bot workspace");
@@ -64,13 +67,17 @@ impl Supervisor {
         // A bot is one continuous conversation: every start after the first
         // resumes the workspace's session, so a daemon restart is invisible to
         // the bot and to whoever was talking to it.
-        let resume = self.wants_resume(bot_id);
+        let resume = bot.runtime == bus::BotRuntime::ClaudeCode && self.wants_resume(bot_id);
         let mut claude_args = self.inner.cfg.claude_args.clone();
         if resume {
             claude_args.push("--continue".to_string());
         }
         // Whatever model the bot was last talking with, it keeps talking with.
-        let model = self.pinned_model(bot_id, &workspace);
+        let model = if bot.runtime == bus::BotRuntime::ClaudeCode {
+            self.pinned_model(bot_id, &workspace)
+        } else {
+            None
+        };
         if let Some(model) = &model {
             claude_args.push("--model".to_string());
             claude_args.push(model.clone());
@@ -120,6 +127,14 @@ impl Supervisor {
         }
 
         let spec = BotSpec {
+            codex: (bot.runtime == bus::BotRuntime::CodexCli).then(|| {
+                crate::runtime::codex::CodexSpec {
+                    bin: self.inner.cfg.codex_bin.clone(),
+                    args: self.inner.cfg.codex_args.clone(),
+                    port: self.inner.cfg.port,
+                    artifacts,
+                }
+            }),
             bot_id: bot.id.clone(),
             bot_name: bot.name.clone(),
             workspace,
@@ -136,16 +151,18 @@ impl Supervisor {
             tracing::warn!(bot_id, error = %e, "could not record the bot's session");
         }
         let session = Arc::new(Mutex::new(started.session));
-        let mut rx = started.events;
+        let rx = started.events;
         let term = {
             let mut bots = self.lock_bots();
             let handle = bots
                 .entry(bot_id.to_string())
                 .or_insert_with(|| BotHandle::new(self.inner.cfg.scrollback_bytes));
+            handle.prepare_terminal(bot.runtime);
             handle.session = Some(session.clone());
             handle.msg_socket = started.msg_socket;
             handle.size = (spec.cols, spec.rows);
             handle.stopping = false;
+            handle.restart_pending = false;
             handle.next_start_at = None;
             handle.resumed = resume;
             handle.pinned_model = model.is_some();
@@ -165,29 +182,12 @@ impl Supervisor {
         });
 
         // Consume session events until exit.
-        let sup = self.clone();
-        let bot_id_owned = bot_id.to_string();
-        tokio::spawn(async move {
-            let mut saw_output = false;
-            while let Some(ev) = rx.recv().await {
-                match ev {
-                    SessionEvent::Output(data) => {
-                        term.push(data);
-                        if !saw_output {
-                            saw_output = true;
-                            let (state, _) = sup.state(&bot_id_owned);
-                            if state == BotState::Starting {
-                                sup.set_state(&bot_id_owned, BotState::Ready, "runtime output");
-                            }
-                        }
-                    }
-                    SessionEvent::Exited { code } => {
-                        sup.on_exit(&bot_id_owned, code);
-                        break;
-                    }
-                }
-            }
-        });
+        tokio::spawn(super::session_events::consume(
+            self.clone(),
+            bot_id.to_string(),
+            term,
+            rx,
+        ));
         Ok(())
     }
 
@@ -202,15 +202,16 @@ impl Supervisor {
                 return;
             }
         };
-        for bot in bots {
+        for bot in bots.into_iter().filter(|b| !b.is_linked()) {
             if !self.wants_start(&bot.id) {
                 continue;
             }
             if let Err(e) = self.start_bot(&bot.id) {
-                tracing::warn!(bot_id = %bot.id, error = %e, "autostart failed");
+                tracing::warn!(bot_id = %bot.id, error = %format!("{e:#}"), "autostart failed");
                 // Back off like a crash so an unresolvable runtime does not
                 // respawn on every tick.
                 self.note_failed_start(&bot.id);
+                self.report_start_failure(&bot.id, &e);
             }
         }
     }
@@ -289,6 +290,7 @@ impl Supervisor {
             None => true,
             Some(h) => {
                 h.session.is_none()
+                    && !h.starting
                     && !h.stopping
                     && h.next_start_at.is_none_or(|at| Instant::now() >= at)
             }
@@ -306,7 +308,7 @@ impl Supervisor {
         handle.next_start_at = Some(Instant::now() + backoff(handle.consecutive_crashes));
     }
 
-    fn on_exit(&self, bot_id: &str, code: Option<i32>) {
+    pub(super) fn on_exit(&self, bot_id: &str, code: Option<i32>) {
         let (was_stopping, crashes) = {
             let mut bots = self.lock_bots();
             let Some(h) = bots.get_mut(bot_id) else {
@@ -329,6 +331,10 @@ impl Supervisor {
             } else {
                 h.consecutive_crashes = 0;
                 h.next_start_at = None;
+                if h.restart_pending {
+                    h.stopping = false;
+                    h.restart_pending = false;
+                }
             }
             (was_stopping, h.consecutive_crashes)
         };

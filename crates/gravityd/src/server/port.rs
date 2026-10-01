@@ -17,6 +17,12 @@ const PORT_GRACE_INTERVAL: Duration = Duration::from_millis(250);
 /// How often a daemon on a fallback port checks whether it can go home.
 pub(super) const PORT_RECLAIM_INTERVAL: Duration = Duration::from_secs(30);
 
+fn port_unavailable(error: &std::io::Error) -> bool {
+    error.kind() == std::io::ErrorKind::AddrInUse
+        // Hyper-V can reserve the preferred loopback port without a listener.
+        || (cfg!(windows) && error.raw_os_error() == Some(10013))
+}
+
 /// What a collision on the configured port means for this launch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortPolicy {
@@ -111,10 +117,10 @@ async fn bind_with_grace(
         Ok(bound) => return Ok(bound),
         Err(error) => error,
     };
-    if policy == PortPolicy::Strict || error.kind() != std::io::ErrorKind::AddrInUse {
+    if policy == PortPolicy::Strict || !port_unavailable(&error) {
         return Err(anyhow::Error::new(error).context(format!(
-            "binding port {configured_port}: stop whatever is using it, \
-             or set a different `port` in gravityd.toml"
+            "binding port {configured_port}: another process or an operating-system \
+             reservation may block this port; choose an available `port` in gravityd.toml"
         )));
     }
 
@@ -143,7 +149,7 @@ async fn bind_with_grace(
                 tracing::info!(port = configured_port, "configured port cleared in time");
                 return Ok(bound);
             }
-            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {}
+            Err(error) if port_unavailable(&error) => {}
             Err(error) => return Err(error.into()),
         }
     }
@@ -156,7 +162,7 @@ async fn bind_with_grace(
     for _ in 0..PORT_NEGOTIATION_ATTEMPTS {
         match bind_port(addresses, 0, configured_port).await {
             Ok(bound) => return Ok(bound),
-            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {}
+            Err(error) if port_unavailable(&error) => {}
             Err(error) => return Err(error.into()),
         }
     }

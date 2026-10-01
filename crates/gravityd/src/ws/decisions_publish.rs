@@ -171,7 +171,7 @@ impl Conn {
             project: project.clone(),
         });
         self.send(json!({
-            "type": "project", "req_id": req_id, "project": super::project_view(&project)
+            "type": "project", "req_id": req_id, "project": super::project_view(&self.app, &project)
         }));
         Ok(())
     }

@@ -46,7 +46,14 @@ if [ -r /proc/self/mountinfo ]; then
   done </proc/self/mountinfo
 fi
 
-if [ "$best_dest" = "/" ] || [ -z "$best_src" ]; then
+if [[ "$OSTYPE" == msys* ]]; then
+  # Docker Desktop needs a native host path and a Linux container path.
+  host_workspace="$(cygpath -m "$PWD")"
+  workspace="/workspace"
+  mount_args=(-v "$host_workspace:$workspace")
+  export MSYS_NO_PATHCONV=1
+  export MSYS2_ARG_CONV_EXCL='*'
+elif [ "$best_dest" = "/" ] || [ -z "$best_src" ]; then
   mount_args=(-v "$workspace:$workspace")
 else
   mount_args=(-v "$best_src:$best_dest")

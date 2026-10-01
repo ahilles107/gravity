@@ -1,0 +1,144 @@
+/* Chat pane: folded tool steps, their detail, and image strips. */
+
+.chat-steps {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+
+.chat-steps-summary,
+.chat-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-steps-summary:hover,
+.chat-step-row:hover {
+  color: var(--text);
+}
+
+.chat-chevron {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.chat-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-step-minor .chat-step-row {
+  opacity: 0.6;
+}
+
+.chat-step-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.chat-step-error .chat-step-dot {
+  background: var(--red);
+}
+
+.chat-step-running .chat-step-dot {
+  background: var(--blue);
+}
+
+.chat-step-title {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.chat-step-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.chat-step-lines {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.chat-step-running {
+  margin-left: auto;
+  color: var(--blue);
+}
+
+.chat-step-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 10px 10px 24px;
+  font-size: 12px;
+}
+
+.chat-step-output {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: #101116;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  color: var(--text-dim);
+}
+
+.chat-image-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 10px 10px;
+}
+
+/* A thumbnail keeps its image's shape: fixed height, width from the aspect. */
+.chat-thumb {
+  flex: none;
+  display: block;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.chat-thumb img {
+  display: block;
+  height: 120px;
+  width: auto;
+  max-width: 360px;
+  object-fit: contain;
+}
+
+.chat-thumb-empty {
+  height: 120px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: default;
+}

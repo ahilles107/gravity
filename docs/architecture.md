@@ -106,7 +106,9 @@ an Agent SDK adapter are not implemented runtime choices.
 
 Messages travel through the durable bus. A user can send a message through the
 control plane; a bot uses MCP tools such as `send_message`, `check_inbox`, and
-`complete_task`. Bot-to-bot addressing is scoped to a project.
+`complete_task`. Bot-to-bot addressing is scoped to a project. A project can
+include linked bots that run on a paired peer daemon; see
+[peer bots](peer-bots.md).
 
 The delivery path is:
 

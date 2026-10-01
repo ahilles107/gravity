@@ -16,6 +16,7 @@ use gravityd::db::Db;
 use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::Message as WsMsg;
 
+pub mod peers;
 pub mod tasks;
 
 pub struct TestDaemon {
@@ -92,7 +93,8 @@ impl WsClient {
                 "type": "hello",
                 "protocol_version": 2,
                 "token": d.app.secrets.client_token(),
-                "client": "test/0"
+                "client": "test/0",
+                "features": ["permission_cards"]
             }))
             .await;
         assert_eq!(reply["type"], "hello_ok", "handshake failed: {reply}");
