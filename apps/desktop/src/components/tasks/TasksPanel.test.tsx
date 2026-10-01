@@ -33,6 +33,36 @@ describe("TasksPanel", () => {
     expect(screen.queryByText("Reviewed — two nits, both fixed.")).not.toBeInTheDocument();
   });
 
+  it("loads the whole task when its preview was cut, and shows it as markdown", async () => {
+    const preview = task({
+      id: "t9",
+      state: "done",
+      request: "Batch 15 review returned three findings…",
+      request_truncated: true,
+      result: "I ruled on all six items…",
+      result_truncated: true,
+    });
+    const client = tasksDaemon([preview]).onRequest("get_task", () => ({
+      type: "task",
+      req_id: "9",
+      task: {
+        ...preview,
+        request: "Batch 15 review returned three findings, all fixed.",
+        request_truncated: false,
+        result: "I ruled on **all six** items, guard order included.",
+        result_truncated: false,
+      },
+    }));
+    render(<TasksPanel client={client} bot={fx.bot()} connected />);
+    await userEvent.click(await screen.findByRole("button", { name: "Show more" }));
+    expect(await screen.findByText("all six")).toBeInTheDocument();
+    expect(screen.getByText(/guard order included/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Batch 15 review returned three findings, all fixed."),
+    ).toBeInTheDocument();
+    expect(client.requests.at(-1)?.body).toEqual({ type: "get_task", bot_id: "b1", task_id: "t9" });
+  });
+
   it("refreshes after bus traffic and says when there is nothing", async () => {
     const client = tasksDaemon([]).onRequest("list_routines", () => ({
       type: "routines",

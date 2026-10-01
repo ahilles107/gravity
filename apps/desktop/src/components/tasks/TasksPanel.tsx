@@ -97,12 +97,12 @@ export default function TasksPanel({ client, bot, connected }: TasksPanelProps):
       ) : null}
       <Section title="Now" count={now.length}>
         {now.map((task) => (
-          <TaskRow key={task.id} task={task} />
+          <TaskRow key={task.id} task={task} client={client} botId={bot.id} />
         ))}
       </Section>
       <Section title="Waiting on others" count={waiting.length}>
         {waiting.map((task) => (
-          <TaskRow key={task.id} task={task} />
+          <TaskRow key={task.id} task={task} client={client} botId={bot.id} />
         ))}
       </Section>
       <Section title="Upcoming" count={next.length}>
@@ -112,7 +112,7 @@ export default function TasksPanel({ client, bot, connected }: TasksPanelProps):
       </Section>
       <Section title="Done" count={done.length}>
         {done.map((task) => (
-          <TaskRow key={task.id} task={task} />
+          <TaskRow key={task.id} task={task} client={client} botId={bot.id} />
         ))}
       </Section>
     </div>

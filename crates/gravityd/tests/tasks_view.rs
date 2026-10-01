@@ -59,3 +59,34 @@ async fn a_bot_sees_its_open_and_finished_tasks_from_both_ends() {
         .iter()
         .all(|t| t["role"] == "assigned" && t["other"]["name"] == "lead"));
 }
+
+#[tokio::test]
+async fn the_list_previews_long_text_and_get_task_has_all_of_it() {
+    let (pair, mut clients) = project_with_bots(&["lead", "dev"]).await;
+    let long = "step ".repeat(200);
+    let sent = clients[0]
+        .call(
+            "send_message",
+            json!({"to": "dev", "kind": "task", "body": long}),
+        )
+        .await;
+    let task_id = sent["task_id"].as_str().expect("task id").to_string();
+    let mut c = WsClient::connect(&pair.d).await;
+    let listed = c
+        .request(json!({"type": "list_tasks", "bot_id": pair.ids[0]}))
+        .await;
+    let preview = &listed["tasks"][0];
+    assert_eq!(preview["request_truncated"], true);
+    assert!(preview["request"].as_str().expect("request").len() < long.len());
+
+    let full = c
+        .request(json!({"type": "get_task", "bot_id": pair.ids[0], "task_id": task_id}))
+        .await;
+    assert_eq!(full["task"]["request"], long);
+    assert_eq!(full["task"]["request_truncated"], false);
+
+    let stranger = c
+        .request(json!({"type": "get_task", "bot_id": "someone-else", "task_id": task_id}))
+        .await;
+    assert_eq!(stranger["type"], "error");
+}

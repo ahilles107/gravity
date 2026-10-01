@@ -168,6 +168,7 @@ export type ServerReply =
       readonly permissions: readonly PermissionRequest[];
     })
   | (ReplyBase & { readonly type: "permission"; readonly permission: PermissionRequest })
+  | (ReplyBase & { readonly type: "task"; readonly task: BotTask })
   | (ReplyBase & {
       readonly type: "upload";
       /** `path` is set once the last chunk is in. */

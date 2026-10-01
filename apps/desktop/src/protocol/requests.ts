@@ -166,6 +166,7 @@ export type ClientRequestBody =
     }
   | { readonly type: "list_permissions"; readonly bot_id?: string }
   | { readonly type: "list_tasks"; readonly bot_id: string; readonly limit?: number }
+  | { readonly type: "get_task"; readonly bot_id: string; readonly task_id: string }
   | {
       readonly type: "write_artifact";
       readonly project_id: string;

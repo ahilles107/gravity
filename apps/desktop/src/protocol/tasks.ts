@@ -15,7 +15,10 @@ export interface BotTask {
     readonly machine?: string | null;
   };
   readonly request: string;
+  /** Set when `request` is a preview; `get_task` has all of it. */
+  readonly request_truncated?: boolean;
   readonly result?: string | null;
+  readonly result_truncated?: boolean;
   readonly created_at: string;
   readonly deadline_at?: string | null;
   readonly closed_at?: string | null;
