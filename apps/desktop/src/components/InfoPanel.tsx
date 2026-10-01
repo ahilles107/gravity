@@ -132,8 +132,8 @@ export default function InfoPanel({
             <button
               type="button"
               className="workspace-reveal"
-              aria-label="Reveal bot workspace in Finder"
-              title="Reveal in Finder"
+              aria-label="Open bot workspace folder"
+              title="Open folder"
               onClick={() => {
                 void revealBotWorkspace(bot.workspace_path);
               }}

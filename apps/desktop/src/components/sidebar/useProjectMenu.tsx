@@ -36,7 +36,7 @@ export function useProjectMenu({
       ...(canControl ? [{ label: "New Bot", onSelect: onCreateBot }] : []),
       { label: "Project settings", onSelect: onOpenSettings },
       {
-        label: "Reveal in Finder",
+        label: "Open folder",
         onSelect: () => {
           void revealProject(project.dir_name);
         },
