@@ -142,6 +142,9 @@ pub struct BotProvision<'a> {
     /// Absolute path of the project's shared artifacts directory, stated in
     /// the prompt so bots know where substance goes.
     pub artifacts_dir: String,
+    /// The peers this project is linked through, by name. Empty when the
+    /// team lives on this machine alone.
+    pub linked_machines: Vec<String>,
 }
 
 /// Create the bot's directory tree: `bot.json`, `system.md`, `mcp.json`, and a

@@ -292,12 +292,13 @@ impl Db {
             .optional()?)
     }
 
-    /// Live bots in a project — the number the population cap applies to.
+    /// Live bots that run here in a project — the number the population cap
+    /// applies to. A linked bot runs on its peer and counts there.
     pub fn count_live_bots(&self, project_id: &str) -> anyhow::Result<i64> {
         let conn = self.lock();
         Ok(conn.query_row(
             &format!(
-                "SELECT count(*) FROM bot WHERE project_id = ?1 AND {}",
+                "SELECT count(*) FROM bot WHERE project_id = ?1 AND peer_id IS NULL AND {}",
                 Self::LIVE
             ),
             params![project_id],

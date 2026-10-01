@@ -74,6 +74,7 @@ pub fn spawn_workers(app: &Arc<AppState>) {
         });
     }
 
+    crate::peer::mirror::spawn(app.clone());
     crate::peer::spawn_dialers(app);
 
     let worker = DeliveryWorker {

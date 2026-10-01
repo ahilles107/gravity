@@ -1,5 +1,6 @@
-//! Requests a peer makes of this daemon. A peer can see which bots exist,
-//! link one, and deliver messages to the bots linked to it. Nothing else.
+//! Requests a peer makes of this daemon. A peer can see which bots and
+//! projects exist, link a bot or a project, deliver messages to the bots
+//! linked to it, and manage bots in projects linked through it. Nothing else.
 
 use std::sync::Arc;
 
@@ -19,6 +20,12 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
         "list_bots" => list_bots(app),
         "link" => link(app, &peer, frame),
         "chat" | "chat_step" | "chat_image" | "read_file" => super::chat::serve(app, &peer, frame),
+        "list_projects" => super::links::serve_list(app, &peer),
+        "link_project" => super::links::serve_link(app, &peer, frame),
+        "unlink_project" => super::links::serve_unlink(app, &peer, frame),
+        "create_bot" => super::remote_bots::serve_create(app, &peer, frame),
+        "update_bot" => super::remote_bots::serve_update(app, &peer, frame),
+        "delete_bot" => super::remote_bots::serve_delete(app, &peer, frame),
         "message" => {
             let message = serde_json::from_value(frame["message"].clone())?;
             let received = super::receive::receive(app, &peer, message)?;
@@ -30,8 +37,15 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
 
 /// News a peer sends without asking anything back.
 pub(super) fn event(app: &Arc<AppState>, peer_id: &str, frame: &Value) {
-    if frame["type"] == "chat_turns" {
-        super::chat::receive_turns(app, peer_id, frame);
+    let live = matches!(app.db.get_peer(peer_id), Ok(Some(p)) if p.revoked_at.is_none());
+    if !live {
+        return;
+    }
+    match frame["type"].as_str().unwrap_or("") {
+        "chat_turns" => super::chat::receive_turns(app, peer_id, frame),
+        "project_roster" => super::mirror::receive_roster(app, peer_id, frame),
+        "project_links" => super::mirror::receive_links(app, peer_id, frame),
+        _ => {}
     }
 }
 

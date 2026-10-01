@@ -94,7 +94,19 @@ pub(super) fn provision_spec<'a>(
         artifacts_dir: paths::artifacts_dir(&app.cfg, &project.dir_name)
             .display()
             .to_string(),
+        linked_machines: linked_machines(app, &project.id),
     }
+}
+
+/// The peers a project is linked through, by name, for the system prompt.
+fn linked_machines(app: &AppState, project_id: &str) -> Vec<String> {
+    app.db
+        .project_links(project_id)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|link| app.db.get_peer(&link.peer_id).ok().flatten())
+        .map(|peer| peer.name)
+        .collect()
 }
 pub(super) fn parse_avatar(raw: &str) -> anyhow::Result<String> {
     bus::avatar::parse(raw)

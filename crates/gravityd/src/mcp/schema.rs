@@ -138,7 +138,8 @@ fn core_tools() -> Vec<Value> {
                  "description": {"type": "string", "description": "Optional. Short summary other bots see in list_bots"},
                  "instructions": {"type": "string", "description": "Optional. Standing instructions for the new bot"},
                  "avatar": {"type": "string", "description": format!("Optional; defaults to a random icon. {}", avatar_hint())},
-                 "runtime": {"type": "string", "enum": ["claude_code", "codex_cli"], "description": "Optional. Select Claude Code or Codex CLI explicitly; omitted inherits your runtime. The result reports the saved runtime; list_bots verifies it."}
+                 "runtime": {"type": "string", "enum": ["claude_code", "codex_cli"], "description": "Optional. Select Claude Code or Codex CLI explicitly; omitted inherits your runtime, or on another machine uses that machine's default. The result reports the saved runtime; list_bots verifies it."},
+                 "machine": {"type": "string", "description": "Optional. Create the bot on another of the owner's machines, named as list_bots reports it. Allowed only when this project is linked with that machine; omitted creates it here."}
              }),
              vec!["name"]),
         tool("update_bot",

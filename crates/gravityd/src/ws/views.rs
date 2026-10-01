@@ -9,13 +9,32 @@ use serde_json::{json, Value};
 
 use crate::app::AppState;
 
-/// A project as clients see it, with an archived row's original name restored.
-pub(crate) fn project_view(project: &bus::Project) -> Value {
+/// A project as clients see it, with an archived row's original name restored
+/// and the peers it is linked through.
+pub(crate) fn project_view(app: &AppState, project: &bus::Project) -> Value {
+    let links: Vec<Value> = app
+        .db
+        .project_links(&project.id)
+        .unwrap_or_default()
+        .iter()
+        .map(|link| {
+            let peer = app.db.get_peer(&link.peer_id).ok().flatten();
+            json!({
+                "peer_id": link.peer_id,
+                "peer_name": peer.as_ref().map(crate::db::Db::display_peer_name),
+                "online": app.peers.is_online(&link.peer_id),
+                "remote_project_id": link.remote_project_id,
+                "remote_project_name": link.remote_project_name,
+                "linked_at": link.linked_at.to_rfc3339()
+            })
+        })
+        .collect();
     json!({
         "id": project.id,
         "name": crate::db::Db::display_project_name(project),
         "dir_name": project.dir_name,
         "lead_bot_id": project.lead_bot_id,
+        "links": links,
         "deleted_at": project.deleted_at.map(|t| t.to_rfc3339()),
         "created_at": project.created_at.to_rfc3339()
     })
@@ -47,8 +66,7 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
     }
     json!({
         "peer": peer.as_ref().map(|p| json!({
-            "id": p.id, "name": crate::db::Db::display_peer_name(p),
-            "online": app.peers.is_online(&p.id)
+            "id": p.id, "name": p.name, "online": app.peers.is_online(&p.id)
         })),
         "id": bot.id,
         "project_id": bot.project_id,

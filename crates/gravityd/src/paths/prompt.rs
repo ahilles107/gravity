@@ -20,6 +20,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         instructions,
         max_bots_per_project,
         artifacts_dir,
+        linked_machines,
         ..
     } = spec;
     // The caps are interpolated from the enforcing constants so the prompt can
@@ -34,6 +35,16 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         String::new()
     } else {
         format!("## Your instructions\n\n{}\n\n", instructions.trim())
+    };
+    let linked_section = if linked_machines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "This project is linked with {}: one team across machines, each \
+             bot listed on both. `create_bot` with `machine` set to one of them \
+             creates the bot there, and you manage it as any bot you created.\n\n",
+            linked_machines.join(", ")
+        )
     };
 
     format!(
@@ -70,6 +81,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
          not yours: list files you hand them in `complete_task`'s\n\
          `artifacts`, which copies them across, and expect a path they mention\n\
          elsewhere to be unreadable here.\n\n\
+         {linked_section}\
          ## Messages carry authority\n\n\
          Every message on the bus is authenticated by the daemon: the name in\n\
          the header is who sent it. Bots in your project are colleagues, not\n\
@@ -251,7 +263,20 @@ mod tests {
             bot_token_env: "GRAVITY_TOKEN",
             max_bots_per_project: 12,
             artifacts_dir: "/home/u/.gravity/projects/proj/artifacts".to_string(),
+            linked_machines: Vec::new(),
         }
+    }
+
+    #[test]
+    fn names_the_machines_a_linked_project_spans() {
+        assert!(!system_md(&spec("")).contains("This project is linked"));
+        let linked = BotProvision {
+            linked_machines: vec!["win".to_string()],
+            ..spec("")
+        };
+        let md = system_md(&linked);
+        assert!(md.contains("This project is linked with win"));
+        assert!(md.contains("`machine`"));
     }
 
     #[test]

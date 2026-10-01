@@ -23,6 +23,7 @@ mod decisions;
 mod decisions_publish;
 mod dispatch;
 mod entities;
+mod links;
 mod messaging;
 mod peers;
 mod permissions;
@@ -143,9 +144,9 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
                 }
                 // Archiving tombstones the name so it can be reused; clients
                 // should see the name the project actually had.
-                crate::events::Push::ProjectUpdated { project } => {
-                    Ok(json!({ "type": "project_updated", "project": project_view(project) }))
-                }
+                crate::events::Push::ProjectUpdated { project } => Ok(
+                    json!({ "type": "project_updated", "project": project_view(&push_app, project) }),
+                ),
                 other => serde_json::to_value(other),
             };
             if let Ok(v) = value {
@@ -261,7 +262,10 @@ fn handshake(
         "server_version": DAEMON_VERSION,
         "capabilities": crate::app::CAPABILITIES,
         "grants": cap_strs,
-        "device_id": device_id
+        "device_id": device_id,
+        // The id peers learn, so a client paired with two daemons can tell
+        // which peer row is which daemon.
+        "daemon_id": app.db.daemon_id().ok()
     }));
     Some((caps, device_id))
 }

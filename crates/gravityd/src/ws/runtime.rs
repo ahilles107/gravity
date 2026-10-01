@@ -21,6 +21,11 @@ impl Conn {
             .db
             .get_live_bot(bot_id)?
             .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
+        // A stand-in's runtime is its machine's to change.
+        if crate::peer::remote_bots::is_mirrored(&self.app, &bot) {
+            self.update_bot_on_peer(req_id, &json!({ "runtime": runtime.as_str() }), bot);
+            return Ok(());
+        }
         let bot = match botmgmt::set_bot_runtime(&self.app, &bot, runtime) {
             Ok(bot) => bot,
             Err(error)

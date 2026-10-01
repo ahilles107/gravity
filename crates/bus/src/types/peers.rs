@@ -42,3 +42,14 @@ pub struct RemoteBot {
     #[serde(default)]
     pub project: String,
 }
+
+/// A project here linked with a project on a peer: one team across two
+/// machines. Recorded on both daemons, each with the other's project id.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectLink {
+    pub project_id: Id,
+    pub peer_id: Id,
+    pub remote_project_id: Id,
+    pub remote_project_name: String,
+    pub linked_at: DateTime<Utc>,
+}
