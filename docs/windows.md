@@ -48,6 +48,15 @@ pipe reported by its SessionStart hook. PowerShell hooks serialize the pipe path
 as JSON and report lifecycle events to the local daemon. A native Windows daemon
 cannot use a Claude inbox inside WSL; install the native CLI for native bots.
 
+For Codex bots, install and sign in to Codex CLI on the daemon host, then choose
+**Bot info → Bot runtime → Codex CLI**. Gravity searches PATH, the usual npm/pnpm
+and native Windows CLI locations, then the Codex desktop bundle. An explicit
+`codex_bin` path in `gravityd.toml` overrides discovery. The Windows task can
+have an older PATH than a newly opened terminal, so custom installation paths
+should be configured explicitly. Missing CLIs are rejected before the current
+bot session is stopped; later startup failures appear in the bot state and
+terminal. Switching providers clears the previous provider's terminal screen.
+
 For development without model credentials, set `runtime = "double"` in a private
 `gravityd.toml` and run `cargo run -p gravityd -- --config <path>`. The double uses
 an authenticated named pipe and exercises the same message-delivery path.

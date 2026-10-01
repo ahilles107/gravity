@@ -37,8 +37,8 @@ export default function BotRuntimePicker({
       onBotUpdated(reply.bot);
       onToast(
         "info",
-        "Runtime updated",
-        `${reply.bot.name} will restart with ${runtime === "codex_cli" ? "Codex CLI" : "Claude Code"}.`,
+        "Runtime saved",
+        `${reply.bot.name} is restarting with ${runtime === "codex_cli" ? "Codex CLI" : "Claude Code"}. Startup progress appears in the terminal.`,
       );
     } catch (error) {
       onToast("error", "Runtime update failed", errText(error));

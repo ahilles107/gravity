@@ -1,6 +1,31 @@
 use super::*;
 
+impl BotHandle {
+    pub(super) fn prepare_terminal(&mut self, runtime: bus::BotRuntime) {
+        if self
+            .terminal_runtime
+            .is_some_and(|previous| previous != runtime)
+        {
+            self.term.push(b"\x1bc".to_vec());
+        }
+        self.terminal_runtime = Some(runtime);
+    }
+}
+
 impl Supervisor {
+    pub(super) fn report_start_failure(&self, bot_id: &str, error: &anyhow::Error) {
+        let (state, _) = self.state(bot_id);
+        let reason = format!("Runtime failed to start: {error:#}");
+        self.set_state(bot_id, BotState::Crashed, &reason);
+        if state != BotState::Crashed {
+            if let Some(term) = self.term(bot_id) {
+                term.push(format!("\r\n[Gravity] {reason}\r\n").into_bytes());
+            }
+            self.inner
+                .events
+                .push(Push::notice("error", "Bot could not start", reason));
+        }
+    }
     pub fn restart_bot(&self, bot_id: &str) -> anyhow::Result<()> {
         let previous = self.state(bot_id);
         let session = {

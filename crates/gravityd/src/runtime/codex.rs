@@ -1,7 +1,7 @@
 //! Codex CLI App Server over stdio JSONL. Bus input is a separate RPC stream.
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -48,16 +48,14 @@ impl RuntimeAdapter for CodexAdapter {
         }
     }
     fn probe(&self) -> anyhow::Result<String> {
-        let out = Command::new("codex").arg("--version").output()?;
-        anyhow::ensure!(out.status.success(), "codex --version failed");
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        super::executable::version("codex")
     }
     fn start(&self, spec: &BotSpec) -> anyhow::Result<StartedSession> {
         let codex = spec
             .codex
             .as_ref()
             .context("missing Codex runtime settings")?;
-        let mut command = Command::new(&codex.bin);
+        let mut command = super::executable::command(&codex.bin);
         command
             .args(&codex.args)
             .arg("app-server")
@@ -68,12 +66,9 @@ impl RuntimeAdapter for CodexAdapter {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-        let mut child = command.spawn().context("spawn Codex CLI App Server")?;
+        let mut child = command
+            .spawn()
+            .with_context(|| format!("spawn Codex CLI App Server using {}", codex.bin))?;
         let stdin = child.stdin.take().context("Codex stdin")?;
         let stdout = child.stdout.take().context("Codex stdout")?;
         let stderr = child.stderr.take().context("Codex stderr")?;

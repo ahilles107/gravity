@@ -101,6 +101,7 @@ struct BotHandle {
     reason: String,
     session: Option<Arc<Mutex<Box<dyn RuntimeSession>>>>,
     term: Arc<TermBuffer>,
+    terminal_runtime: Option<bus::BotRuntime>,
     /// Inbox socket for channel delivery; from the adapter (double) or the
     /// SessionStart hook (pty).
     msg_socket: Option<MsgSocket>,
@@ -138,6 +139,7 @@ impl BotHandle {
             reason: String::new(),
             session: None,
             term: Arc::new(TermBuffer::new(scrollback)),
+            terminal_runtime: None,
             msg_socket: None,
             size: (0, 0),
             repaint_restore: None,

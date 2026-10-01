@@ -29,6 +29,10 @@ impl Conn {
             .get_live_bot(bot_id)?
             .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
         if bot.runtime != runtime {
+            if let Err(error) = self.app.supervisor.adapter().check_available(runtime) {
+                self.reply_err(req_id, "runtime_unavailable", &format!("{error:#}"));
+                return Ok(());
+            }
             self.app.db.set_bot_runtime(bot_id, runtime)?;
             if let Err(error) = self.app.supervisor.restart_bot(bot_id) {
                 self.app.db.set_bot_runtime(bot_id, bot.runtime)?;

@@ -156,6 +156,7 @@ impl Supervisor {
             let handle = bots
                 .entry(bot_id.to_string())
                 .or_insert_with(|| BotHandle::new(self.inner.cfg.scrollback_bytes));
+            handle.prepare_terminal(bot.runtime);
             handle.session = Some(session.clone());
             handle.msg_socket = started.msg_socket;
             handle.size = (spec.cols, spec.rows);
@@ -234,10 +235,11 @@ impl Supervisor {
                 continue;
             }
             if let Err(e) = self.start_bot(&bot.id) {
-                tracing::warn!(bot_id = %bot.id, error = %e, "autostart failed");
+                tracing::warn!(bot_id = %bot.id, error = %format!("{e:#}"), "autostart failed");
                 // Back off like a crash so an unresolvable runtime does not
                 // respawn on every tick.
                 self.note_failed_start(&bot.id);
+                self.report_start_failure(&bot.id, &e);
             }
         }
     }

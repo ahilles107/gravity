@@ -6,6 +6,7 @@
 
 pub mod codex;
 pub mod double;
+mod executable;
 #[cfg(windows)]
 mod inbox;
 pub mod mixed;
@@ -80,6 +81,10 @@ pub trait RuntimeSession: Send {
 }
 
 pub trait RuntimeAdapter: Send + Sync {
+    /// Check the configured CLI before changing a bot's saved provider.
+    fn check_available(&self, _runtime: bus::BotRuntime) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn capabilities(&self) -> Capabilities;
     /// Start a session. Output and exit events arrive on the returned channel.
     fn start(&self, spec: &BotSpec) -> anyhow::Result<StartedSession>;

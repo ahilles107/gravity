@@ -18,6 +18,15 @@ impl MixedAdapter {
 }
 
 impl RuntimeAdapter for MixedAdapter {
+    fn check_available(&self, runtime: bus::BotRuntime) -> anyhow::Result<()> {
+        let (bin, setting) = match runtime {
+            bus::BotRuntime::ClaudeCode => (&self.claude_bin, "claude_bin"),
+            bus::BotRuntime::CodexCli => (&self.codex_bin, "codex_bin"),
+        };
+        super::executable::version(bin).map(|_| ()).map_err(|error| {
+            anyhow::anyhow!("{error:#}. Install the CLI or set {setting} to its executable path in gravityd.toml.")
+        })
+    }
     fn capabilities(&self) -> Capabilities {
         Capabilities {
             kind: "cli",
@@ -36,14 +45,7 @@ impl RuntimeAdapter for MixedAdapter {
     fn probe(&self) -> anyhow::Result<String> {
         let versions: Vec<String> = [&self.claude_bin, &self.codex_bin]
             .into_iter()
-            .filter_map(|bin| {
-                std::process::Command::new(bin)
-                    .arg("--version")
-                    .output()
-                    .ok()
-                    .filter(|out| out.status.success())
-                    .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
-            })
+            .filter_map(|bin| super::executable::version(bin).ok())
             .collect();
         anyhow::ensure!(!versions.is_empty(), "neither configured CLI is available");
         Ok(versions.join("; "))
