@@ -204,3 +204,41 @@ describe("ChatPane", () => {
     expect(await screen.findByText(/no fake responder/)).toBeInTheDocument();
   });
 });
+
+describe("ChatPane commands and search", () => {
+  it("types slash commands into the terminal instead of the bus", async () => {
+    const client = daemon([]);
+    renderPane(client);
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: "Message" }),
+      "/compact{Enter}",
+    );
+    expect(client.fired[0]).toEqual({
+      type: "input",
+      bot_id: "b1",
+      data: "\u001b[200~/compact\u001b[201~",
+    });
+    expect(client.requests.some((r) => r.body.type === "send_user_message")).toBe(false);
+  });
+
+  it("narrows the turns to a search with ⌘F", async () => {
+    renderPane(
+      daemon([
+        turn({ id: "a", items: [text("Built the installer.", "x")] }),
+        turn({
+          id: "b",
+          started_at: "2026-10-01T11:00:00Z",
+          items: [text("Signed the MSI.", "y")],
+        }),
+      ]),
+    );
+    expect(await screen.findByText("Built the installer.")).toBeInTheDocument();
+    await userEvent.keyboard("{Meta>}f{/Meta}");
+    await userEvent.type(screen.getByRole("textbox", { name: "Search this chat" }), "msi");
+    expect(screen.queryByText("Built the installer.")).not.toBeInTheDocument();
+    expect(screen.getByText("Signed the MSI.")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 loaded turns")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByText("Built the installer.")).toBeInTheDocument();
+  });
+});

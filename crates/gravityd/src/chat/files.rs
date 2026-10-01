@@ -204,3 +204,82 @@ pub fn mime_for(name: &str) -> &'static str {
         _ => "application/octet-stream",
     }
 }
+
+/// Largest file the owner may attach from the app.
+const MAX_UPLOAD_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Where an attachment upload stands after one chunk.
+#[derive(Debug, Serialize)]
+pub struct Upload {
+    pub upload_id: String,
+    /// Set once the last chunk is in: where the file landed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+/// Appends one chunk of a file the owner attached in the composer. Chunks
+/// collect in a hidden partial file under the project's `artifacts/uploads/`;
+/// the last one moves it to its final name. Control frames are small, so a
+/// file arrives in pieces; only the name's last component is kept, so an
+/// attachment cannot be written anywhere else.
+pub fn append_upload(
+    app: &AppState,
+    project: &Project,
+    upload_id: Option<&str>,
+    name: &str,
+    bytes: &[u8],
+    last: bool,
+) -> anyhow::Result<Upload> {
+    use std::io::Write;
+    let upload_id = match upload_id {
+        Some(id) => {
+            anyhow::ensure!(uuid::Uuid::parse_str(id).is_ok(), "not an upload id");
+            id.to_string()
+        }
+        None => bus::new_id(),
+    };
+    let dir = artifacts_dir(app, project).join("uploads");
+    std::fs::create_dir_all(&dir)?;
+    let partial = dir.join(format!(".partial-{upload_id}"));
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&partial)?;
+    file.write_all(bytes)?;
+    if file.metadata()?.len() > MAX_UPLOAD_BYTES {
+        let _ = std::fs::remove_file(&partial);
+        anyhow::bail!("attachments are limited to 16 MB");
+    }
+    if !last {
+        return Ok(Upload {
+            upload_id,
+            path: None,
+        });
+    }
+    let path = unique_upload_path(&dir, name);
+    std::fs::rename(&partial, &path)?;
+    Ok(Upload {
+        upload_id,
+        path: Some(path.display().to_string()),
+    })
+}
+
+fn unique_upload_path(dir: &Path, name: &str) -> PathBuf {
+    let base = name
+        .rsplit(['/', '\\'])
+        .next()
+        .map(str::trim)
+        .filter(|n| !n.is_empty() && !n.starts_with('.'))
+        .unwrap_or("attachment");
+    let (stem, ext) = match base.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_string(), format!(".{ext}")),
+        _ => (base.to_string(), String::new()),
+    };
+    let mut path = dir.join(base);
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{stem}-{n}{ext}"));
+        n += 1;
+    }
+    path
+}

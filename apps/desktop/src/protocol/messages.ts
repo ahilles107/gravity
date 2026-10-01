@@ -169,6 +169,11 @@ export type ServerReply =
     })
   | (ReplyBase & { readonly type: "permission"; readonly permission: PermissionRequest })
   | (ReplyBase & {
+      readonly type: "upload";
+      /** `path` is set once the last chunk is in. */
+      readonly upload: { readonly upload_id: string; readonly path?: string };
+    })
+  | (ReplyBase & {
       readonly type: "tasks";
       readonly bot_id: string;
       /** Newest first. */

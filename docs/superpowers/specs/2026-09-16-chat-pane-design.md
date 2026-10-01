@@ -2,9 +2,10 @@
 
 Issue: [ahilles107/gravity#13](https://github.com/ahilles107/gravity/issues/13).
 Status: phases 1 (daemon chat model), 2 (desktop chat), 3 (permission cards)
-4 (Codex parity) and 5 (linked bots over the peer link) implemented, plus a
-Tasks tab; the live Claude Code check for phase 3 is pending. Branch:
-`codex/chat-pane`
+4 (Codex parity), 5 (linked bots over the peer link) and 6 (decisions in the
+thread, attachments, slash commands, search) implemented, plus a Tasks tab.
+Pending: the live Claude Code check for phase 3, and moving gravity_os off Gravity
+Lens (a separate repository). Branch: `codex/chat-pane`
 (stacked on `codex/peer-bots`).
 
 Opening a bot today shows its terminal. The terminal is the truth, but it is a

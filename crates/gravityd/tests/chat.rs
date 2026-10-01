@@ -182,3 +182,38 @@ async fn the_chat_capability_is_advertised() {
     let caps = hello["capabilities"].as_array().expect("capabilities");
     assert!(caps.contains(&json!("chat")));
 }
+
+#[tokio::test]
+async fn attachments_upload_in_chunks_into_the_project_artifacts() {
+    use base64::Engine;
+    let mut s = setup().await;
+    let encode = |text: &str| base64::engine::general_purpose::STANDARD.encode(text);
+    let first =
+        s.c.request(json!({
+            "type": "write_artifact", "project_id": s.project_id,
+            "name": "../../evil/notes.txt", "base64": encode("hello "), "last": false
+        }))
+        .await;
+    let upload_id = first["upload"]["upload_id"]
+        .as_str()
+        .expect("upload id")
+        .to_string();
+    assert!(first["upload"]["path"].is_null());
+    let done =
+        s.c.request(json!({
+            "type": "write_artifact", "project_id": s.project_id, "upload_id": upload_id,
+            "name": "../../evil/notes.txt", "base64": encode("world"), "last": true
+        }))
+        .await;
+    let path = done["upload"]["path"].as_str().expect("path");
+    assert!(path.ends_with("artifacts/uploads/notes.txt"), "{path}");
+    assert_eq!(std::fs::read_to_string(path).expect("read"), "hello world");
+
+    let refused =
+        s.c.request(json!({
+            "type": "write_artifact", "project_id": s.project_id, "upload_id": "../x",
+            "name": "a.txt", "base64": encode("x")
+        }))
+        .await;
+    assert_eq!(refused["type"], "error");
+}

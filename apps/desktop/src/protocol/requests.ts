@@ -167,6 +167,16 @@ export type ClientRequestBody =
   | { readonly type: "list_permissions"; readonly bot_id?: string }
   | { readonly type: "list_tasks"; readonly bot_id: string; readonly limit?: number }
   | {
+      readonly type: "write_artifact";
+      readonly project_id: string;
+      readonly name: string;
+      /** One chunk of the file. */
+      readonly base64: string;
+      /** From the first chunk's reply; absent on the first chunk. */
+      readonly upload_id?: string;
+      readonly last: boolean;
+    }
+  | {
       readonly type: "answer_permission";
       readonly request_id: string;
       readonly decision: PermissionAnswer;

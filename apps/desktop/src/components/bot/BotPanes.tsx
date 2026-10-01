@@ -20,6 +20,7 @@ interface BotPanesProps {
   readonly connected: boolean;
   readonly canControl: boolean;
   readonly onOpenFile: (path: string) => void;
+  readonly onOpenDecision?: (decisionId: string) => void;
   readonly onRoutinesChanged: (botId: string, routines: readonly Routine[]) => void;
   readonly onToast: AddToast;
 }
@@ -77,6 +78,8 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
                 connected={connected}
                 writeBlocked={writeBlocked}
                 onOpenFile={props.onOpenFile}
+                onOpenDecision={props.onOpenDecision}
+                active={active === "chat"}
                 note={linked ? machineNote(bot) : undefined}
               />
             )}

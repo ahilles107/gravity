@@ -15,7 +15,7 @@ function Frame({ turns }: { readonly turns: readonly ChatTurn[] }): ReactElement
   return (
     <div className="chat-scroll" style={{ width: 760 }}>
       {turns.map((t) => (
-        <TurnView key={t.id} client={client} turn={t} onOpenFile={noop} />
+        <TurnView key={t.id} client={client} turn={t} connected onOpenFile={noop} />
       ))}
     </div>
   );

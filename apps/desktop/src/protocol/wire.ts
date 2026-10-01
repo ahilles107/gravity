@@ -74,6 +74,7 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     permissions: true,
     permission: true,
     tasks: true,
+    upload: true,
   } satisfies Record<ServerReplyType, true>),
 );
 

@@ -3,6 +3,7 @@ import type { DaemonApi } from "../../protocol/api";
 import type { ChatTurn } from "../../protocol/chat";
 import { fmtTimestamp } from "../../util";
 import ChatMarkdown from "./ChatMarkdown";
+import DecisionCard from "./DecisionCard";
 import { durationLabel, groupItems, statsLine, triggerView } from "./chatModel";
 import type { ChatBlock } from "./chatModel";
 import StepGroup from "./StepGroup";
@@ -12,10 +13,13 @@ interface TurnViewProps {
   readonly turn: ChatTurn;
   /** Opens a file a result names in the Files panel. */
   readonly onOpenFile: (path: string) => void;
+  readonly connected: boolean;
+  readonly onOpenDecision?: (decisionId: string) => void;
 }
 
 /** One turn: what woke the bot, what it did, and how it ended. */
-export default function TurnView({ client, turn, onOpenFile }: TurnViewProps): ReactElement {
+export default function TurnView(props: TurnViewProps): ReactElement {
+  const { client, turn, onOpenFile } = props;
   const trigger = triggerView(turn.trigger);
   const stats = statsLine(turn.stats);
   const meta = [fmtTimestamp(turn.started_at), durationLabel(turn.duration_ms)]
@@ -43,6 +47,8 @@ export default function TurnView({ client, turn, onOpenFile }: TurnViewProps): R
           turnOpen={turn.open}
           block={block}
           onOpenFile={onOpenFile}
+          connected={props.connected}
+          onOpenDecision={props.onOpenDecision}
         />
       ))}
       {turn.open ? <div className="chat-working">Working…</div> : null}
@@ -57,9 +63,12 @@ interface BlockProps {
   readonly turnOpen: boolean;
   readonly block: ChatBlock;
   readonly onOpenFile: (path: string) => void;
+  readonly connected: boolean;
+  readonly onOpenDecision?: (decisionId: string) => void;
 }
 
-function Block({ client, botId, turnOpen, block, onOpenFile }: BlockProps): ReactElement {
+function Block(props: BlockProps): ReactElement {
+  const { client, botId, turnOpen, block, onOpenFile } = props;
   if (block.kind === "steps") {
     return <StepGroup client={client} botId={botId} steps={block.steps} turnOpen={turnOpen} />;
   }
@@ -106,10 +115,13 @@ function Block({ client, botId, turnOpen, block, onOpenFile }: BlockProps): Reac
       );
     case "decision":
       return (
-        <div className="chat-card chat-decision">
-          <div className="chat-card-label">Asked you to decide</div>
-          <div>{item.title}</div>
-        </div>
+        <DecisionCard
+          client={client}
+          decisionId={item.decision_id}
+          title={item.title}
+          connected={props.connected}
+          onOpenDecision={props.onOpenDecision}
+        />
       );
     case "aside":
       return <div className={`chat-note chat-note-${item.kind}`}>{item.text}</div>;

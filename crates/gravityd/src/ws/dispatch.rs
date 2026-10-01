@@ -152,6 +152,7 @@ impl Conn {
             "read_file" => self.read_file(&req_id, req),
             "list_permissions" => self.list_permissions(&req_id, req),
             "list_tasks" => self.list_tasks(&req_id, req),
+            "write_artifact" => self.write_artifact(&req_id, req),
             "answer_permission" => self.answer_permission(&req_id, req),
             other => {
                 self.reply_err(

@@ -137,6 +137,29 @@ impl Conn {
         Ok(())
     }
 
+    /// One chunk of a file the owner attached in the composer, saved into the
+    /// project's artifacts. `control`: it writes to the bots' shared folder.
+    pub(super) fn write_artifact(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        use base64::Engine;
+        let project_id = Self::str_field(req, "project_id")?.to_string();
+        let name = Self::str_field(req, "name")?.to_string();
+        let upload_id = req
+            .get("upload_id")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let last = req.get("last").and_then(Value::as_bool).unwrap_or(true);
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(Self::str_field(req, "base64")?)
+            .map_err(|_| anyhow::anyhow!("'base64' is not valid base64"))?;
+        self.blocking(req_id, move |app| {
+            let project = live_project(app, &project_id)?;
+            let upload =
+                files::append_upload(app, &project, upload_id.as_deref(), &name, &bytes, last)?;
+            Ok(json!({ "type": "upload", "upload": upload }))
+        });
+        Ok(())
+    }
+
     /// The bot, when it is linked: its chat lives on its peer.
     fn linked(&self, bot_id: &str) -> Option<bus::Bot> {
         self.app

@@ -26,6 +26,7 @@ interface BotViewProps {
   readonly onBotUpdated: (bot: Bot) => void;
   readonly onRoutinesChanged: (botId: string, routines: readonly Routine[]) => void;
   readonly onToast: AddToast;
+  readonly onOpenDecision?: (decisionId: string) => void;
 }
 
 interface DragState {
@@ -165,6 +166,7 @@ export default function BotView(props: BotViewProps): ReactElement {
             connected={connected}
             canControl={canControl}
             onOpenFile={showFile}
+            onOpenDecision={props.onOpenDecision}
             onRoutinesChanged={props.onRoutinesChanged}
             onToast={onToast}
           />

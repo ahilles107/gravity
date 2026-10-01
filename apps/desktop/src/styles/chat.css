@@ -237,3 +237,73 @@
 .chat-composer-field:disabled {
   opacity: 0.6;
 }
+
+/* Search, attachments and decisions in the chat. */
+.chat-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-search-field,
+.chat-decision-other {
+  flex: 1;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.chat-search-count,
+.chat-composer-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.chat-composer-hint {
+  padding: 0 20px;
+}
+
+.chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 20px 0;
+}
+
+.chat-file-chip-error {
+  color: var(--red);
+}
+
+.chat-file-chip-remove {
+  margin-left: 4px;
+  font: inherit;
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.chat-attach {
+  align-self: center;
+}
+
+.chat-decision-title {
+  color: var(--text-strong);
+}
+
+.chat-decision-ruling {
+  margin-top: 6px;
+  color: var(--green);
+}
+
+.chat-decision-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
