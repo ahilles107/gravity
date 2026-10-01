@@ -279,22 +279,26 @@ fn hook_settings(daemon_port: u16, bot_token_env: &str) -> serde_json::Value {
             }]
         }])
     };
-    // Notification carries Claude Code's stdin payload through untouched, so
-    // the daemon can read its `message` and tell a permission prompt apart
-    // from the "waiting for your input" idle ping. The event name rides in the
-    // query string because the body is no longer ours to shape.
-    let notification = serde_json::json!([{
-        "hooks": [{
-            "type": "command",
-            "command": format!(
-                "curl -fsS -m 3 -X POST \
-                 'http://127.0.0.1:{daemon_port}/hook?event=Notification' \
-                 -H \"Authorization: Bearer ${{{bot_token_env}}}\" \
-                 -H 'Content-Type: application/json' --data-binary @- \
-                 >/dev/null 2>&1 || true"
-            )
-        }]
-    }]);
+    // Notification and Stop carry Claude Code's stdin payload through
+    // untouched: Notification so the daemon can read its `message` and tell a
+    // permission prompt apart from the "waiting for your input" idle ping,
+    // Stop so it learns the `transcript_path` a finished routine run is read
+    // from. The event name rides in the query string because the body is no
+    // longer ours to shape.
+    let forwarding = |event: &str| {
+        serde_json::json!([{
+            "hooks": [{
+                "type": "command",
+                "command": format!(
+                    "curl -fsS -m 3 -X POST \
+                     'http://127.0.0.1:{daemon_port}/hook?event={event}' \
+                     -H \"Authorization: Bearer ${{{bot_token_env}}}\" \
+                     -H 'Content-Type: application/json' --data-binary @- \
+                     >/dev/null 2>&1 || true"
+                )
+            }]
+        }])
+    };
     // SessionStart additionally reports the session's inbox socket (and its
     // messaging token) so the daemon can deliver bus messages through it
     // instead of the terminal.
@@ -333,8 +337,8 @@ fn hook_settings(daemon_port: u16, bot_token_env: &str) -> serde_json::Value {
             // executing again: nothing else reports that a pending permission
             // prompt was answered.
             "PostToolUse": hook_cmd("PostToolUse"),
-            "Stop": hook_cmd("Stop"),
-            "Notification": notification,
+            "Stop": forwarding("Stop"),
+            "Notification": forwarding("Notification"),
             "SessionEnd": hook_cmd("SessionEnd")
         }
     })

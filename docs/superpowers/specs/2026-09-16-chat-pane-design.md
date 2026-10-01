@@ -1,7 +1,8 @@
 # Chat pane: the default bot surface
 
 Issue: [ahilles107/gravity#13](https://github.com/ahilles107/gravity/issues/13).
-Status: design. Branch: `codex/chat-pane` (stacked on `codex/peer-bots`).
+Status: phase 1 (daemon chat model) implemented. Branch: `codex/chat-pane`
+(stacked on `codex/peer-bots`).
 
 Opening a bot today shows its terminal. The terminal is the truth, but it is a
 poor way to read what a bot did. Images are invisible, diffs scroll past, files

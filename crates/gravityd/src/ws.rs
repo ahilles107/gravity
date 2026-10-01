@@ -18,6 +18,7 @@ use tokio::task::JoinHandle;
 use crate::app::{AppState, DAEMON_VERSION, PROTOCOL_VERSION};
 
 mod admin;
+mod chat;
 mod decisions;
 mod decisions_publish;
 mod dispatch;

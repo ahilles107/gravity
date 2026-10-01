@@ -32,6 +32,11 @@ const READ_ONLY: &[&str] = &[
     "count_pending_decisions",
     "list_peers",
     "list_peer_bots",
+    "list_chat",
+    "get_chat_step",
+    "get_chat_image",
+    "list_artifacts",
+    "read_file",
 ];
 
 /// Requests that exercise the owner's ruling authority.
@@ -138,6 +143,11 @@ impl Conn {
             "revoke_peer" => self.revoke_peer(&req_id, req),
             "list_peer_bots" => self.list_peer_bots(&req_id, req),
             "link_peer_bot" => self.link_peer_bot(&req_id, req),
+            "list_chat" => self.list_chat(&req_id, req),
+            "get_chat_step" => self.get_chat_step(&req_id, req),
+            "get_chat_image" => self.get_chat_image(&req_id, req),
+            "list_artifacts" => self.list_artifacts(&req_id, req),
+            "read_file" => self.read_file(&req_id, req),
             other => {
                 self.reply_err(
                     &req_id,

@@ -36,6 +36,11 @@ pub enum Push {
     DeliveryUpdate {
         delivery: Delivery,
     },
+    /// Turns of a bot's chat that are new or changed, oldest first.
+    ChatTurns {
+        bot_id: String,
+        turns: Vec<crate::chat::model::ChatTurn>,
+    },
     RoutineRunUpdate {
         routine_run: RoutineRun,
     },

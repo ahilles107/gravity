@@ -89,6 +89,11 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `revoke_peer` | `peer_id` | `peer` |
 | `list_peer_bots` | `peer_id` | `peer_bots` (`bots`: id, name, description, avatar, runtime, project) |
 | `link_peer_bot` | `peer_id, remote_bot_id, project_id` | `bot` (a linked bot; `peer` is set on it) |
+| `list_chat` | `bot_id, before?` (a turn id), `limit?` (default 30, max 200) | `chat` (`turns` oldest first, `has_more`) |
+| `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
+| `get_chat_image` | `bot_id, image_id` | `file` |
+| `list_artifacts` | `project_id` | `artifacts` (newest first) |
+| `read_file` | `path` and `bot_id` (its directory and its project's artifacts) or `project_id` (artifacts only) | `file` (`text` or `base64`, capped at 16 MiB) |
 | `list_decisions` | `project_id?, state?, tag?, bot_id?, query?, before?, limit?` | `decisions` |
 | `get_decision` | `decision_id` | `decision` (with comments, tags, notifications) |
 | `count_pending_decisions` | – | `pending_decisions` |
@@ -174,6 +179,10 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
   the `ready` state; see Semantics.
 - `delivery_update`: `{ "delivery": {...} }`.
+- `chat_turns`: `{ "bot_id", "turns": [...] }` — turns of a loaded chat that are new or
+  changed, usually the open one. Merge by turn `id`. Only bots whose chat a client has
+  listed are followed. The turn model is described in
+  [the chat pane design](superpowers/specs/2026-09-16-chat-pane-design.md).
 - `routine_run_update`: `{ "routine_run": {...} }`.
 - `approval_pending`: `{ "bot_id", "detail" }` — bot is waiting on its native permission prompt.
 - `notify`: `{ "level": "info|warn|error", "title", "body", "decision_id"? }` —

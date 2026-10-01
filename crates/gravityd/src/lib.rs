@@ -7,6 +7,7 @@ pub mod app;
 pub mod backup;
 pub mod botmgmt;
 pub mod channel;
+pub mod chat;
 pub mod config;
 pub mod db;
 pub mod decisions;

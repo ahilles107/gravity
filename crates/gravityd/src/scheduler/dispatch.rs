@@ -227,6 +227,8 @@ fn routine_run_id_from_transcript(path: &Path) -> Option<String> {
                 .join("\n"),
             _ => return None,
         };
+        // Claude Code wraps a delivered message in its own peer preamble.
+        let text = crate::chat::unwrap_peer(&text);
         if !text.starts_with("[routine \"") {
             return None;
         }
@@ -269,6 +271,25 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         fs::write(&path, format!("{body}\n")).unwrap();
+
+        assert_eq!(routine_run_id_from_transcript(&path), Some(run_id));
+    }
+
+    #[test]
+    fn finds_the_run_id_inside_claude_codes_peer_wrapper() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.jsonl");
+        let run_id = bus::new_id();
+        let record = json!({
+            "type": "user",
+            "isMeta": true,
+            "origin": {"kind": "peer"},
+            "message": {"content": format!(
+                "Another Claude session sent a message:\n[routine \"nightly\" #7 · run_id \
+                 {run_id}] run it\n\nThis came from another Claude session."
+            )}
+        });
+        fs::write(&path, format!("{record}\n")).unwrap();
 
         assert_eq!(routine_run_id_from_transcript(&path), Some(run_id));
     }

@@ -1,0 +1,138 @@
+//! Chat requests: a bot's turns, a step's detail, images and files. They read
+//! transcripts and files, so each runs off the connection's task.
+
+use std::sync::Arc;
+
+use serde_json::{json, Value};
+
+use crate::app::AppState;
+use crate::chat::files::{self, Scope};
+
+use super::Conn;
+
+/// Turns sent when the client does not ask for a number.
+const DEFAULT_PAGE: usize = 30;
+const MAX_PAGE: usize = 200;
+
+impl Conn {
+    pub(super) fn list_chat(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let bot_id = Self::str_field(req, "bot_id")?.to_string();
+        let before = req
+            .get("before")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let limit = req
+            .get("limit")
+            .and_then(Value::as_u64)
+            .map_or(DEFAULT_PAGE, |n| (n as usize).clamp(1, MAX_PAGE));
+        self.blocking(req_id, move |app| {
+            let bot = live_bot(app, &bot_id)?;
+            let (turns, has_more) = app.chat.page(app, &bot, before.as_deref(), limit)?;
+            Ok(json!({ "type": "chat", "bot_id": bot_id, "turns": turns, "has_more": has_more }))
+        });
+        Ok(())
+    }
+
+    pub(super) fn get_chat_step(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let bot_id = Self::str_field(req, "bot_id")?.to_string();
+        let item_id = Self::str_field(req, "item_id")?.to_string();
+        self.blocking(req_id, move |app| {
+            let bot = live_bot(app, &bot_id)?;
+            let detail = app.chat.step(app, &bot, &item_id)?;
+            Ok(json!({
+                "type": "chat_step", "bot_id": bot_id, "item_id": item_id, "detail": detail
+            }))
+        });
+        Ok(())
+    }
+
+    pub(super) fn get_chat_image(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let bot_id = Self::str_field(req, "bot_id")?.to_string();
+        let image_id = Self::str_field(req, "image_id")?.to_string();
+        self.blocking(req_id, move |app| {
+            let bot = live_bot(app, &bot_id)?;
+            let (mime, base64) = app.chat.image(app, &bot, &image_id)?;
+            Ok(json!({
+                "type": "file",
+                "file": { "name": image_id, "mime": mime, "base64": base64, "truncated": false }
+            }))
+        });
+        Ok(())
+    }
+
+    pub(super) fn list_artifacts(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let project_id = Self::str_field(req, "project_id")?.to_string();
+        self.blocking(req_id, move |app| {
+            let project = live_project(app, &project_id)?;
+            let artifacts = files::list_artifacts(app, &project);
+            Ok(json!({ "type": "artifacts", "project_id": project_id, "artifacts": artifacts }))
+        });
+        Ok(())
+    }
+
+    /// A file from the project's artifacts (`project_id`), or from a bot's
+    /// directory and its project's artifacts (`bot_id`).
+    pub(super) fn read_file(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let path = Self::str_field(req, "path")?.to_string();
+        let bot_id = req
+            .get("bot_id")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let project_id = req
+            .get("project_id")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        self.blocking(req_id, move |app| {
+            let file = match (bot_id, project_id) {
+                (Some(bot_id), _) => {
+                    let bot = live_bot(app, &bot_id)?;
+                    let project = live_project(app, &bot.project_id)?;
+                    files::read_file(app, Scope::Bot(&bot, &project), &path)?
+                }
+                (None, Some(project_id)) => {
+                    let project = live_project(app, &project_id)?;
+                    files::read_file(app, Scope::Project(&project), &path)?
+                }
+                (None, None) => anyhow::bail!("'bot_id' or 'project_id' is required"),
+            };
+            Ok(json!({ "type": "file", "file": file }))
+        });
+        Ok(())
+    }
+
+    /// Runs `work` on a blocking thread and replies with its result, or with
+    /// a `not_found` error the client can show.
+    fn blocking(
+        &self,
+        req_id: &Value,
+        work: impl FnOnce(&Arc<AppState>) -> anyhow::Result<Value> + Send + 'static,
+    ) {
+        let (app, out, req_id) = (self.app.clone(), self.out.clone(), req_id.clone());
+        tokio::task::spawn_blocking(move || {
+            let reply = match work(&app) {
+                Ok(mut reply) => {
+                    reply["req_id"] = req_id;
+                    reply
+                }
+                Err(e) => json!({
+                    "type": "error", "req_id": req_id, "code": "not_found",
+                    "message": format!("{e:#}")
+                }),
+            };
+            let _ = out.send(reply);
+        });
+    }
+}
+
+fn live_bot(app: &AppState, bot_id: &str) -> anyhow::Result<bus::Bot> {
+    app.db
+        .get_live_bot(bot_id)?
+        .ok_or_else(|| anyhow::anyhow!("bot not found"))
+}
+
+fn live_project(app: &AppState, project_id: &str) -> anyhow::Result<bus::Project> {
+    app.db
+        .get_project(project_id)?
+        .filter(|p| p.deleted_at.is_none())
+        .ok_or_else(|| anyhow::anyhow!("project not found"))
+}
