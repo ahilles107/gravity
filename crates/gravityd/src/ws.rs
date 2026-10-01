@@ -23,6 +23,7 @@ mod decisions_publish;
 mod dispatch;
 mod entities;
 mod messaging;
+mod peers;
 mod routines;
 mod runtime;
 mod terminal;

@@ -18,6 +18,7 @@ pub mod messaging;
 pub mod model;
 pub mod overrides;
 pub mod paths;
+pub mod peer;
 mod permissions;
 pub mod projectmgmt;
 pub mod routine_validation;

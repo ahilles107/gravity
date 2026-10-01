@@ -185,6 +185,10 @@ pub fn apply_identity_edit(
 
 /// Rewrite the daemon-owned files for a bot after its identity changed.
 pub fn reprovision(app: &Arc<AppState>, bot: &Bot) -> anyhow::Result<()> {
+    // A linked bot's files live on its peer; there is nothing to write here.
+    if bot.is_linked() {
+        return Ok(());
+    }
     let project = app
         .db
         .get_project(&bot.project_id)?
@@ -199,7 +203,12 @@ pub fn reprovision(app: &Arc<AppState>, bot: &Bot) -> anyhow::Result<()> {
 /// `CLAUDE.md` pick up the new layout. The write is content-hash guarded, so
 /// this is a no-op once each bot is current.
 pub fn regenerate_all_system_md(app: &Arc<AppState>) -> anyhow::Result<()> {
-    for bot in app.db.list_bots(None)? {
+    for bot in app
+        .db
+        .list_bots(None)?
+        .into_iter()
+        .filter(|b| !b.is_linked())
+    {
         if let Err(e) = reprovision(app, &bot) {
             tracing::warn!(bot_id = %bot.id, error = %e, "system.md regeneration failed");
         }

@@ -25,6 +25,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/ws", get(crate::ws::ws_handler))
         .route("/mcp", post(crate::mcp::mcp_handler))
         .route("/hook", post(crate::mcp::hook_handler))
+        .route("/peer", get(crate::peer::peer_handler))
         .with_state(app)
 }
 
@@ -72,7 +73,10 @@ pub fn spawn_workers(app: &Arc<AppState>) {
         });
     }
 
+    crate::peer::spawn_dialers(app);
+
     let worker = DeliveryWorker {
+        app: app.clone(),
         db: app.db.clone(),
         supervisor: app.supervisor.clone(),
         events: app.events.clone(),

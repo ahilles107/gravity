@@ -62,6 +62,10 @@ async fn main() -> anyhow::Result<()> {
             println!("restored into {}", cfg.home.display());
             return Ok(());
         }
+        Some("peer") => {
+            gravityd::peer::cli::run(&cfg, &args[1..]).await?;
+            return Ok(());
+        }
         Some("service") => {
             let paths =
                 gravityd::service::ServicePaths::new(cfg.home.clone(), cfg.user_home.clone());
