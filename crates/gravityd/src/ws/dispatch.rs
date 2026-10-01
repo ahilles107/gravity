@@ -37,6 +37,7 @@ const READ_ONLY: &[&str] = &[
     "get_chat_image",
     "list_artifacts",
     "read_file",
+    "list_permissions",
 ];
 
 /// Requests that exercise the owner's ruling authority.
@@ -148,6 +149,8 @@ impl Conn {
             "get_chat_image" => self.get_chat_image(&req_id, req),
             "list_artifacts" => self.list_artifacts(&req_id, req),
             "read_file" => self.read_file(&req_id, req),
+            "list_permissions" => self.list_permissions(&req_id, req),
+            "answer_permission" => self.answer_permission(&req_id, req),
             other => {
                 self.reply_err(
                     &req_id,

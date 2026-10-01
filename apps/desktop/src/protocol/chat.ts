@@ -133,3 +133,23 @@ export interface FileBody {
   readonly base64?: string;
   readonly truncated: boolean;
 }
+
+/** A bot's tool waiting on the owner's answer. */
+export interface PermissionRequest {
+  readonly id: string;
+  readonly bot_id: string;
+  readonly tool: string;
+  readonly summary: string;
+  readonly input: string;
+  readonly created_at: string;
+  readonly expires_at: string;
+}
+
+export type PermissionAnswer = "allow_once" | "allow_session" | "deny";
+
+export type PermissionOutcome =
+  | "allowed_once"
+  | "allowed_session"
+  | "denied"
+  | "expired"
+  | "abandoned";

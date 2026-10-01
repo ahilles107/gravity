@@ -1,6 +1,13 @@
 // Server → client frames (protocol v2): replies carry `req_id`, pushes do not.
 
-import type { Artifact, ChatTurn, FileBody, StepDetail } from "./chat";
+import type {
+  Artifact,
+  ChatTurn,
+  FileBody,
+  PermissionOutcome,
+  PermissionRequest,
+  StepDetail,
+} from "./chat";
 import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
 import type {
   Bot,
@@ -156,6 +163,11 @@ export type ServerReply =
     })
   | (ReplyBase & { readonly type: "file"; readonly file: FileBody })
   | (ReplyBase & {
+      readonly type: "permissions";
+      readonly permissions: readonly PermissionRequest[];
+    })
+  | (ReplyBase & { readonly type: "permission"; readonly permission: PermissionRequest })
+  | (ReplyBase & {
       readonly type: "artifacts";
       readonly project_id: string;
       readonly artifacts: readonly Artifact[];
@@ -199,6 +211,13 @@ export type ServerPush =
   | { readonly type: "decision_update"; readonly decision: Decision }
   | { readonly type: "decision_deleted"; readonly decision_id: string }
   | { readonly type: "decision_comment_new"; readonly comment: DecisionComment }
+  | { readonly type: "permission_request"; readonly request: PermissionRequest }
+  | {
+      readonly type: "permission_resolved";
+      readonly request_id: string;
+      readonly bot_id: string;
+      readonly outcome: PermissionOutcome;
+    }
   | {
       readonly type: "chat_turns";
       readonly bot_id: string;

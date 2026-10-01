@@ -18,6 +18,7 @@
 @import "./styles/chat.css";
 @import "./styles/chat-steps.css";
 @import "./styles/files.css";
+@import "./styles/permissions.css";
 @import "./styles/overlays.css";
 @import "./styles/settings.css";
 @import "./styles/devices.css";

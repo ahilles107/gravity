@@ -25,6 +25,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/ws", get(crate::ws::ws_handler))
         .route("/mcp", post(crate::mcp::mcp_handler))
         .route("/hook", post(crate::mcp::hook_handler))
+        .route("/hook/permission", post(crate::approval::permission_hook))
         .route("/peer", get(crate::peer::peer_handler))
         .with_state(app)
 }

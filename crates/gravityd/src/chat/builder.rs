@@ -9,13 +9,13 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use super::envelope::{self, Delivered};
-use super::model::{AsideKind, ChatItem, ChatTurn, ImageRef, OwnerVia, Step, StepStatus, Trigger};
-use super::steps::{self, BusCall, ToolKind};
+use super::model::{AsideKind, ChatItem, ChatTurn, ImageRef, Step, StepStatus, Trigger};
+use super::steps::{self, patch_counts, result_text, BusCall, ToolKind};
+use super::triggers::{self, MAX_TRIGGER_CHARS};
 
 /// Longest text kept in a turn. A bot that pastes a whole file into its
 /// answer is still readable, and the rest is in the terminal.
 const MAX_TEXT_CHARS: usize = 20_000;
-const MAX_TRIGGER_CHARS: usize = 4_000;
 
 /// Where a step's heavy content lives in the transcript.
 #[derive(Debug, Clone)]
@@ -125,85 +125,8 @@ impl Builder {
 
     /// A user record that starts a turn, unless it is runtime bookkeeping.
     fn prompt(&mut self, id: &str, at: DateTime<Utc>, record: &Value, text: &str) {
-        let flag = |key: &str| record.get(key).and_then(Value::as_bool) == Some(true);
-        if flag("isCompactSummary") || flag("isVisibleInTranscriptOnly") {
-            return;
-        }
-        let origin = record["origin"]["kind"].as_str();
-        let trigger =
-            if origin == Some("task-notification") || text.starts_with("<task-notification>") {
-                Trigger::Background {
-                    text: tag(text, "summary")
-                        .unwrap_or("A background task finished")
-                        .to_string(),
-                }
-            } else if record.get("scheduledTaskId").is_some() {
-                Trigger::Background {
-                    text: format!("Scheduled wake-up: {}", first_line(text)),
-                }
-            } else if let Some(delivered) = envelope::parse(text) {
-                self.delivered(delivered)
-            } else if origin == Some("human") {
-                Trigger::Owner {
-                    text: owner_text(text),
-                    via: OwnerVia::Terminal,
-                }
-            } else if text.starts_with("<local-command") || flag("isMeta") {
-                return;
-            } else {
-                Trigger::Owner {
-                    text: owner_text(text),
-                    via: OwnerVia::Terminal,
-                }
-            };
-        self.start(id, at, trigger);
-    }
-
-    fn delivered(&self, delivered: Delivered) -> Trigger {
-        match delivered {
-            Delivered::Message {
-                num,
-                from,
-                kind,
-                task_id,
-                body,
-            } => {
-                let body = steps::truncate(&body, MAX_TRIGGER_CHARS);
-                if from == "USER" && kind == "chat" {
-                    Trigger::Owner {
-                        text: body,
-                        via: OwnerVia::Chat,
-                    }
-                } else {
-                    // `USER` on anything but a chat is the daemon speaking:
-                    // introductions, expiries, renames.
-                    let from = if from == "USER" {
-                        "Gravity".to_string()
-                    } else {
-                        self.names.get(&from).cloned().unwrap_or(from)
-                    };
-                    Trigger::Bus {
-                        from,
-                        msg_kind: kind,
-                        num,
-                        text: body,
-                        task_id,
-                    }
-                }
-            }
-            Delivered::Routine {
-                name,
-                run_id,
-                prompt,
-            } => Trigger::Routine {
-                name,
-                text: steps::truncate(&prompt, MAX_TRIGGER_CHARS),
-                run_id,
-            },
-            Delivered::Decision { decision_id, text } => Trigger::Ruling {
-                decision_id,
-                text: steps::truncate(&text, MAX_TRIGGER_CHARS),
-            },
+        if let Some(trigger) = triggers::of_prompt(record, text, &self.names) {
+            self.start(id, at, trigger);
         }
     }
 
@@ -448,58 +371,4 @@ impl Builder {
         }
         self.turns.len() - 1
     }
-}
-
-/// Lines added and removed by an edit, from Claude Code's structured patch.
-pub fn patch_counts(result: &Value) -> (u32, u32) {
-    let mut added = 0;
-    let mut removed = 0;
-    for hunk in result["structuredPatch"].as_array().into_iter().flatten() {
-        for line in hunk["lines"].as_array().into_iter().flatten() {
-            match line.as_str().and_then(|l| l.chars().next()) {
-                Some('+') => added += 1,
-                Some('-') => removed += 1,
-                _ => {}
-            }
-        }
-    }
-    (added, removed)
-}
-
-/// A tool result's text, whether it is a string or text blocks.
-pub fn result_text(block: &Value) -> Option<String> {
-    match &block["content"] {
-        Value::String(text) => Some(text.clone()),
-        Value::Array(parts) => Some(
-            parts
-                .iter()
-                .filter_map(|p| p["text"].as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        ),
-        _ => None,
-    }
-}
-
-/// A slash command typed into the terminal reads as the command, not markup.
-fn owner_text(text: &str) -> String {
-    match tag(text, "command-name") {
-        Some(command) => match tag(text, "command-args").filter(|a| !a.is_empty()) {
-            Some(args) => format!("{command} {args}"),
-            None => command.to_string(),
-        },
-        None => steps::truncate(text, MAX_TRIGGER_CHARS),
-    }
-}
-
-fn tag<'a>(text: &'a str, name: &str) -> Option<&'a str> {
-    let open = format!("<{name}>");
-    let close = format!("</{name}>");
-    let start = text.find(&open)? + open.len();
-    let end = text[start..].find(&close)? + start;
-    Some(text[start..end].trim())
-}
-
-fn first_line(text: &str) -> &str {
-    text.lines().next().unwrap_or_default()
 }

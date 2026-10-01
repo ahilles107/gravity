@@ -1,5 +1,6 @@
 // Client → server frames (protocol v2).
 
+import type { PermissionAnswer } from "./chat";
 import type { DecisionRequestBody } from "./decisionRequests";
 import type {
   BotRuntime,
@@ -16,6 +17,8 @@ export type ClientRequestBody =
       readonly protocol_version: number;
       readonly token: string;
       readonly client: string;
+      /** Optional behaviours this client supports, e.g. `permission_cards`. */
+      readonly features?: readonly string[];
     }
   | { readonly type: "list_projects" }
   | { readonly type: "create_project"; readonly name: string }
@@ -160,6 +163,13 @@ export type ClientRequestBody =
       readonly bot_id?: string;
       /** The project's artifacts only. */
       readonly project_id?: string;
+    }
+  | { readonly type: "list_permissions"; readonly bot_id?: string }
+  | {
+      readonly type: "answer_permission";
+      readonly request_id: string;
+      readonly decision: PermissionAnswer;
+      readonly reason?: string;
     };
 
 /**

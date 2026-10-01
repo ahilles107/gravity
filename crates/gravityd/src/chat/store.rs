@@ -13,9 +13,9 @@ use serde_json::Value;
 
 use crate::app::AppState;
 
-use super::builder::{result_text, Builder};
+use super::builder::Builder;
 use super::model::{ChatTurn, StepDetail};
-use super::steps;
+use super::steps::{self, result_text};
 
 const MAX_INPUT_CHARS: usize = 4_000;
 const MAX_OUTPUT_CHARS: usize = 12_000;

@@ -5,6 +5,8 @@ import type { DaemonApi } from "../../protocol/api";
 import type { Bot, Routine } from "../../protocol/entities";
 import ChatPane from "../chat/ChatPane";
 import LinkedChat from "../chat/LinkedChat";
+import PermissionCards from "../permissions/PermissionCards";
+import { usePermissions } from "../permissions/usePermissions";
 import RoutinesPanel from "../RoutinesPanel";
 import TerminalPane from "../TerminalPane";
 import type { BotTab } from "./BotTabs";
@@ -45,52 +47,57 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
   const { client, bot, tabs, active, connected, canControl, onToast } = props;
   const writeBlocked = writeBlockedReason(connected, canControl, bot);
   const linked = bot.peer != null;
+  const permissions = usePermissions(client, bot.id, connected && !linked);
   return (
-    <div className="bot-view-body">
-      {tabs.includes("chat") ? (
-        <div className={paneClass(active === "chat")}>
-          {linked ? (
-            <LinkedChat
+    <>
+      {/* Above every tab: a prompt waits whether the owner reads the chat or the terminal. */}
+      <PermissionCards permissions={permissions} canAnswer={connected && canControl} />
+      <div className="bot-view-body">
+        {tabs.includes("chat") ? (
+          <div className={paneClass(active === "chat")}>
+            {linked ? (
+              <LinkedChat
+                client={client}
+                bot={bot}
+                connected={connected}
+                writeBlocked={writeBlocked}
+              />
+            ) : (
+              <ChatPane
+                client={client}
+                bot={bot}
+                connected={connected}
+                writeBlocked={writeBlocked}
+                onOpenFile={props.onOpenFile}
+              />
+            )}
+          </div>
+        ) : null}
+        {tabs.includes("terminal") ? (
+          <div className={paneClass(active === "terminal")}>
+            {/* The terminal belongs to the user: any `control` connection may type while the bot runs. */}
+            <TerminalPane
+              client={client}
+              botId={bot.id}
+              canWrite={canControl && !isStopped(bot)}
+              onToast={onToast}
+            />
+          </div>
+        ) : null}
+        {active === "routines" ? (
+          <div className="tab-pane tab-pane-scroll">
+            <RoutinesPanel
               client={client}
               bot={bot}
+              bots={props.bots}
               connected={connected}
-              writeBlocked={writeBlocked}
+              canControl={canControl}
+              onRoutinesChanged={props.onRoutinesChanged}
+              onToast={onToast}
             />
-          ) : (
-            <ChatPane
-              client={client}
-              bot={bot}
-              connected={connected}
-              writeBlocked={writeBlocked}
-              onOpenFile={props.onOpenFile}
-            />
-          )}
-        </div>
-      ) : null}
-      {tabs.includes("terminal") ? (
-        <div className={paneClass(active === "terminal")}>
-          {/* The terminal belongs to the user: any `control` connection may type while the bot runs. */}
-          <TerminalPane
-            client={client}
-            botId={bot.id}
-            canWrite={canControl && !isStopped(bot)}
-            onToast={onToast}
-          />
-        </div>
-      ) : null}
-      {active === "routines" ? (
-        <div className="tab-pane tab-pane-scroll">
-          <RoutinesPanel
-            client={client}
-            bot={bot}
-            bots={props.bots}
-            connected={connected}
-            canControl={canControl}
-            onRoutinesChanged={props.onRoutinesChanged}
-            onToast={onToast}
-          />
-        </div>
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }

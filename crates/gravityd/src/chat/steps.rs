@@ -224,6 +224,37 @@ pub fn tail(text: &str, max: usize) -> String {
     out
 }
 
+/// Lines added and removed by an edit, from Claude Code's structured patch.
+pub fn patch_counts(result: &Value) -> (u32, u32) {
+    let mut added = 0;
+    let mut removed = 0;
+    for hunk in result["structuredPatch"].as_array().into_iter().flatten() {
+        for line in hunk["lines"].as_array().into_iter().flatten() {
+            match line.as_str().and_then(|l| l.chars().next()) {
+                Some('+') => added += 1,
+                Some('-') => removed += 1,
+                _ => {}
+            }
+        }
+    }
+    (added, removed)
+}
+
+/// A tool result's text, whether it is a string or text blocks.
+pub fn result_text(block: &Value) -> Option<String> {
+    match &block["content"] {
+        Value::String(text) => Some(text.clone()),
+        Value::Array(parts) => Some(
+            parts
+                .iter()
+                .filter_map(|p| p["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -36,6 +36,16 @@ pub enum Push {
     DeliveryUpdate {
         delivery: Delivery,
     },
+    /// A bot's tool is waiting on the owner's answer.
+    PermissionRequest {
+        request: crate::approval::PermissionRequest,
+    },
+    /// A permission prompt stopped waiting: answered, expired or abandoned.
+    PermissionResolved {
+        request_id: String,
+        bot_id: String,
+        outcome: crate::approval::Outcome,
+    },
     /// Turns of a bot's chat that are new or changed, oldest first.
     ChatTurns {
         bot_id: String,

@@ -1,7 +1,8 @@
 # Chat pane: the default bot surface
 
 Issue: [ahilles107/gravity#13](https://github.com/ahilles107/gravity/issues/13).
-Status: phases 1 (daemon chat model) and 2 (desktop chat) implemented. Branch:
+Status: phases 1 (daemon chat model), 2 (desktop chat) and 3 (permission
+cards) implemented; the live Claude Code check for phase 3 is pending. Branch:
 `codex/chat-pane`
 (stacked on `codex/peer-bots`).
 
@@ -204,7 +205,11 @@ Flow:
    `permission_timeout_minutes` in config), the daemon answers deny with
    "The owner did not answer in time", resolves the card as `expired` and
    the bot moves on.
-5. If the daemon is unreachable or answers nothing, the hook prints nothing
+5. The daemon only holds a prompt while an app that shows cards is connected
+   with `control` (it says so with `features: ["permission_cards"]` in
+   `hello`). With no such app open, it answers at once with no decision, so an
+   older app, or none, leaves the prompt in the terminal as before.
+6. If the daemon is unreachable or answers nothing, the hook prints nothing
    and exits 0. Claude Code then shows its own prompt in the terminal, and the
    chat shows "answer in the terminal". This is the permission-relay fallback,
    and it is still closed: nothing is allowed without someone answering.

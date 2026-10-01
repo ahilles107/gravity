@@ -92,7 +92,8 @@ impl WsClient {
                 "type": "hello",
                 "protocol_version": 2,
                 "token": d.app.secrets.client_token(),
-                "client": "test/0"
+                "client": "test/0",
+                "features": ["permission_cards"]
             }))
             .await;
         assert_eq!(reply["type"], "hello_ok", "handshake failed: {reply}");
