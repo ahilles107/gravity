@@ -59,11 +59,11 @@ describe("InfoPanel", () => {
     expect(screen.getByText("ready — idle")).toBeInTheDocument();
   });
 
-  it("reveals the bot workspace in Finder", async () => {
+  it("opens the bot workspace folder", async () => {
     const user = userEvent.setup();
     renderPanel(new FakeDaemon());
 
-    await user.click(screen.getByRole("button", { name: "Reveal bot workspace in Finder" }));
+    await user.click(screen.getByRole("button", { name: "Open bot workspace folder" }));
 
     expect(revealBotWorkspace).toHaveBeenCalledWith("/tmp/alice");
   });

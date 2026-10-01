@@ -70,9 +70,9 @@ describe("SetupScreen", () => {
     probeDaemon.mockResolvedValue(null);
     installLocalDaemon.mockReturnValue(new Promise(() => undefined));
     render(<SetupScreen onConnect={vi.fn<() => void>()} />);
-    expect(
-      await screen.findByText(/launchd agent in ~\/Library\/LaunchAgents/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/daemon starts when you sign in/)).toBeInTheDocument();
+    expect(screen.getByText("Installing the daemon on this computer…")).toBeInTheDocument();
+    expect(screen.queryByText(/on this Mac|launchd|LaunchAgents/)).not.toBeInTheDocument();
   });
 
   it("reports how long it has waited for the daemon to answer", async () => {

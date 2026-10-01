@@ -147,17 +147,17 @@ export default function SetupScreen(props: SetupScreenProps): ReactElement {
       <div className="setup-panel">
         <h1 className="setup-title">Gravity</h1>
         {phase.kind === "probing" ? (
-          <p className="setup-note">Looking for a daemon on this Mac…</p>
+          <p className="setup-note">Looking for a daemon on this computer…</p>
         ) : null}
         {phase.kind === "connecting" ? (
           <p className="setup-note">Connecting to the daemon…</p>
         ) : null}
         {phase.kind === "installing" ? (
           <>
-            <p className="setup-note">Installing the daemon on this Mac…</p>
+            <p className="setup-note">Installing the daemon on this computer…</p>
             <p className="setup-detail">
-              It is installed as a launchd agent in ~/Library/LaunchAgents and keeps running in the
-              background after you quit Gravity.
+              The daemon starts when you sign in and keeps running in the background after you close
+              Gravity.
             </p>
             {phase.waited > 0 ? (
               <p className="setup-detail">
@@ -238,7 +238,7 @@ function ManualConnectForm(props: ManualConnectFormProps): ReactElement {
       }}
     >
       <p className="setup-detail">
-        Point Gravity at a daemon running elsewhere — a Mac mini or server on your tailnet. A device
+        Point Gravity at a daemon running on another computer or server on your tailnet. A device
         token is only needed when the daemon is on another machine.
       </p>
       <input
