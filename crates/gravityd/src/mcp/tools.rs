@@ -209,6 +209,7 @@ pub(super) fn list_bots(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<Val
                 "name": b.name,
                 "avatar": b.avatar,
                 "description": b.description,
+                "runtime": b.runtime,
                 "status": state.as_str(),
                 "created_by_me": b.created_by_bot_id.as_deref() == Some(bot_id)
             })

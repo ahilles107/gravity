@@ -19,8 +19,16 @@ codex_args = []
 ```
 
 Use an absolute `codex_bin` or `claude_bin` path when the daemon service cannot find
-the CLI on its PATH. Bot-authored children inherit their creator's runtime. Control
-clients may also pass `runtime` when creating a bot. The `runtime = "double"` daemon
+the CLI on its PATH. Bot-authored children inherit their creator's runtime when
+the MCP `create_bot` call omits `runtime`. Both `create_bot` and `update_bot` accept
+`runtime: "claude_code"` or `runtime: "codex_cli"`; `update_bot` can only change a
+bot the caller created and leaves the runtime unchanged when omitted. These tools
+return the saved runtime, also available through `list_bots` and `get_self`.
+For example, `create_bot({"name":"Reviewer","runtime":"claude_code"})` creates a
+Claude bot even when the caller uses Codex. A runtime change interrupts the child's
+current turn and restarts it, just like the client picker. The selected CLI must
+be available before creation or switching succeeds. Control clients may also pass
+`runtime` when creating a bot. The `runtime = "double"` daemon
 setting continues to select the deterministic test adapter for every bot.
 
 ## Codex terminal
