@@ -10,8 +10,13 @@ use anyhow::Context;
 use serde_json::Value;
 
 mod approvals;
+mod input;
+mod native;
 mod observations;
+mod transport;
 mod worker;
+
+pub use native::NativeCodexAdapter;
 
 #[derive(Debug, Clone)]
 pub struct CodexSpec {
@@ -51,30 +56,65 @@ impl RuntimeAdapter for CodexAdapter {
         super::executable::version("codex")
     }
     fn start(&self, spec: &BotSpec) -> anyhow::Result<StartedSession> {
-        let codex = spec
-            .codex
-            .as_ref()
-            .context("missing Codex runtime settings")?;
-        let mut command = super::executable::command(&codex.bin);
-        command
-            .args(&codex.args)
-            .arg("app-server")
-            .args(["--listen", "stdio://"])
-            .current_dir(&spec.workspace)
-            .envs(spec.env.iter().cloned())
-            .env_remove("CODEX_THREAD_ID")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = command
-            .spawn()
-            .with_context(|| format!("spawn Codex CLI App Server using {}", codex.bin))?;
-        let stdin = child.stdin.take().context("Codex stdin")?;
-        let stdout = child.stdout.take().context("Codex stdout")?;
-        let stderr = child.stderr.take().context("Codex stderr")?;
-        let child = Arc::new(Mutex::new(child));
-        let (tx, rx) = mpsc::channel();
-        let (events_tx, events_rx) = tokio::sync::mpsc::unbounded_channel();
+        start_server(spec, None)
+    }
+}
+
+fn start_server(
+    spec: &BotSpec,
+    remote: Option<&transport::Remote>,
+) -> anyhow::Result<StartedSession> {
+    let codex = spec
+        .codex
+        .as_ref()
+        .context("missing Codex runtime settings")?;
+    let mut command = super::executable::command(&codex.bin);
+    command
+        .args(&codex.args)
+        .arg("app-server")
+        .current_dir(&spec.workspace)
+        .envs(spec.env.iter().cloned())
+        .env_remove("CODEX_THREAD_ID")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(remote) = remote {
+        command.args([
+            "--listen",
+            &remote.address,
+            "--ws-auth",
+            "capability-token",
+            "--ws-token-sha256",
+            &remote.verifier(),
+        ]);
+    } else {
+        command.args(["--listen", "stdio://"]);
+    }
+    let mut child = command
+        .spawn()
+        .with_context(|| format!("spawn Codex CLI App Server using {}", codex.bin))?;
+    let stdin = child.stdin.take().context("Codex stdin")?;
+    let stdout = child.stdout.take().context("Codex stdout")?;
+    let stderr = child.stderr.take().context("Codex stderr")?;
+    let child = Arc::new(Mutex::new(child));
+    let (tx, rx) = mpsc::channel();
+    let (events_tx, events_rx) = tokio::sync::mpsc::unbounded_channel();
+    let native = remote.is_some();
+    let input = if let Some(remote) = remote {
+        drop(stdin);
+        std::thread::spawn(
+            move || {
+                for _ in BufReader::new(stdout).lines().map_while(Result::ok) {}
+            },
+        );
+        match transport::connect(remote, tx.clone(), child.clone()) {
+            Ok(input) => input,
+            Err(error) => {
+                let _ = child.lock().unwrap_or_else(|e| e.into_inner()).kill();
+                return Err(error);
+            }
+        }
+    } else {
         let reader_tx = tx.clone();
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -94,57 +134,61 @@ impl RuntimeAdapter for CodexAdapter {
             }
             let _ = reader_tx.send(Wire::Closed);
         });
-        let err_tx = events_tx.clone();
-        let stderr_tail = Arc::new(Mutex::new(String::new()));
-        let captured = stderr_tail.clone();
-        std::thread::spawn(move || {
-            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                let mut tail = captured.lock().unwrap_or_else(|e| e.into_inner());
-                if tail.len() + line.len() > 32_768 {
-                    tail.clear();
-                }
-                tail.push_str(&line);
-                tail.push('\n');
-                drop(tail);
-                if err_tx
+        transport::RpcWriter::Stdio(std::io::BufWriter::new(stdin))
+    };
+    let err_tx = events_tx.clone();
+    let stderr_tail = Arc::new(Mutex::new(String::new()));
+    let captured = stderr_tail.clone();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            let mut tail = captured.lock().unwrap_or_else(|e| e.into_inner());
+            if tail.len() + line.len() > 32_768 {
+                tail.clear();
+            }
+            tail.push_str(&line);
+            tail.push('\n');
+            drop(tail);
+            if !native
+                && err_tx
                     .send(SessionEvent::Output(
                         format!("[codex] {line}\r\n").into_bytes(),
                     ))
                     .is_err()
-                {
-                    break;
-                }
+            {
+                break;
             }
-        });
-        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
-        let spec = spec.clone();
-        let worker_child = child.clone();
-        std::thread::spawn(move || worker::run(spec, stdin, rx, events_tx, ready_tx, worker_child));
-        let ready = ready_rx
-            .recv_timeout(Duration::from_secs(30))
-            .context("Codex initialization timed out");
-        match ready {
-            Ok(Ok(())) => Ok(StartedSession {
-                session: Box::new(CodexSession { tx, child }),
-                events: events_rx,
-                msg_socket: None,
-            }),
-            outcome => {
-                let _ = child.lock().unwrap_or_else(|e| e.into_inner()).kill();
-                let detail = stderr_tail
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .clone();
-                match outcome {
-                    Ok(Err(error)) | Err(error) => {
-                        if detail.trim().is_empty() {
-                            Err(error)
-                        } else {
-                            Err(error).context(detail.trim().to_string())
-                        }
+        }
+    });
+    let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let spec = spec.clone();
+    let worker_child = child.clone();
+    std::thread::spawn(move || {
+        worker::run(spec, input, native, rx, events_tx, ready_tx, worker_child)
+    });
+    let ready = ready_rx
+        .recv_timeout(Duration::from_secs(30))
+        .context("Codex initialization timed out");
+    match ready {
+        Ok(Ok(())) => Ok(StartedSession {
+            session: Box::new(CodexSession { tx, child }),
+            events: events_rx,
+            msg_socket: None,
+        }),
+        outcome => {
+            let _ = child.lock().unwrap_or_else(|e| e.into_inner()).kill();
+            let detail = stderr_tail
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+            match outcome {
+                Ok(Err(error)) | Err(error) => {
+                    if detail.trim().is_empty() {
+                        Err(error)
+                    } else {
+                        Err(error).context(detail.trim().to_string())
                     }
-                    Ok(Ok(())) => unreachable!(),
                 }
+                Ok(Ok(())) => unreachable!(),
             }
         }
     }

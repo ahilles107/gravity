@@ -1,4 +1,4 @@
-use gravityd::runtime::codex::{CodexAdapter, CodexSpec};
+use gravityd::runtime::codex::{CodexAdapter, CodexSpec, NativeCodexAdapter};
 use gravityd::runtime::{BotSpec, RuntimeAdapter, SessionEvent, StartedSession};
 use serde_json::Value;
 use std::path::Path;
@@ -33,6 +33,70 @@ fn spec(root: &Path) -> BotSpec {
         cols: 80,
         rows: 24,
     }
+}
+
+#[tokio::test]
+async fn native_terminal_and_bus_share_history_without_consuming_a_draft() {
+    let root = tempfile::tempdir().unwrap();
+    let spec = spec(root.path());
+    let mut started = NativeCodexAdapter.start(&spec).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match started.events.recv().await.unwrap() {
+                SessionEvent::Output(bytes)
+                    if String::from_utf8_lossy(&bytes).contains("Native Codex CLI ready") =>
+                {
+                    break
+                }
+                SessionEvent::Exited { code } => panic!("native terminal exit {code:?}"),
+                _ => {}
+            }
+        }
+    })
+    .await
+    .unwrap();
+    started.session.resize(120, 40).unwrap();
+    started.session.send_input("draft 🪟".as_bytes()).unwrap();
+    started.session.deliver("bus envelope").unwrap().unwrap();
+    hook(&mut started, "Stop").await;
+    started.session.send_input(b"\r").unwrap();
+    hook(&mut started, "Stop").await;
+    let turns: Vec<_> = log(root.path())
+        .into_iter()
+        .filter(|v| v["method"] == "turn/start")
+        .collect();
+    assert_eq!(turns[0]["params"]["input"][0]["text"], "bus envelope");
+    assert_eq!(turns[1]["params"]["input"][0]["text"], "draft 🪟");
+    let observations =
+        std::fs::read_to_string(root.path().join("codex-observations.jsonl")).unwrap();
+    assert_eq!(observations.matches("bus envelope").count(), 1);
+    assert!(observations.contains("draft 🪟"));
+    started.session.deliver("approval").unwrap().unwrap();
+    hook(&mut started, "Notification").await;
+    assert!(!log(root.path())
+        .iter()
+        .any(|v| v["id"] == "approval-1" && v.get("result").is_some()));
+    started.session.send_input(b"n").unwrap();
+    hook(&mut started, "Stop").await;
+    assert!(log(root.path())
+        .iter()
+        .any(|v| v["id"] == "approval-1" && v["result"]["decision"] == "decline"));
+    started.session.send_input(b"/exit\r").unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let Some(SessionEvent::Exited { .. }) = started.events.recv().await {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    started.session.kill().unwrap();
+    let mut resumed = NativeCodexAdapter.start(&spec).unwrap();
+    assert!(log(root.path())
+        .iter()
+        .any(|v| v["method"] == "thread/resume"));
+    resumed.session.kill().unwrap();
 }
 
 fn log(root: &Path) -> Vec<Value> {

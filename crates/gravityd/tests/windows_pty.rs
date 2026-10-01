@@ -164,6 +164,18 @@ async fn check_provider_switch(codex_bin: String, codex_args: Vec<String>) {
     .await
     .expect("Codex starts after terminating the native PTY");
     let terminal = daemon.app.supervisor.term(id).unwrap();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while !terminal
+            .replay_after(0)
+            .frames
+            .iter()
+            .any(|frame| String::from_utf8_lossy(&frame.data).contains("Codex"))
+        {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("native Codex terminal renders");
     let replay: Vec<u8> = terminal
         .replay_after(0)
         .frames
@@ -174,7 +186,7 @@ async fn check_provider_switch(codex_bin: String, codex_args: Vec<String>) {
     let reset = output
         .rfind("\x1bc")
         .expect("clear the previous provider's screen");
-    assert!(output[reset..].contains("Codex CLI ready"), "{output}");
+    assert!(output[reset..].contains("Codex"), "{output}");
     let reply = client
         .request(json!({"type":"set_bot_runtime", "bot_id":id, "runtime":"claude_code"}))
         .await;

@@ -59,7 +59,7 @@ impl RuntimeAdapter for PtyAdapter {
         // (CLAUDECODE, CLAUDE_CODE_*) would make the bot think it is a nested
         // child session and, e.g., disable transcript saving.
         for (key, _) in std::env::vars() {
-            if key == "CLAUDECODE" || key.starts_with("CLAUDE_CODE_") {
+            if key == "CODEX_THREAD_ID" || key == "CLAUDECODE" || key.starts_with("CLAUDE_CODE_") {
                 cmd.env_remove(&key);
             }
         }
@@ -68,7 +68,10 @@ impl RuntimeAdapter for PtyAdapter {
         }
         cmd.env("TERM", "xterm-256color");
 
-        let child = pair.slave.spawn_command(cmd).context("spawn claude")?;
+        let child = pair
+            .slave
+            .spawn_command(cmd)
+            .context("spawn terminal CLI")?;
         drop(pair.slave);
 
         let mut reader = pair.master.try_clone_reader().context("clone pty reader")?;

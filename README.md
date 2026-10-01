@@ -13,7 +13,7 @@ runtime works without it. See [public-build configuration](docs/public-builds.md
 for telemetry, releases, and secret scanning.
 
 Choose each bot's CLI in **Bot info → Bot runtime**. See
-[bot runtimes](docs/bot-runtimes.md) for setup, configuration and Codex terminal commands.
+[bot runtimes](docs/bot-runtimes.md) for setup, configuration and the native Codex terminal.
 
 ## Layout
 

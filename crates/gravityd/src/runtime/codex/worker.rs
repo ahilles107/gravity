@@ -2,15 +2,15 @@ use super::{approvals::Prompt, observations, transcript_path, BotSpec, SessionEv
 use anyhow::Context;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, VecDeque};
-use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin};
+use std::process::Child;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub(super) struct Worker {
     pub spec: BotSpec,
-    pub input: BufWriter<ChildStdin>,
+    pub input: super::transport::RpcWriter,
+    pub native: bool,
     pub rx: mpsc::Receiver<Wire>,
     pub events: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
     pub queued: VecDeque<Wire>,
@@ -28,7 +28,8 @@ pub(super) struct Worker {
 
 pub(super) fn run(
     spec: BotSpec,
-    stdin: ChildStdin,
+    input: super::transport::RpcWriter,
+    native: bool,
     rx: mpsc::Receiver<Wire>,
     events: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
     ready: mpsc::SyncSender<anyhow::Result<()>>,
@@ -37,7 +38,8 @@ pub(super) fn run(
     let transcript = transcript_path(&spec.workspace);
     let mut worker = Worker {
         spec,
-        input: BufWriter::new(stdin),
+        input,
+        native,
         rx,
         events,
         queued: VecDeque::new(),
@@ -73,6 +75,9 @@ pub(super) fn run(
 
 impl Worker {
     pub fn output(&self, text: &str) {
+        if self.native {
+            return;
+        }
         let _ = self.events.send(SessionEvent::Output(
             text.replace('\n', "\r\n").into_bytes(),
         ));
@@ -86,12 +91,9 @@ impl Worker {
         });
     }
     pub fn write(&mut self, value: &Value) -> anyhow::Result<()> {
-        serde_json::to_writer(&mut self.input, value)?;
-        self.input.write_all(b"\n")?;
-        self.input.flush()?;
-        Ok(())
+        self.input.write(value)
     }
-    fn rpc(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
+    pub fn rpc(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
         self.serial += 1;
         let id = self.serial;
         self.write(&json!({ "id": id, "method": method, "params": params }))?;
@@ -136,7 +138,7 @@ impl Worker {
         }
     }
     fn initialize(&mut self) -> anyhow::Result<()> {
-        self.rpc("initialize", json!({ "clientInfo": { "name": "gravity", "title": "Gravity", "version": env!("CARGO_PKG_VERSION") } }))?;
+        self.rpc("initialize", json!({ "clientInfo": { "name": "gravity", "title": "Gravity", "version": env!("CARGO_PKG_VERSION") }, "capabilities": { "experimentalApi": true } }))?;
         self.write(&json!({ "method": "initialized", "params": {} }))?;
         let codex = self.spec.codex.as_ref().context("missing Codex settings")?;
         let mut roots = vec![self.spec.workspace.display().to_string()];
@@ -167,6 +169,9 @@ impl Worker {
             params["threadId"] = json!(id);
             "thread/resume"
         } else {
+            if self.native {
+                params["historyMode"] = json!("legacy");
+            }
             "thread/start"
         };
         let reply = match self.rpc(method, params.clone()) {
@@ -179,6 +184,9 @@ impl Worker {
                 if let Some(object) = params.as_object_mut() {
                     object.remove("threadId");
                 }
+                if self.native {
+                    params["historyMode"] = json!("legacy");
+                }
                 self.rpc("thread/start", params)?
             }
             result => result?,
@@ -188,6 +196,13 @@ impl Worker {
             .and_then(Value::as_str)
             .context("Codex did not return a thread ID")?
             .to_string();
+        if self.native {
+            // Naming materializes an empty thread without a model turn.
+            self.rpc(
+                "thread/name/set",
+                json!({ "threadId": self.thread, "name": self.spec.bot_name }),
+            )?;
+        }
         std::fs::write(path, format!("{}\n", self.thread))?;
         self.output("Codex CLI ready. Type a prompt and press Enter. /interrupt stops a turn.\n");
         self.hook("SessionStart", None);
@@ -213,8 +228,10 @@ impl Worker {
             }
         }
     }
-    fn deliver(&mut self, text: &str) -> anyhow::Result<()> {
-        observations::append(&self.transcript, "user", text)?;
+    pub fn deliver(&mut self, text: &str) -> anyhow::Result<()> {
+        if !self.native {
+            observations::append(&self.transcript, "user", text)?;
+        }
         let input = json!([{ "type": "text", "text": text }]);
         if let Some(turn) = &self.turn {
             match self.rpc(
@@ -244,61 +261,6 @@ impl Worker {
         }
         Ok(())
     }
-    fn keystrokes(&mut self, bytes: &[u8]) -> anyhow::Result<()> {
-        for &byte in bytes {
-            if self.escaping {
-                if byte != b'[' && (0x40..=0x7e).contains(&byte) {
-                    self.escaping = false;
-                }
-                continue;
-            }
-            match byte {
-                27 => self.escaping = true,
-                3 => {
-                    self.line.clear();
-                    self.interrupt()?;
-                }
-                8 | 127 => {
-                    if let Some(last) = self.line.pop() {
-                        if last & 0xc0 == 0x80 {
-                            while self.line.pop().is_some_and(|b| b & 0xc0 == 0x80) {}
-                        }
-                        self.output("\u{8} \u{8}");
-                    }
-                }
-                13 | 10 if !self.line.is_empty() => {
-                    let text = String::from_utf8(std::mem::take(&mut self.line))
-                        .context("prompt is not UTF-8")?;
-                    self.output("\n");
-                    if text == "/interrupt" {
-                        self.interrupt()?;
-                    } else if !self.answer(&text)? {
-                        self.deliver(&text)?;
-                    }
-                }
-                13 | 10 => {}
-                b if b >= 32 => self.line.push(b),
-                _ => {}
-            }
-        }
-        // Echo whole UTF-8 inputs rather than one byte per output frame.
-        if !bytes
-            .iter()
-            .any(|b| matches!(b, 3 | 8 | 10 | 13 | 27 | 127))
-        {
-            let _ = self.events.send(SessionEvent::Output(bytes.to_vec()));
-        }
-        Ok(())
-    }
-    fn interrupt(&mut self) -> anyhow::Result<()> {
-        if let Some(turn) = &self.turn {
-            self.rpc(
-                "turn/interrupt",
-                json!({ "threadId": self.thread, "turnId": turn }),
-            )?;
-        }
-        Ok(())
-    }
     fn server(&mut self, value: Value) -> anyhow::Result<()> {
         let Some(method) = value.get("method").and_then(Value::as_str) else {
             return Ok(());
@@ -311,6 +273,14 @@ impl Worker {
             );
         }
         let params = value.get("params").unwrap_or(&Value::Null);
+        if self.native
+            && params
+                .get("threadId")
+                .and_then(Value::as_str)
+                .is_some_and(|id| !self.thread.is_empty() && id != self.thread)
+        {
+            return Ok(());
+        }
         match method {
             "turn/started" => {
                 self.turn = params
@@ -346,6 +316,18 @@ impl Worker {
                 }
             }
             "item/completed" => {
+                if self.native
+                    && params.pointer("/item/type").and_then(Value::as_str) == Some("userMessage")
+                {
+                    if let Some(content) = params.pointer("/item/content").and_then(Value::as_array)
+                    {
+                        for item in content {
+                            if let Some(text) = item.get("text").and_then(Value::as_str) {
+                                observations::append(&self.transcript, "user", text)?;
+                            }
+                        }
+                    }
+                }
                 if params.pointer("/item/type").and_then(Value::as_str) == Some("agentMessage") {
                     if let Some(text) = params.pointer("/item/text").and_then(Value::as_str) {
                         observations::append(&self.transcript, "assistant", text)?;

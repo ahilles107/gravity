@@ -9,6 +9,13 @@ pub(super) struct Prompt {
 
 impl Worker {
     pub fn prompt(&mut self, id: Value, method: &str, params: Value) -> anyhow::Result<()> {
+        if self.native {
+            self.hook(
+                "Notification",
+                Some("Codex needs your response in the terminal".into()),
+            );
+            return Ok(());
+        }
         if !matches!(
             method,
             "item/commandExecution/requestApproval"

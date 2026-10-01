@@ -1,4 +1,4 @@
-use super::codex::CodexAdapter;
+use super::codex::NativeCodexAdapter;
 use super::pty::PtyAdapter;
 use super::{BotSpec, Capabilities, RuntimeAdapter, StartedSession};
 use crate::config::Config;
@@ -37,7 +37,7 @@ impl RuntimeAdapter for MixedAdapter {
     }
     fn start(&self, spec: &BotSpec) -> anyhow::Result<StartedSession> {
         if spec.codex.is_some() {
-            CodexAdapter.start(spec)
+            NativeCodexAdapter.start(spec)
         } else {
             PtyAdapter.start(spec)
         }
