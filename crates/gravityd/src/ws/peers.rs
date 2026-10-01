@@ -182,7 +182,7 @@ fn listening_url(app: &AppState) -> anyhow::Result<String> {
 pub(crate) fn peer_view(app: &AppState, peer: &bus::Peer) -> Value {
     json!({
         "id": peer.id,
-        "name": peer.name,
+        "name": crate::db::Db::display_peer_name(peer),
         "url": peer.url,
         "daemon_id": peer.daemon_id,
         "online": app.peers.is_online(&peer.id),

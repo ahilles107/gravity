@@ -44,3 +44,14 @@ CREATE TABLE peer_task (
 );
 CREATE INDEX idx_peer_task_local ON peer_task(peer_id, task_id);
 "#;
+
+/// Migration 15: a revoked peer frees its name and its daemon.
+///
+/// The name is tombstoned the way an archived bot's is, and the daemon id
+/// released, so pairing the same machine again can reuse both. New
+/// revocations do the same in `Db::revoke_peer`.
+pub(super) const MIGRATION_15: &str = r#"
+UPDATE peer SET name = name || '#' || substr(id, 1, 8)
+    WHERE revoked_at IS NOT NULL AND instr(name, '#') = 0;
+UPDATE peer SET daemon_id = NULL WHERE revoked_at IS NOT NULL;
+"#;

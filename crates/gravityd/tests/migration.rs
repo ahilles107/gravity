@@ -339,3 +339,39 @@ fn upgrading_gives_open_tasks_a_reply_budget_and_keeps_them_open() {
     assert_eq!(task.hop_count, 6, "legacy chains stay valid");
     assert!(db.integrity_check().expect("integrity"));
 }
+
+/// Migration 15 frees what a peer revoked before it still held: its name and
+/// its daemon, so the same two machines can pair again.
+#[test]
+fn upgrading_frees_the_names_of_revoked_peers() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path().join("bus.sqlite");
+    v2_database(&path, "/tmp/acme/bots/reviewer/workspace");
+    {
+        let conn = Connection::open(&path).expect("open");
+        for migration in MIGRATIONS.iter().skip(2).take(12) {
+            conn.execute_batch(migration).expect("apply migration");
+        }
+        conn.execute_batch(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '14');
+             INSERT INTO peer(id, name, daemon_id, created_at, revoked_at)
+               VALUES ('p-old', 'win', 'd-1', '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z');
+             INSERT INTO peer(id, name, daemon_id, created_at)
+               VALUES ('p-live', 'pc', 'd-2', '2026-01-01T00:00:00Z');",
+        )
+        .expect("peers");
+    }
+
+    let db = Db::open(&path).expect("migrate");
+    let old = db.get_peer("p-old").expect("query").expect("kept");
+    assert_eq!(Db::display_peer_name(&old), "win");
+    assert_ne!(old.name, "win");
+    assert!(old.daemon_id.is_none());
+    let live = db.get_peer("p-live").expect("query").expect("kept");
+    assert_eq!(
+        (live.name.as_str(), live.daemon_id.as_deref()),
+        ("pc", Some("d-2"))
+    );
+    let again = db.create_peer("win", None).expect("the name is free again");
+    assert!(db.bind_peer_daemon(&again.id, "d-1").expect("bind"));
+}

@@ -8,7 +8,7 @@ mod common;
 use std::time::Duration;
 
 use bus::TaskState;
-use common::peers::{find, team, wait_until};
+use common::peers::{find, pair, team, wait_until};
 use common::tasks::{drain_until, error_text};
 use common::*;
 use serde_json::json;
@@ -220,4 +220,25 @@ async fn the_peer_bot_can_ask_back_on_an_open_task() {
         )
         .await;
     assert!(error_text(&refused).contains("loop"));
+}
+
+#[tokio::test]
+async fn a_revoked_peer_frees_its_name_so_the_machines_pair_again() {
+    let mut t = team().await;
+    let mut win_client = WsClient::connect(&t.win).await;
+    let revoked = win_client
+        .request(json!({"type": "revoke_peer", "peer_id": t.win_peer_id}))
+        .await;
+    // The owner's name for it, not the tombstone that frees it.
+    assert_eq!(revoked["peer"]["name"], "mac", "{revoked}");
+    let mac_peer_id = t.mac.app.db.list_peers().expect("peers")[0].id.clone();
+    let revoked = t
+        .mac_client
+        .request(json!({"type": "revoke_peer", "peer_id": mac_peer_id}))
+        .await;
+    assert_eq!(revoked["type"], "peer", "{revoked}");
+
+    let (win_peer_id, again) = pair(&t.mac, &t.win, &mut t.mac_client, &mut win_client).await;
+    assert_ne!(win_peer_id, t.win_peer_id);
+    assert_ne!(again, mac_peer_id);
 }

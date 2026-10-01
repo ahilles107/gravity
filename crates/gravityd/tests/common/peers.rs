@@ -100,6 +100,67 @@ pub async fn team() -> Team {
     }
 }
 
+/// Two daemons paired over a peer link, with nothing linked yet.
+pub struct Paired {
+    pub mac: TestDaemon,
+    pub win: TestDaemon,
+    pub mac_client: WsClient,
+    pub win_client: WsClient,
+    /// The Mac's id for the peer row standing for the PC.
+    pub mac_peer_id: String,
+    /// The PC's id for the peer row standing for the Mac.
+    pub win_peer_id: String,
+}
+
+pub async fn paired() -> Paired {
+    let mac = spawn_daemon_with(|cfg| cfg.user_home = cfg.home.join("user")).await;
+    let win = spawn_daemon_with(|cfg| cfg.user_home = cfg.home.join("user")).await;
+    let mut mac_client = WsClient::connect(&mac).await;
+    let mut win_client = WsClient::connect(&win).await;
+    let (win_peer_id, mac_peer_id) = pair(&mac, &win, &mut mac_client, &mut win_client).await;
+    Paired {
+        mac,
+        win,
+        mac_client,
+        win_client,
+        mac_peer_id,
+        win_peer_id,
+    }
+}
+
+/// Pairs the two: the PC invites, the Mac dials. Returns the PC's and the
+/// Mac's peer ids once the link is up.
+pub async fn pair(
+    mac: &TestDaemon,
+    win: &TestDaemon,
+    mac_client: &mut WsClient,
+    win_client: &mut WsClient,
+) -> (String, String) {
+    let invite = win_client
+        .request(json!({
+            "type": "create_peer_invite", "name": "mac",
+            "url": format!("ws://{}/peer", win.addr)
+        }))
+        .await;
+    assert_eq!(invite["type"], "peer", "{invite}");
+    let added = mac_client
+        .request(json!({"type": "add_peer", "name": "win", "invite": invite["invite"]}))
+        .await;
+    assert_eq!(added["type"], "peer", "{added}");
+    let win_peer_id = invite["peer"]["id"].as_str().expect("id").to_string();
+    let mac_peer_id = added["peer"]["id"].as_str().expect("id").to_string();
+    wait_until("the link comes up", || {
+        mac.app.peers.is_online(&mac_peer_id) && win.app.peers.is_online(&win_peer_id)
+    })
+    .await;
+    (win_peer_id, mac_peer_id)
+}
+
+/// The live bot named `name` in a project, if there is one.
+pub fn bot_named(d: &TestDaemon, project_id: &str, name: &str) -> Option<bus::Bot> {
+    d.app.db.get_bot_by_name(project_id, name).expect("db")
+}
+
 pub fn find<'a>(messages: &'a [Value], needle: &str) -> &'a Value {
     messages
         .iter()

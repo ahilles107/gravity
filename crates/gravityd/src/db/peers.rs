@@ -9,6 +9,9 @@ use super::{parse_ts, ts, Db};
 /// `meta` key holding this daemon's stable id, which peers bind a token to.
 const DAEMON_ID_KEY: &str = "daemon_id";
 
+/// Separates a revoked peer's name from the id suffix that frees it.
+const TOMBSTONE_SEP: char = '#';
+
 impl Db {
     // ---- this daemon ----
 
@@ -115,12 +118,28 @@ impl Db {
         Ok(())
     }
 
+    /// Revokes a peer, tombstoning its name as archiving does a bot's and
+    /// releasing the daemon it was bound to, so pairing the same machine again
+    /// can reuse both.
     pub fn revoke_peer(&self, peer_id: &str) -> anyhow::Result<bool> {
         let changed = self.lock().execute(
-            "UPDATE peer SET revoked_at = ?2 WHERE id = ?1 AND revoked_at IS NULL",
-            params![peer_id, ts(now())],
+            "UPDATE peer SET revoked_at = ?2, name = name || ?3 || substr(id, 1, 8),
+                 daemon_id = NULL
+             WHERE id = ?1 AND revoked_at IS NULL",
+            params![peer_id, ts(now()), TOMBSTONE_SEP.to_string()],
         )?;
         Ok(changed > 0)
+    }
+
+    /// The name the owner gave a peer, without a revoked peer's tombstone.
+    pub fn display_peer_name(peer: &Peer) -> String {
+        match peer.revoked_at {
+            Some(_) => peer
+                .name
+                .rsplit_once(TOMBSTONE_SEP)
+                .map_or_else(|| peer.name.clone(), |(base, _)| base.to_string()),
+            None => peer.name.clone(),
+        }
     }
 
     // ---- links ----

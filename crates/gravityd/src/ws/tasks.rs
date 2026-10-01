@@ -40,7 +40,7 @@ fn task_json(db: &Db, task: &Task, bot_id: &str, length: Length) -> anyhow::Resu
         None => None,
     };
     let machine = match other.as_ref().and_then(|b| b.peer_id.as_deref()) {
-        Some(peer_id) => db.get_peer(peer_id)?.map(|p| p.name),
+        Some(peer_id) => db.get_peer(peer_id)?.map(|p| Db::display_peer_name(&p)),
         None => None,
     };
     let request_body = db

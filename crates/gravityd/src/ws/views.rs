@@ -41,13 +41,14 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         };
         reason = format!(
             "runs on {}{}",
-            peer.name,
+            crate::db::Db::display_peer_name(peer),
             if online { "" } else { " (offline)" }
         );
     }
     json!({
         "peer": peer.as_ref().map(|p| json!({
-            "id": p.id, "name": p.name, "online": app.peers.is_online(&p.id)
+            "id": p.id, "name": crate::db::Db::display_peer_name(p),
+            "online": app.peers.is_online(&p.id)
         })),
         "id": bot.id,
         "project_id": bot.project_id,
