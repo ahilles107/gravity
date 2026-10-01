@@ -35,6 +35,7 @@ INPUTS = [
     ".github/workflows/release.yml", "scripts/prepare-sidecar.sh",
     "scripts/notices.py", "third-party/README.md", "package.json",
     "apps/desktop/src-tauri/tauri.windows.conf.json", "scripts/prepare-sidecar.ps1",
+    "apps/desktop/src-tauri/windows/installer-hooks.nsh",
     ".github/workflows/windows.yml",
 ]
 

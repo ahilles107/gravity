@@ -68,13 +68,8 @@ Codex bots. CLI authentication and a live model response require the user's acco
 The default tests use a local App Server fixture. Opt-in native CLI tests use a
 local mock Responses provider without paid model requests.
 
-For a development installer with the same version number as the installed build,
-refresh the managed daemon explicitly after installing:
-
-```powershell
-.\gravityd.exe service install
-```
-
-Use the daemon built with that installer. Running its `.exe` without `service
-install` starts a foreground daemon and does not replace the managed service. The
-refresh restarts bot sessions while preserving projects and configuration.
+The Windows installer includes and installs the matching daemon automatically.
+Running it again refreshes the managed daemon even for the same app version;
+there is no separate daemon download or install command. The refresh restarts bot
+sessions while preserving projects and configuration. The desktop uninstaller
+also removes the managed daemon task while keeping that data.

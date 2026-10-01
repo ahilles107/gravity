@@ -183,6 +183,10 @@ pub fn reload(paths: &ServicePaths) -> anyhow::Result<()> {
 }
 
 pub fn uninstall(paths: &ServicePaths) -> anyhow::Result<()> {
+    // The app may be removed after the user already uninstalled its daemon.
+    if !paths.plist_path().is_file() {
+        return Ok(());
+    }
     stop(paths)?;
     run_task(&["/delete", "/tn", &task_name(paths)?, "/f"])?;
     for path in [
@@ -214,6 +218,17 @@ pub fn status(paths: &ServicePaths, configured_port: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uninstall_without_an_installed_daemon_is_a_no_op() {
+        let root = tempfile::tempdir().expect("temporary home");
+        for home in [root.path().to_path_buf(), root.path().join("absent")] {
+            let paths = ServicePaths::new(home.clone(), root.path().to_path_buf());
+            uninstall(&paths).expect("already uninstalled");
+            assert!(!paths.plist_path().exists());
+            assert!(!paths.bin_path().exists());
+        }
+    }
 
     #[test]
     fn task_is_scoped_to_current_user_and_escapes_paths() {

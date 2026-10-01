@@ -18,12 +18,18 @@ The installer is written under
 `apps/desktop/src-tauri/target/release/bundle/nsis/`. Tauri automatically merges
 `tauri.windows.conf.json`, which selects a per-user NSIS installer and native
 window decorations. The Windows CI workflow checks the daemon, frontend, native
-shell, and installer and uploads the installer as a build artifact. It does not
+shell, and installer and uploads the installer as a build artifact. The actual
+installer lifecycle test checks fresh install, same-version refresh, uninstall,
+and uninstall after manual daemon removal, using an isolated test home with no
+real bots. It does not
 publish a release or subscribe source builds to an update feed.
 
-On first launch the setup wizard installs the bundled daemon under
+The Windows installer installs and starts the bundled daemon under
 `%USERPROFILE%\.gravity\bin\gravityd.exe` and registers a Task Scheduler task
-for the current user. It runs immediately and at user sign-in, without elevation,
+for the current user. No separate daemon download or command is needed. Running
+the installer again refreshes the managed daemon even when the app version has
+not changed, restarting bot sessions while preserving projects and configuration.
+It runs immediately and at user sign-in, without elevation,
 and leaves bots running when the desktop closes. The task requires an interactive
 user session; it does not run while that user is signed out. Logs, configuration,
 and state live under `%USERPROFILE%\.gravity`; `GRAVITY_HOME` overrides this root.
@@ -38,7 +44,10 @@ launches and remotely reachable daemons require an available configured port.
 & "$env:USERPROFILE/.gravity/bin/gravityd.exe" service uninstall
 ```
 
-Uninstalling the daemon task keeps its database, configuration and workspaces.
+The desktop uninstaller also stops and removes its managed daemon task.
+Uninstalling keeps the database, configuration and workspaces; deleting
+`%USERPROFILE%\.gravity` after uninstall gives a completely fresh setup.
+The first-run wizard can still install a missing bundled daemon as a recovery step.
 The desktop can also connect to a remote daemon using a device token.
 
 Local Claude Code bots require an installed and authenticated native Claude Code
