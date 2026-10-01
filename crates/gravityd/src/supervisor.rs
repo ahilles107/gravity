@@ -25,7 +25,7 @@ use crate::config::Config;
 use crate::db::Db;
 use crate::events::{Events, Internal, Push};
 use crate::overrides::AutoCompactOverride;
-use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession, SessionEvent};
+use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession};
 use crate::secrets::Secrets;
 use crate::terminal::TermBuffer;
 
@@ -33,6 +33,7 @@ mod claim;
 mod hooks;
 mod lifecycle;
 mod restart;
+mod session_events;
 mod termio;
 
 pub const BOT_TOKEN_ENV: &str = "GRAVITY_TOKEN";

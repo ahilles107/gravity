@@ -56,6 +56,26 @@ pub enum SessionEvent {
         detail: Option<String>,
         transcript: Option<String>,
     },
+    /// The runtime asks to run something only the owner can allow. `key`
+    /// names it when answering through `RuntimeSession::answer_permission`.
+    Permission {
+        key: u64,
+        tool: String,
+        input: serde_json::Value,
+    },
+    /// A permission request stopped waiting without Gravity's answer, e.g.
+    /// it was answered in the runtime's own terminal.
+    PermissionGone {
+        key: u64,
+    },
+}
+
+/// The owner's answer to a runtime's permission request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionAnswer {
+    Once,
+    Session,
+    Deny,
 }
 
 /// A freshly started runtime session.
@@ -73,6 +93,11 @@ pub trait RuntimeSession: Send {
     /// A structured transport, when supported. Never writes terminal input.
     fn deliver(&mut self, _text: &str) -> Option<anyhow::Result<()>> {
         None
+    }
+    /// Answers a permission request the session raised as
+    /// `SessionEvent::Permission`.
+    fn answer_permission(&mut self, _key: u64, _answer: PermissionAnswer) -> anyhow::Result<()> {
+        anyhow::bail!("this runtime takes permission answers in its terminal")
     }
     /// Raw user keystrokes forwarded from the attached terminal.
     fn send_input(&mut self, bytes: &[u8]) -> anyhow::Result<()>;

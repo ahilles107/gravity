@@ -120,6 +120,15 @@ pub enum Internal {
         bot_id: String,
         transcript_path: Option<String>,
     },
+    /// A bot's runtime asks the owner's permission (Codex approvals).
+    RuntimePermission {
+        bot_id: String,
+        key: u64,
+        tool: String,
+        input: serde_json::Value,
+    },
+    /// That request no longer waits on Gravity's answer.
+    RuntimePermissionGone { bot_id: String, key: u64 },
 }
 
 #[derive(Clone)]

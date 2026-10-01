@@ -220,3 +220,27 @@ async fn with_no_app_to_answer_the_prompt_stays_in_the_terminal() {
     );
     assert!(b.d.app.approvals.list(None).is_empty());
 }
+
+#[tokio::test]
+async fn a_runtime_permission_is_answered_through_its_session() {
+    let mut b = bot_with(|_| {}).await;
+    b.c.wait_for(|v| v["type"] == "bot_state" && v["state"] == "ready")
+        .await;
+    // Ctrl-P makes the runtime double ask, as a Codex approval would.
+    b.c.send(json!({"type": "input", "bot_id": b.bot_id, "data": "\u{10}"}))
+        .await;
+    let request = card(&mut b).await;
+    assert_eq!(request["summary"], "Bash: echo from the double");
+    b.c.request(json!({"type": "answer_permission", "request_id": request["id"], "decision": "allow_session"}))
+        .await;
+    let d = &b.d;
+    let bot_id = b.bot_id.clone();
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !terminal(d, &bot_id).contains("[permission 1: Session]") {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "answer never reached the session"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+}

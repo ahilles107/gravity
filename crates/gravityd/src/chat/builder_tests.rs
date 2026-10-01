@@ -265,3 +265,40 @@ fn changed_turns_are_reported_once() {
     );
     assert_eq!(builder.take_changed()[0].id, "u1");
 }
+
+#[test]
+fn codex_tool_records_read_as_steps_and_bus_calls() {
+    let builder = build(&[
+        json!({"type": "user", "timestamp": "2026-10-01T10:00:00Z",
+               "message": {"content": [{"type": "text", "text": "[msg #5 from LEAD · task · task_id t9] build it"}]}}),
+        json!({"type": "assistant", "timestamp": "2026-10-01T10:00:01Z",
+               "message": {"content": [{"type": "tool_use", "id": "cmd-1", "name": "Bash",
+                                        "input": {"command": "cargo test", "cwd": "/w"}}]}}),
+        json!({"type": "user", "timestamp": "2026-10-01T10:00:02Z",
+               "message": {"content": [{"type": "tool_result", "tool_use_id": "cmd-1",
+                                        "content": "ok", "is_error": false}]}}),
+        json!({"type": "assistant", "timestamp": "2026-10-01T10:00:03Z",
+               "message": {"content": [{"type": "tool_use", "id": "fc-1:0", "name": "Edit",
+                                        "input": {"file_path": "/w/src/update.rs"}}]}}),
+        json!({"type": "user", "timestamp": "2026-10-01T10:00:04Z",
+               "message": {"content": [{"type": "tool_result", "tool_use_id": "fc-1:0", "content": "completed"}]},
+               "toolUseResult": {"structuredPatch": [{"oldStart": 1, "oldLines": 1, "newStart": 1,
+                                                      "newLines": 2, "lines": ["-old", "+new", "+more"]}]}}),
+        json!({"type": "assistant", "timestamp": "2026-10-01T10:00:05Z",
+               "message": {"content": [{"type": "tool_use", "id": "mcp-1", "name": "mcp__gravity-bus__send_message",
+                                        "input": {"to": "lead", "kind": "note", "body": "built"}}]}}),
+        json!({"type": "system", "subtype": "turn_duration", "timestamp": "2026-10-01T10:00:06Z", "durationMs": 6000}),
+    ]);
+    let turn = &builder.turns[0];
+    assert!(!turn.open);
+    assert!(matches!(&turn.trigger, Trigger::Bus { from, task_id, .. }
+        if from == "lead" && task_id.as_deref() == Some("t9")));
+    assert!(
+        matches!(&turn.items[1], ChatItem::Step(s) if s.title == "Edited update.rs" && s.added == Some(2))
+    );
+    assert!(matches!(&turn.items[2], ChatItem::Sent { to, .. } if to == "lead"));
+    assert_eq!(
+        (turn.stats.commands, turn.stats.edits, turn.stats.sent),
+        (1, 1, 1)
+    );
+}

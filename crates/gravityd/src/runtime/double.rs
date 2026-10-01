@@ -18,6 +18,9 @@ use crate::channel::MsgSocket;
 
 /// Ctrl-D: ends the double session as an unsolicited exit.
 const EOF: u8 = 0x04;
+/// Ctrl-P: asks permission the way Codex does, as a structured request, so
+/// tests can drive the card path end to end.
+const ASK: u8 = 0x10;
 
 pub struct DoubleAdapter;
 
@@ -149,6 +152,16 @@ impl RuntimeSession for DoubleSession {
             self.end(Some(0));
             return Ok(());
         }
+        if bytes.contains(&ASK) {
+            return self
+                .tx
+                .send(SessionEvent::Permission {
+                    key: 1,
+                    tool: "Bash".to_string(),
+                    input: serde_json::json!({ "command": "echo from the double" }),
+                })
+                .map_err(|_| anyhow::anyhow!("output channel closed"));
+        }
         self.tx
             .send(SessionEvent::Output(bytes.to_vec()))
             .map_err(|_| anyhow::anyhow!("output channel closed"))
@@ -163,6 +176,18 @@ impl RuntimeSession for DoubleSession {
         self.tx
             .send(SessionEvent::Output(
                 format!("[resize {cols}x{rows}]").into_bytes(),
+            ))
+            .map_err(|_| anyhow::anyhow!("output channel closed"))
+    }
+
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: super::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.tx
+            .send(SessionEvent::Output(
+                format!("[permission {key}: {answer:?}]").into_bytes(),
             ))
             .map_err(|_| anyhow::anyhow!("output channel closed"))
     }

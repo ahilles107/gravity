@@ -33,6 +33,8 @@ pub(super) enum Wire {
     Closed,
     Input(Vec<u8>),
     Deliver(String, mpsc::SyncSender<anyhow::Result<()>>),
+    /// The owner's answer to a permission request, by its number.
+    Answer(u64, super::PermissionAnswer),
     Stop,
 }
 
@@ -215,6 +217,15 @@ impl RuntimeSession for CodexSession {
                 .recv_timeout(Duration::from_secs(12))
                 .context("Codex delivery timed out")?
         })())
+    }
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: super::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.tx
+            .send(Wire::Answer(key, answer))
+            .map_err(|_| anyhow::anyhow!("Codex session stopped"))
     }
     fn resize(&mut self, _cols: u16, _rows: u16) -> anyhow::Result<()> {
         Ok(())

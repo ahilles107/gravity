@@ -151,7 +151,7 @@ impl Supervisor {
             tracing::warn!(bot_id, error = %e, "could not record the bot's session");
         }
         let session = Arc::new(Mutex::new(started.session));
-        let mut rx = started.events;
+        let rx = started.events;
         let term = {
             let mut bots = self.lock_bots();
             let handle = bots
@@ -182,41 +182,12 @@ impl Supervisor {
         });
 
         // Consume session events until exit.
-        let sup = self.clone();
-        let bot_id_owned = bot_id.to_string();
-        tokio::spawn(async move {
-            let mut saw_output = false;
-            while let Some(ev) = rx.recv().await {
-                match ev {
-                    SessionEvent::Output(data) => {
-                        term.push(data);
-                        if !saw_output {
-                            saw_output = true;
-                            let (state, _) = sup.state(&bot_id_owned);
-                            if state == BotState::Starting {
-                                sup.set_state(&bot_id_owned, BotState::Ready, "runtime output");
-                            }
-                        }
-                    }
-                    SessionEvent::Exited { code } => {
-                        sup.on_exit(&bot_id_owned, code);
-                        break;
-                    }
-                    SessionEvent::Lifecycle {
-                        event,
-                        detail,
-                        transcript,
-                    } => {
-                        sup.on_hook_with_transcript(
-                            &bot_id_owned,
-                            event,
-                            detail.as_deref(),
-                            transcript.as_deref(),
-                        );
-                    }
-                }
-            }
-        });
+        tokio::spawn(super::session_events::consume(
+            self.clone(),
+            bot_id.to_string(),
+            term,
+            rx,
+        ));
         Ok(())
     }
 
@@ -337,7 +308,7 @@ impl Supervisor {
         handle.next_start_at = Some(Instant::now() + backoff(handle.consecutive_crashes));
     }
 
-    fn on_exit(&self, bot_id: &str, code: Option<i32>) {
+    pub(super) fn on_exit(&self, bot_id: &str, code: Option<i32>) {
         let (was_stopping, crashes) = {
             let mut bots = self.lock_bots();
             let Some(h) = bots.get_mut(bot_id) else {

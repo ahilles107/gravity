@@ -94,6 +94,7 @@ pub fn spawn_workers(app: &Arc<AppState>) {
 
     tokio::spawn(crate::activity::watch(app.clone()));
     tokio::spawn(crate::chat::watch(app.clone()));
+    tokio::spawn(crate::approval::watch(app.clone()));
     tokio::spawn(crate::decisions::run_watch(app.clone()));
 
     if app.cfg.retention.enabled {

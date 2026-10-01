@@ -255,6 +255,7 @@ pub async fn watch(app: Arc<AppState>) {
             Ok(Internal::BotDone { bot_id, .. }) => {
                 tokio::spawn(settle_and_push(app.clone(), bot_id, Utc::now()));
             }
+            Ok(_) => {}
             // A burst of finished turns must not retire the watcher for the
             // rest of the daemon's life: the turns it skipped surface on the
             // next snapshot, the ones after it keep flowing.
