@@ -92,9 +92,12 @@ fn project_key(path: &Path) -> anyhow::Result<String> {
     #[cfg(windows)]
     {
         if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
-            return Ok(format!(r"\\{rest}"));
+            return Ok(format!("//{}", rest.replace('\\', "/")));
         }
-        Ok(path.strip_prefix(r"\\?\").unwrap_or(path).to_string())
+        Ok(path
+            .strip_prefix(r"\\?\")
+            .unwrap_or(path)
+            .replace('\\', "/"))
     }
     #[cfg(not(windows))]
     Ok(path.to_string())
@@ -164,6 +167,46 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_keys_match_claudes_forward_slashes() {
+        assert_eq!(
+            project_key(Path::new(r"C:\bots\one")).unwrap(),
+            "C:/bots/one"
+        );
+        assert_eq!(
+            project_key(Path::new(r"\\?\C:\bots\one")).unwrap(),
+            "C:/bots/one"
+        );
+        assert_eq!(
+            project_key(Path::new(r"\\?\UNC\server\share\one")).unwrap(),
+            "//server/share/one"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn trust_updates_the_entry_claude_reads_without_forking_project_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = tmp.path().join("workspace");
+        fs::create_dir(&workspace).unwrap();
+        let node_key = workspace.to_str().unwrap().replace('\\', "/");
+        let config_path = tmp.path().join(".claude.json");
+        fs::write(
+            &config_path,
+            serde_json::to_vec(&serde_json::json!({"projects": {
+                node_key.clone(): {"hasTrustDialogAccepted": false, "otherSetting": "preserved"}
+            }}))
+            .unwrap(),
+        )
+        .unwrap();
+        trust_workspace(tmp.path(), &workspace).unwrap();
+        let config = read_claude_config(&config_path).unwrap();
+        assert!(is_trusted(&config, &node_key));
+        assert_eq!(config["projects"][&node_key]["otherSetting"], "preserved");
+        assert_eq!(config["projects"].as_object().unwrap().len(), 1);
+    }
 
     /// A temp home with a workspace and a `.claude.json` holding `config`.
     fn trust_fixture(config: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {

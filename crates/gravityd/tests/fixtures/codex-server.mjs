@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
-const log = process.env.GRAVITY_TEST_LOG;
+const log = process.env.GRAVITY_TEST_LOG ?? "../codex-fixture-rpc.jsonl";
 const send = (value) => { process.stdout.write(`${JSON.stringify(value)}\n`); };
 const reply = (id, result) => { send({ id, result }); };
 const notify = (method, params) => { send({ method, params }); };

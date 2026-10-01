@@ -9,7 +9,11 @@ use std::process::Command as StdCommand;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
-use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
+#[cfg(unix)]
+use portable_pty::ChildKiller;
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+#[cfg(windows)]
+mod windows;
 use tokio::sync::mpsc;
 
 use super::{BotSpec, Capabilities, RuntimeAdapter, RuntimeSession, SessionEvent, StartedSession};
@@ -73,7 +77,10 @@ impl RuntimeAdapter for PtyAdapter {
         let master_fd = pair.master.as_raw_fd();
 
         let (tx, rx) = mpsc::unbounded_channel();
+        #[cfg(unix)]
         let killer = child.clone_killer();
+        #[cfg(windows)]
+        let killer = windows::ProcessKiller::new(child.as_ref())?;
 
         // ConPTY keeps its read pipe open until the master is dropped. Waiting
         // for reader EOF first would hide exits forever, preventing restarts.
@@ -227,7 +234,10 @@ fn utf8_prefix_len(bytes: &[u8]) -> usize {
 struct PtySession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
+    #[cfg(unix)]
     killer: Box<dyn ChildKiller + Send + Sync>,
+    #[cfg(windows)]
+    killer: windows::ProcessKiller,
 }
 
 impl RuntimeSession for PtySession {
