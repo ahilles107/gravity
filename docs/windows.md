@@ -33,8 +33,11 @@ It runs immediately and at user sign-in, without elevation,
 and leaves bots running when the desktop closes. The task requires an interactive
 user session; it does not run while that user is signed out. Logs, configuration,
 and state live under `%USERPROFILE%\.gravity`; `GRAVITY_HOME` overrides this root.
-If Windows reserves the preferred port (for example for Hyper-V), the local
-managed daemon chooses an available port and the desktop follows it. Direct
+The configured port defaults to 49777. If Windows reserves it (for example for
+Hyper-V), the local managed daemon chooses an available port and the desktop
+follows it. To use a fixed port, choose an available `port` in `gravityd.toml`
+and restart the daemon. Remote clients and MCP URL allowlists must use the active
+port. Direct
 launches and remotely reachable daemons require an available configured port.
 
 ```powershell

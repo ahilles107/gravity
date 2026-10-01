@@ -119,8 +119,8 @@ async fn bind_with_grace(
     };
     if policy == PortPolicy::Strict || !port_unavailable(&error) {
         return Err(anyhow::Error::new(error).context(format!(
-            "binding port {configured_port}: stop whatever is using it, \
-             or set a different `port` in gravityd.toml"
+            "binding port {configured_port}: another process or an operating-system \
+             reservation may block this port; choose an available `port` in gravityd.toml"
         )));
     }
 
