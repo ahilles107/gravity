@@ -6,7 +6,7 @@ import type { FirstRunSetup } from "./app/useFirstRunSetup";
 import { useDaemonState } from "./app/useDaemonState";
 import type { DaemonState } from "./app/useDaemonState";
 import { useDesktopShell } from "./app/useDesktopShell";
-import { usePendingDecisions } from "./app/usePendingDecisions";
+import { usePermissionInbox } from "./app/usePermissionInbox";
 import { useOverlays } from "./app/useOverlays";
 import type { OverlaysApi } from "./app/useOverlays";
 import { usePaletteActions } from "./app/usePaletteActions";
@@ -121,7 +121,15 @@ export default function App(): ReactElement {
     [select],
   );
 
-  const pending = usePendingDecisions(client, daemon.connected);
+  const inbox = usePermissionInbox({
+    client,
+    connected: daemon.connected,
+    bots,
+    selection: daemon.selection,
+    select,
+    addToast,
+  });
+  const pending = inbox.counts;
 
   const paletteActions = usePaletteActions({
     bots,
@@ -169,6 +177,8 @@ export default function App(): ReactElement {
             onSetProjectLead={actions.setProjectLead}
             onSetProjectRepo={actions.setProjectRepo}
             onDeleteProject={actions.deleteProject}
+            permissions={inbox.permissions}
+            onOpenBot={openBot}
           />
         </main>
         {overlays.paletteOpen ? (

@@ -9,11 +9,16 @@ export interface Permissions {
 }
 
 /**
- * A bot's permission prompts waiting on the owner: listed on connect, then
- * followed through `permission_request` and `permission_resolved` pushes.
- * A daemon without the capability answers with an error; that is no prompts.
+ * Permission prompts waiting on the owner — one bot's, or with `botId` null
+ * every bot's: listed on connect, then followed through `permission_request`
+ * and `permission_resolved` pushes. A daemon without the capability answers
+ * with an error; that is no prompts.
  */
-export function usePermissions(client: DaemonApi, botId: string, connected: boolean): Permissions {
+export function usePermissions(
+  client: DaemonApi,
+  botId: string | null,
+  connected: boolean,
+): Permissions {
   const [pending, setPending] = useState<readonly PermissionRequest[]>([]);
   // Prompts pushed while a list request is in flight: the reply predates them.
   const pushed = useRef(new Set<string>());
@@ -23,7 +28,7 @@ export function usePermissions(client: DaemonApi, botId: string, connected: bool
     let listed: readonly PermissionRequest[] = [];
     try {
       const reply = await client.request(
-        { type: "list_permissions", bot_id: botId },
+        botId === null ? { type: "list_permissions" } : { type: "list_permissions", bot_id: botId },
         "permissions",
       );
       listed = reply.permissions;
@@ -42,7 +47,7 @@ export function usePermissions(client: DaemonApi, botId: string, connected: bool
   useEffect(() => {
     const off = [
       client.on("permission_request", (push) => {
-        if (push.request.bot_id === botId) {
+        if (botId === null || push.request.bot_id === botId) {
           pushed.current.add(push.request.id);
           setPending((current) => [
             ...current.filter((r) => r.id !== push.request.id),

@@ -8,6 +8,7 @@ import { connectionStatusLabel } from "../protocol/connection";
 import type { ProjectRepo } from "../protocol/entities";
 import BotView from "./BotView";
 import ControlCenterView from "./control/ControlCenterView";
+import type { Permissions } from "./permissions/usePermissions";
 import ConversationsView from "./conversations/ConversationsView";
 import ProjectView from "./ProjectView";
 import NewProjectForm from "./sidebar/NewProjectForm";
@@ -21,6 +22,9 @@ interface MainPaneProps {
   readonly onSetProjectLead: (projectId: string, botId: string | null) => Promise<void>;
   readonly onSetProjectRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly onDeleteProject: (projectId: string) => Promise<void>;
+  /** Every bot's permission prompts, answered in the Control Center. */
+  readonly permissions?: Permissions;
+  readonly onOpenBot?: (botId: string) => void;
 }
 
 interface EmptyStateProps {
@@ -81,6 +85,8 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         canControl={canControl}
         decisionId={selection.decisionId}
         onToast={addToast}
+        permissions={props.permissions}
+        onOpenBot={props.onOpenBot}
       />
     );
   }

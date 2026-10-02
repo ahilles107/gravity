@@ -9,12 +9,18 @@ interface PermissionCardsProps {
   readonly permissions: Permissions;
   /** False on a read-only connection: the cards show, the buttons do not act. */
   readonly canAnswer: boolean;
+  /** Set where cards from many bots share a list: each card names its bot. */
+  readonly botName?: (botId: string) => string | undefined;
+  /** Set with `botName`: opens the bot a card is from. */
+  readonly onOpenBot?: (botId: string) => void;
 }
 
-/** The bot's tools waiting on the owner, one card each, oldest first. */
+/** Tools waiting on the owner, one card each, oldest first. */
 export default function PermissionCards({
   permissions,
   canAnswer,
+  botName,
+  onOpenBot,
 }: PermissionCardsProps): ReactElement | null {
   if (permissions.pending.length === 0) {
     return null;
@@ -27,6 +33,8 @@ export default function PermissionCards({
           request={request}
           canAnswer={canAnswer}
           onAnswer={permissions.answer}
+          botName={botName?.(request.bot_id) ?? (botName === undefined ? undefined : "A bot")}
+          onOpenBot={onOpenBot}
         />
       ))}
     </div>
@@ -37,6 +45,41 @@ interface PermissionCardProps {
   readonly request: PermissionRequest;
   readonly canAnswer: boolean;
   readonly onAnswer: Permissions["answer"];
+  readonly botName?: string;
+  readonly onOpenBot?: (botId: string) => void;
+}
+
+/** Who wants it, with a way to open that bot, and when the prompt runs out. */
+function PermissionHead({
+  request,
+  botName,
+  onOpenBot,
+}: {
+  readonly request: PermissionRequest;
+  readonly botName?: string;
+  readonly onOpenBot?: (botId: string) => void;
+}): ReactElement {
+  return (
+    <div className="permission-head">
+      <span className="permission-label">
+        {botName === undefined ? "Wants to run" : `${botName} wants to run`}
+      </span>
+      {botName === undefined || onOpenBot === undefined ? null : (
+        <button
+          type="button"
+          className="permission-toggle permission-open"
+          onClick={() => {
+            onOpenBot(request.bot_id);
+          }}
+        >
+          Open {botName}
+        </button>
+      )}
+      <span className="permission-expiry">
+        Denied at {fmtTimestamp(request.expires_at)} if unanswered
+      </span>
+    </div>
+  );
 }
 
 const KEYS: Readonly<Record<string, PermissionAnswer>> = {
@@ -45,7 +88,13 @@ const KEYS: Readonly<Record<string, PermissionAnswer>> = {
   d: "deny",
 };
 
-function PermissionCard({ request, canAnswer, onAnswer }: PermissionCardProps): ReactElement {
+function PermissionCard({
+  request,
+  canAnswer,
+  onAnswer,
+  botName,
+  onOpenBot,
+}: PermissionCardProps): ReactElement {
   const [details, setDetails] = useState(false);
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
@@ -83,12 +132,7 @@ function PermissionCard({ request, canAnswer, onAnswer }: PermissionCardProps): 
 
   return (
     <div className="permission-card" role="group" aria-label={request.summary}>
-      <div className="permission-head">
-        <span className="permission-label">Wants to run</span>
-        <span className="permission-expiry">
-          Denied at {fmtTimestamp(request.expires_at)} if unanswered
-        </span>
-      </div>
+      <PermissionHead request={request} botName={botName} onOpenBot={onOpenBot} />
       <div className="permission-summary">{request.summary}</div>
       <button
         type="button"

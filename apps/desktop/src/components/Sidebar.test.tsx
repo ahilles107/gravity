@@ -282,6 +282,8 @@ describe("Sidebar", () => {
   it("shows no control center count when nothing waits", () => {
     renderSidebar();
     expect(document.querySelector(".control-row-count")).toBeNull();
-    expect(screen.getByTitle("Decisions waiting on you")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("Decisions and permission prompts waiting on you"),
+    ).toBeInTheDocument();
   });
 });

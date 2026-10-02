@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import PermissionCards from "../permissions/PermissionCards";
 import ControlBody from "./ControlBody";
 import ControlTop from "./ControlTop";
 import DeleteDecisionDialog from "./DeleteDecisionDialog";
@@ -39,6 +40,14 @@ export default function ControlCenterView(props: ControlCenterOptions): ReactEle
         candidatesFor={cc.candidatesFor}
         canControl={canControl}
       />
+      {props.permissions === undefined ? null : (
+        <PermissionCards
+          permissions={props.permissions}
+          canAnswer={props.connected && canControl}
+          botName={(botId) => props.bots.find((bot) => bot.id === botId)?.name}
+          onOpenBot={props.onOpenBot}
+        />
+      )}
       <ControlBody
         api={api}
         state={state}
