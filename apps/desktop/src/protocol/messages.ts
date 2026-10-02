@@ -9,6 +9,14 @@ import type {
   StepDetail,
 } from "./chat";
 import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
+import type {
+  AgentBot,
+  AgentConversation,
+  AgentMessage,
+  BrowserAction,
+  BrowserFramePush,
+  BrowserTabsPush,
+} from "./agents";
 import type { BotTask } from "./tasks";
 import type {
   Bot,
@@ -181,6 +189,28 @@ export type ServerReply =
       readonly tasks: readonly BotTask[];
     })
   | (ReplyBase & {
+      readonly type: "browser_activity";
+      readonly bot_id: string;
+      /** Newest first. */
+      readonly activity: readonly BrowserAction[];
+    })
+  | (ReplyBase & {
+      readonly type: "agent_conversations";
+      readonly project_id: string;
+      /** Most recently active first. */
+      readonly conversations: readonly AgentConversation[];
+      readonly bots: readonly AgentBot[];
+    })
+  | (ReplyBase & {
+      readonly type: "agent_conversation";
+      readonly project_id: string;
+      readonly bot_ids: readonly [string, string];
+      /** Oldest first. */
+      readonly messages: readonly AgentMessage[];
+      readonly has_more: boolean;
+      readonly bots: readonly AgentBot[];
+    })
+  | (ReplyBase & {
       readonly type: "artifacts";
       readonly project_id: string;
       readonly artifacts: readonly Artifact[];
@@ -231,6 +261,8 @@ export type ServerPush =
       readonly bot_id: string;
       readonly outcome: PermissionOutcome;
     }
+  | BrowserTabsPush
+  | BrowserFramePush
   | {
       readonly type: "chat_turns";
       readonly bot_id: string;

@@ -32,6 +32,8 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   chat_turns: true,
   permission_request: true,
   permission_resolved: true,
+  browser_tabs: true,
+  browser_frame: true,
 };
 
 const REPLY_TYPES: ReadonlySet<string> = new Set(
@@ -76,6 +78,9 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     tasks: true,
     upload: true,
     task: true,
+    browser_activity: true,
+    agent_conversations: true,
+    agent_conversation: true,
   } satisfies Record<ServerReplyType, true>),
 );
 

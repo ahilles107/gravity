@@ -8,6 +8,7 @@ import { errText } from "../util";
 import BotAvatar from "./BotAvatar";
 import { BOT_ICONS } from "./botIcons";
 import BotHistory from "./bot/BotHistory";
+import BotChromeSwitch from "./bot/BotChromeSwitch";
 import BotRuntimePicker from "./bot/BotRuntimePicker";
 
 interface InfoPanelProps {
@@ -246,6 +247,15 @@ export default function InfoPanel({
 
       <BotRuntimePicker
         key={`${bot.id}:${bot.runtime ?? "claude_code"}`}
+        client={client}
+        bot={bot}
+        connected={connected}
+        canControl={canControl}
+        onBotUpdated={onBotUpdated}
+        onToast={onToast}
+      />
+
+      <BotChromeSwitch
         client={client}
         bot={bot}
         connected={connected}

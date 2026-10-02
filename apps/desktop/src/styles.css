@@ -21,6 +21,8 @@
 @import "./styles/files.css";
 @import "./styles/permissions.css";
 @import "./styles/tasks.css";
+@import "./styles/agent-browser.css";
+@import "./styles/conversations.css";
 @import "./styles/overlays.css";
 @import "./styles/settings.css";
 @import "./styles/devices.css";

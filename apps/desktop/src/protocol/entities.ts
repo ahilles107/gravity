@@ -54,6 +54,8 @@ export interface Bot {
   readonly deleted_at?: string | null;
   /** Set on a linked bot: one that runs on a paired peer daemon. */
   readonly peer?: BotPeer | null;
+  /** May drive the owner's own Chrome; absent on older daemons. */
+  readonly user_chrome?: boolean;
   readonly created_at: string;
 }
 

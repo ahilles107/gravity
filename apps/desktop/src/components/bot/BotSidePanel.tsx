@@ -4,16 +4,18 @@ import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import FilesPanel from "../files/FilesPanel";
 import InfoPanel from "../InfoPanel";
+import MemoryPanel from "../memory/MemoryPanel";
 import TasksPanel from "../tasks/TasksPanel";
 
-export type SideTab = "info" | "tasks" | "files";
+export type SideTab = "info" | "tasks" | "files" | "memory";
 
-const SIDE_TABS: readonly SideTab[] = ["info", "tasks", "files"];
+const SIDE_TABS: readonly SideTab[] = ["info", "tasks", "files", "memory"];
 
 const SIDE_LABEL: Readonly<Record<SideTab, string>> = {
   info: "Info",
   tasks: "Tasks",
   files: "Files",
+  memory: "Memory",
 };
 
 interface BotSidePanelProps {
@@ -59,6 +61,9 @@ export default function BotSidePanel(props: BotSidePanelProps): ReactElement {
         />
       ) : null}
       {side === "tasks" ? <TasksPanel client={client} bot={bot} connected={connected} /> : null}
+      {side === "memory" ? (
+        <MemoryPanel key={bot.id} client={client} bot={bot} connected={connected} />
+      ) : null}
       {side === "files" ? (
         <FilesPanel
           client={client}

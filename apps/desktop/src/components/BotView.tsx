@@ -43,7 +43,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export default function BotView(props: BotViewProps): ReactElement {
   const { client, bot, bots, connected, canControl, onToast } = props;
-  const tabs = botTabs(client.capabilities.includes("chat"), bot.peer != null);
+  const tabs = botTabs(
+    client.capabilities.includes("chat"),
+    bot.peer != null,
+    client.capabilities.includes("bot_browser"),
+  );
   const [tab, setTab] = useState<BotTab>(tabs[0] ?? "terminal");
   const [side, setSide] = useState<SideTab>("info");
   const [openFile, setOpenFile] = useState<string | null>(null);

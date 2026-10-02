@@ -23,7 +23,7 @@ export type Trigger =
   | { readonly kind: "resumed" }
   | { readonly kind: "background"; readonly text: string };
 
-type StepStatus = "running" | "ok" | "error";
+export type StepStatus = "running" | "ok" | "error";
 
 export interface ImageRef {
   readonly id: string;

@@ -1,19 +1,28 @@
 import type { ReactElement } from "react";
 
-export type BotTab = "chat" | "terminal" | "routines";
+export type BotTab = "chat" | "terminal" | "browser" | "routines";
 
 const TAB_LABEL: Readonly<Record<BotTab, string>> = {
   chat: "Chat",
   terminal: "Terminal",
+  browser: "Browser",
   routines: "Routines",
 };
 
-/** The tabs a bot offers: chat needs a daemon that serves it, and a linked bot has only chat. */
-export function botTabs(chat: boolean, linked: boolean): readonly BotTab[] {
+/**
+ * The tabs a bot offers. Chat and the bot's own browser need a daemon that
+ * serves them, and a linked bot has only chat: its browser is on its machine.
+ */
+export function botTabs(chat: boolean, linked: boolean, browser = false): readonly BotTab[] {
   if (linked) {
     return ["chat"];
   }
-  return chat ? ["chat", "terminal", "routines"] : ["terminal", "routines"];
+  const tabs: BotTab[] = chat ? ["chat", "terminal"] : ["terminal"];
+  if (browser) {
+    tabs.push("browser");
+  }
+  tabs.push("routines");
+  return tabs;
 }
 
 interface BotTabsProps {

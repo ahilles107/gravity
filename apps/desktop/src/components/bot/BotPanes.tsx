@@ -7,6 +7,7 @@ import ChatPane from "../chat/ChatPane";
 import LinkedChat from "../chat/LinkedChat";
 import PermissionCards from "../permissions/PermissionCards";
 import { usePermissions } from "../permissions/usePermissions";
+import BrowserPane from "../browser/BrowserPane";
 import RoutinesPanel from "../RoutinesPanel";
 import TerminalPane from "../TerminalPane";
 import type { BotTab } from "./BotTabs";
@@ -93,6 +94,19 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
               botId={bot.id}
               canWrite={canControl && !isStopped(bot)}
               onToast={onToast}
+            />
+          </div>
+        ) : null}
+        {tabs.includes("browser") ? (
+          // Mounted while hidden so its activity log stays loaded; it only
+          // streams while shown. Keyed by bot: another bot is another browser.
+          <div className={paneClass(active === "browser")}>
+            <BrowserPane
+              key={bot.id}
+              client={client}
+              bot={bot}
+              active={active === "browser"}
+              connected={connected}
             />
           </div>
         ) : null}

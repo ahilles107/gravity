@@ -23,6 +23,8 @@ export function emptyHandlers(): PushHandlerSets {
     chat_turns: new Set(),
     permission_request: new Set(),
     permission_resolved: new Set(),
+    browser_tabs: new Set(),
+    browser_frame: new Set(),
   };
 }
 
@@ -92,6 +94,12 @@ export function dispatchPush(handlers: PushHandlerSets, push: ServerPush): void 
       break;
     case "permission_resolved":
       emitPush(handlers, "permission_resolved", push);
+      break;
+    case "browser_tabs":
+      emitPush(handlers, "browser_tabs", push);
+      break;
+    case "browser_frame":
+      emitPush(handlers, "browser_frame", push);
       break;
     default:
       push satisfies never;

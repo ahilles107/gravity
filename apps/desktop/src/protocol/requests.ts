@@ -167,6 +167,20 @@ export type ClientRequestBody =
   | { readonly type: "list_permissions"; readonly bot_id?: string }
   | { readonly type: "list_tasks"; readonly bot_id: string; readonly limit?: number }
   | { readonly type: "get_task"; readonly bot_id: string; readonly task_id: string }
+  | { readonly type: "set_bot_user_chrome"; readonly bot_id: string; readonly enabled: boolean }
+  /** Streams `browser_tabs` and `browser_frame`; `tab_id` pins a tab, else it follows the bot. */
+  | { readonly type: "watch_browser"; readonly bot_id: string; readonly tab_id?: string }
+  | { readonly type: "unwatch_browser" }
+  | { readonly type: "list_browser_activity"; readonly bot_id: string; readonly limit?: number }
+  | { readonly type: "list_agent_conversations"; readonly project_id: string }
+  | {
+      readonly type: "list_agent_conversation";
+      readonly project_id: string;
+      readonly bot_ids: readonly [string, string];
+      /** A message `num`: the page ends just before it. */
+      readonly before?: number;
+      readonly limit?: number;
+    }
   | {
       readonly type: "write_artifact";
       readonly project_id: string;

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { BotTab } from "./BotTabs";
 
 /**
- * ⌘1…⌘3 switch the bot's tabs and ⌘L jumps to the chat composer. Registered
+ * ⌘1…⌘4 switch the bot's tabs and ⌘L jumps to the chat composer. Registered
  * in the capture phase so a focused terminal cannot swallow them.
  */
 export function useBotKeys(tabs: readonly BotTab[], onSelect: (tab: BotTab) => void): void {
