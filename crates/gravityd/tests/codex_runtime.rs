@@ -22,6 +22,7 @@ fn spec(root: &Path) -> BotSpec {
                 .to_string()],
             port: 49777,
             artifacts: Some(root.join("artifacts")),
+            browser: None,
         }),
         env: vec![
             ("GRAVITY_TOKEN".into(), "test-token".into()),

@@ -77,6 +77,7 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         "avatar": bot.avatar,
         "instructions": bot.instructions,
         "runtime": bot.runtime,
+        "user_chrome": bot.user_chrome,
         "state": state.as_str(),
         "state_reason": reason,
         "unread_count": unread,

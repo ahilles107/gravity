@@ -198,7 +198,7 @@ impl Conn {
 
     /// Runs `work` on a blocking thread and replies with its result, or with
     /// a `not_found` error the client can show.
-    fn blocking(
+    pub(super) fn blocking(
         &self,
         req_id: &Value,
         work: impl FnOnce(&Arc<AppState>) -> anyhow::Result<Value> + Send + 'static,

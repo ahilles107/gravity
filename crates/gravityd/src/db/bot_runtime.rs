@@ -59,6 +59,7 @@ impl Db {
             deleted_at: None,
             peer_id: None,
             remote_bot_id: None,
+            user_chrome: false,
             created_at: now(),
         };
         let conn = self.lock();
@@ -94,6 +95,16 @@ impl Db {
         let changed = self.lock().execute(
             "UPDATE bot SET runtime = ?2 WHERE id = ?1 AND deleted_at IS NULL",
             params![bot_id, runtime.as_str()],
+        )?;
+        anyhow::ensure!(changed == 1, "bot not found or archived");
+        Ok(())
+    }
+
+    /// Allows or forbids the bot the owner's own Chrome (Claude in Chrome).
+    pub fn set_bot_user_chrome(&self, bot_id: &str, enabled: bool) -> anyhow::Result<()> {
+        let changed = self.lock().execute(
+            "UPDATE bot SET user_chrome = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+            params![bot_id, enabled],
         )?;
         anyhow::ensure!(changed == 1, "bot not found or archived");
         Ok(())

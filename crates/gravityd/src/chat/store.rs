@@ -79,6 +79,40 @@ impl ChatStore {
         Ok((page, start > 0))
     }
 
+    /// The bot's browser actions, newest first: what it did to which page, in
+    /// which turn, and what started that turn.
+    pub fn browser_activity(
+        &self,
+        app: &AppState,
+        bot: &Bot,
+        limit: usize,
+    ) -> anyhow::Result<Vec<Value>> {
+        self.refresh(app, bot)?;
+        let (chat, _) = self.entry(app, bot)?;
+        let chat = lock(&chat);
+        let mut activity = Vec::new();
+        for turn in chat.builder.turns.iter().rev() {
+            let steps = turn.items.iter().rev().filter_map(|item| match item {
+                super::model::ChatItem::Step(step) => {
+                    super::browser_steps::browser_tool(&step.tool)
+                        .map(|(browser, _)| (browser, step))
+                }
+                _ => None,
+            });
+            for (browser, step) in steps {
+                activity.push(serde_json::json!({
+                    "turn_id": turn.id, "step_id": step.id, "at": turn.started_at,
+                    "browser": browser.as_str(), "title": step.title,
+                    "subtitle": step.subtitle, "status": step.status, "trigger": turn.trigger
+                }));
+                if activity.len() >= limit {
+                    return Ok(activity);
+                }
+            }
+        }
+        Ok(activity)
+    }
+
     pub fn step(&self, app: &AppState, bot: &Bot, item_id: &str) -> anyhow::Result<StepDetail> {
         let (chat, _) = self.entry(app, bot)?;
         let chat = lock(&chat);

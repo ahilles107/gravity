@@ -34,4 +34,6 @@ pub const MIGRATIONS: &[&str] = &[
     MIGRATION_14,
     MIGRATION_15,
     MIGRATION_16,
+    // Bots drive a browser of their own; the owner's Chrome is opt-in per bot.
+    "ALTER TABLE bot ADD COLUMN user_chrome INTEGER NOT NULL DEFAULT 0;",
 ];

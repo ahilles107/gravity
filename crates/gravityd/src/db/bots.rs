@@ -37,6 +37,7 @@ impl Db {
             },
             peer_id: r.get(12)?,
             remote_bot_id: r.get(13)?,
+            user_chrome: r.get(14)?,
             // Runtime fields are overlaid by the supervisor.
             state: BotState::Stopped,
             state_reason: String::new(),
@@ -47,7 +48,7 @@ impl Db {
     pub(super) const BOT_COLS: &'static str =
         "id, project_id, name, description, avatar, instructions, \
          workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime, peer_id, \
-         remote_bot_id";
+         remote_bot_id, user_chrome";
 
     /// Restricts a query to bots that still exist for addressing purposes.
     const LIVE: &'static str = "deleted_at IS NULL";

@@ -41,4 +41,24 @@ impl Conn {
         self.send(json!({ "type": "bot", "req_id": req_id, "bot": self.bot_json(&bot) }));
         Ok(())
     }
+
+    pub(super) fn set_bot_user_chrome(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let bot_id = Self::str_field(req, "bot_id")?;
+        let Some(enabled) = req.get("enabled").and_then(Value::as_bool) else {
+            self.reply_err(req_id, "invalid_request", "'enabled' must be true or false");
+            return Ok(());
+        };
+        let bot = self
+            .app
+            .db
+            .get_live_bot(bot_id)?
+            .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
+        match botmgmt::set_bot_user_chrome(&self.app, &bot, enabled) {
+            Ok(bot) => {
+                self.send(json!({ "type": "bot", "req_id": req_id, "bot": self.bot_json(&bot) }));
+            }
+            Err(error) => self.reply_err(req_id, "invalid_request", &format!("{error:#}")),
+        }
+        Ok(())
+    }
 }

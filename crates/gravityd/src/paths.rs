@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 
 mod prompt;
+mod prompt_sections;
 #[cfg(test)]
 mod tests;
 mod trust;
@@ -145,6 +146,10 @@ pub struct BotProvision<'a> {
     /// The peers this project is linked through, by name. Empty when the
     /// team lives on this machine alone.
     pub linked_machines: Vec<String>,
+    /// Whether the bot has a browser of its own (see `crate::browser`), and
+    /// whether it may also drive the owner's Chrome.
+    pub own_browser: bool,
+    pub user_chrome: bool,
 }
 
 /// Create the bot's directory tree: `bot.json`, `system.md`, `mcp.json`, and a
@@ -167,7 +172,9 @@ pub fn provision_bot(cfg: &Config, spec: &BotProvision<'_>) -> anyhow::Result<Bo
 
     write_system_md(&root, spec)?;
 
-    write_mcp_config(&root, spec.daemon_port, spec.bot_token_env)?;
+    // The browser entry is added at spawn, when the session's config is
+    // refreshed with whatever Node and Chrome the machine has then.
+    write_mcp_config(&root, spec.daemon_port, spec.bot_token_env, None)?;
 
     seed_memory_files(&workspace, spec.name)?;
 
@@ -181,8 +188,13 @@ pub fn provision_bot(cfg: &Config, spec: &BotProvision<'_>) -> anyhow::Result<Bo
 /// re-provisioning — the same reason `write_hook_settings` runs each start. The
 /// token is referenced through an environment variable the daemon injects when
 /// it starts the runtime.
-pub fn write_mcp_config(root: &Path, daemon_port: u16, bot_token_env: &str) -> anyhow::Result<()> {
-    let mcp = serde_json::json!({
+pub fn write_mcp_config(
+    root: &Path,
+    daemon_port: u16,
+    bot_token_env: &str,
+    browser: Option<&serde_json::Value>,
+) -> anyhow::Result<()> {
+    let mut mcp = serde_json::json!({
         "mcpServers": {
             "gravity-bus": {
                 "type": "http",
@@ -193,6 +205,12 @@ pub fn write_mcp_config(root: &Path, daemon_port: u16, bot_token_env: &str) -> a
             }
         }
     });
+    // The bot's own browser, when one can be started; see `crate::browser`.
+    if let Some(browser) = browser {
+        let mut server = browser.clone();
+        server["type"] = serde_json::json!("stdio");
+        mcp["mcpServers"][crate::browser::setup::SERVER] = server;
+    }
     atomic_write_json(&root.join("mcp.json"), &mcp)
 }
 

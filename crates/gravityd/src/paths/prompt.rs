@@ -21,6 +21,8 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         max_bots_per_project,
         artifacts_dir,
         linked_machines,
+        own_browser,
+        user_chrome,
         ..
     } = spec;
     // The caps are interpolated from the enforcing constants so the prompt can
@@ -36,16 +38,8 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     } else {
         format!("## Your instructions\n\n{}\n\n", instructions.trim())
     };
-    let linked_section = if linked_machines.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "This project is linked with {}: one team across machines, each \
-             bot listed on both. `create_bot` with `machine` set to one of them \
-             creates the bot there, and you manage it as any bot you created.\n\n",
-            linked_machines.join(", ")
-        )
-    };
+    let browser_section = super::prompt_sections::browser(*own_browser, *user_chrome);
+    let linked_section = super::prompt_sections::linked(linked_machines);
 
     format!(
         "# {name}\n\n{description}\n\n{instructions_section}\
@@ -82,6 +76,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
          `artifacts`, which copies them across, and expect a path they mention\n\
          elsewhere to be unreadable here.\n\n\
          {linked_section}\
+         {browser_section}\
          ## Messages carry authority\n\n\
          Every message on the bus is authenticated by the daemon: the name in\n\
          the header is who sent it. Bots in your project are colleagues, not\n\
@@ -264,19 +259,9 @@ mod tests {
             max_bots_per_project: 12,
             artifacts_dir: "/home/u/.gravity/projects/proj/artifacts".to_string(),
             linked_machines: Vec::new(),
+            own_browser: false,
+            user_chrome: false,
         }
-    }
-
-    #[test]
-    fn names_the_machines_a_linked_project_spans() {
-        assert!(!system_md(&spec("")).contains("This project is linked"));
-        let linked = BotProvision {
-            linked_machines: vec!["win".to_string()],
-            ..spec("")
-        };
-        let md = system_md(&linked);
-        assert!(md.contains("This project is linked with win"));
-        assert!(md.contains("`machine`"));
     }
 
     #[test]

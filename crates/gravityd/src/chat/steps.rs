@@ -163,8 +163,15 @@ pub fn describe(name: &str, input: &Value) -> Described {
             ToolKind::Other,
         ),
         "TodoWrite" => ("Updated the plan".to_string(), None, ToolKind::Other),
-        other => match other.strip_prefix("mcp__") {
-            Some(rest) => {
+        other => match (
+            super::browser_steps::browser_tool(other),
+            other.strip_prefix("mcp__"),
+        ) {
+            (Some((_, tool)), _) => {
+                let (title, subtitle) = super::browser_steps::describe(tool, input);
+                (title, subtitle, ToolKind::Other)
+            }
+            (None, Some(rest)) => {
                 let (server, tool) = rest.split_once("__").unwrap_or(("mcp", rest));
                 (
                     tool.replace('_', " "),
@@ -172,7 +179,7 @@ pub fn describe(name: &str, input: &Value) -> Described {
                     ToolKind::Other,
                 )
             }
-            None => (other.to_string(), None, ToolKind::Other),
+            (None, None) => (other.to_string(), None, ToolKind::Other),
         },
     };
     let minor = MINOR_TOOLS.contains(&name)

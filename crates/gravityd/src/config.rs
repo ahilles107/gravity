@@ -76,6 +76,8 @@ pub struct Config {
     /// header (native clients) and tauri/localhost origins are always allowed.
     pub allowed_origins: Vec<String>,
     pub retention: RetentionConfig,
+    /// Each bot's own browser. See [`crate::browser`].
+    pub browser: crate::browser::BrowserConfig,
     /// The *user's* home, where Claude Code keeps its `~/.claude/projects`
     /// transcripts. Distinct from `home`, which is the daemon's own state
     /// directory; separate so tests can point it at a fixture tree.
@@ -184,6 +186,7 @@ impl Default for Config {
             max_bots_per_project: 12,
             permission_timeout_seconds: 600,
             delivery: DeliveryConfig::default(),
+            browser: crate::browser::BrowserConfig::default(),
             scheduler: SchedulerConfig::default(),
             supervision_interval_ms: 5_000,
             scrollback_bytes: 1_048_576,

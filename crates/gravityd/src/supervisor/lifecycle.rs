@@ -57,9 +57,18 @@ impl Supervisor {
         // Refresh `mcp.json` so a change to the daemon's port reaches existing
         // bots on their next start, just like the hook settings above. Written
         // once at creation otherwise, it would keep pointing at the old port.
+        // The bot's own browser is (re)configured here too, so Node or Chrome
+        // installed since the last start is picked up.
+        let browser = bot_root
+            .as_deref()
+            .and_then(|root| crate::browser::setup::server(&self.inner.cfg, root));
         if let Some(root) = &bot_root {
-            if let Err(e) = crate::paths::write_mcp_config(root, self.inner.cfg.port, BOT_TOKEN_ENV)
-            {
+            if let Err(e) = crate::paths::write_mcp_config(
+                root,
+                self.inner.cfg.port,
+                BOT_TOKEN_ENV,
+                browser.as_ref(),
+            ) {
                 tracing::warn!(bot_id, error = %e, "failed to refresh mcp config");
             }
         }
@@ -81,6 +90,20 @@ impl Supervisor {
         if let Some(model) = &model {
             claude_args.push("--model".to_string());
             claude_args.push(model.clone());
+        }
+        // The owner's own Chrome is opt-in per bot: by default a bot drives
+        // the browser of its own that its MCP config provides, so tabs never
+        // open in the owner's Chrome without saying which bot asked. Claude
+        // Code would otherwise follow the owner's global setting.
+        if bot.runtime == bus::BotRuntime::ClaudeCode {
+            claude_args.push(
+                if bot.user_chrome {
+                    "--chrome"
+                } else {
+                    "--no-chrome"
+                }
+                .to_string(),
+            );
         }
         if let Some(root) = &bot_root {
             let mcp = root.join("mcp.json");
@@ -133,6 +156,7 @@ impl Supervisor {
                     args: self.inner.cfg.codex_args.clone(),
                     port: self.inner.cfg.port,
                     artifacts,
+                    browser,
                 }
             }),
             bot_id: bot.id.clone(),

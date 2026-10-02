@@ -26,7 +26,8 @@ pub use archive::{archive_bot, prune_archived_workspaces};
 pub use create::{create_bot, create_bot_with_runtime, Created};
 pub use revert::revert_revision;
 pub use runtime::{
-    check_runtime_available, requested_runtime, set_bot_runtime, RuntimeUnavailable,
+    check_runtime_available, requested_runtime, set_bot_runtime, set_bot_user_chrome,
+    RuntimeUnavailable,
 };
 
 /// Fields that may change on a bot. `None` leaves the stored value alone,
@@ -95,6 +96,8 @@ pub(super) fn provision_spec<'a>(
             .display()
             .to_string(),
         linked_machines: linked_machines(app, &project.id),
+        own_browser: app.cfg.browser.enabled,
+        user_chrome: bot.user_chrome,
     }
 }
 

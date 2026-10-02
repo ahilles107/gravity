@@ -18,7 +18,9 @@ use tokio::task::JoinHandle;
 use crate::app::{AppState, DAEMON_VERSION, PROTOCOL_VERSION};
 
 mod admin;
+mod browser;
 mod chat;
+mod conversations;
 mod decisions;
 mod decisions_publish;
 mod dispatch;
@@ -77,6 +79,8 @@ struct Conn {
     out: mpsc::UnboundedSender<Value>,
     /// bot_id -> forwarding task for live terminal frames.
     attachments: HashMap<String, JoinHandle<()>>,
+    /// The bot browser this connection is watching, if any.
+    browser_watch: Option<JoinHandle<()>>,
     caps: Vec<Capability>,
     /// None for the owner token; the issuing device otherwise. A ruling made
     /// from a device stays attributable after that device is revoked.
@@ -161,6 +165,7 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
         app: app.clone(),
         out: out_tx.clone(),
         attachments: HashMap::new(),
+        browser_watch: None,
         caps,
         device_id,
     };
@@ -183,6 +188,9 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
 
     // Cleanup: attachments die with the connection.
     for (_, task) in conn.attachments.drain() {
+        task.abort();
+    }
+    if let Some(task) = conn.browser_watch.take() {
         task.abort();
     }
     push_task.abort();

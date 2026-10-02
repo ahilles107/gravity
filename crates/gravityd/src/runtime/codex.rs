@@ -24,6 +24,8 @@ pub struct CodexSpec {
     pub args: Vec<String>,
     pub port: u16,
     pub artifacts: Option<PathBuf>,
+    /// The bot's own browser server, `{command, args, env}`, when it has one.
+    pub browser: Option<Value>,
 }
 
 pub struct CodexAdapter;

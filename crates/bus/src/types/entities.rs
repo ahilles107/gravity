@@ -58,6 +58,10 @@ pub struct Bot {
     /// The linked bot's id on its peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remote_bot_id: Option<Id>,
+    /// Whether the bot may drive the owner's own Chrome through the Claude in
+    /// Chrome extension. Off by default: every bot has a browser of its own.
+    #[serde(default)]
+    pub user_chrome: bool,
     pub created_at: DateTime<Utc>,
 }
 

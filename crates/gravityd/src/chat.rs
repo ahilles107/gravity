@@ -7,6 +7,7 @@ use std::time::Duration;
 use crate::app::AppState;
 use crate::events::Push;
 
+mod browser_steps;
 mod builder;
 #[cfg(test)]
 mod builder_tests;

@@ -7,6 +7,7 @@ pub mod app;
 pub mod approval;
 pub mod backup;
 pub mod botmgmt;
+pub mod browser;
 pub mod channel;
 pub mod chat;
 pub mod config;
