@@ -53,7 +53,11 @@ fn bot_creator(app: &AppState, bot: &Bot, via: &'static str) -> Creator {
 /// Fills in `created_by` wherever it can be told.
 pub fn attribute(app: &AppState, project: &Project, artifacts: &mut [Artifact]) {
     let mut earliest: HashMap<usize, (DateTime<Utc>, Creator)> = HashMap::new();
-    let bots = app.db.list_bots(Some(&project.id)).unwrap_or_default();
+    // Archived bots made files too, and their transcripts are still there.
+    let bots = app
+        .db
+        .list_bots_with_archived(Some(&project.id))
+        .unwrap_or_default();
     for bot in bots.iter().filter(|b| !b.is_linked()) {
         let found = app.chat.with_logs(app, bot, |commands, writes| {
             artifacts
@@ -69,8 +73,9 @@ pub fn attribute(app: &AppState, project: &Project, artifacts: &mut [Artifact]) 
                         (at, via)
                     });
                     let found = touched.or_else(|| {
-                        commands
-                            .first_mention(&artifact.path)
+                        mentions(&artifact.path, &artifact.rel)
+                            .iter()
+                            .find_map(|needle| commands.first_mention(needle))
                             .map(|at| (at, "command"))
                     });
                     found.map(|(at, via)| (i, at, via))
@@ -100,6 +105,32 @@ pub fn attribute(app: &AppState, project: &Project, artifacts: &mut [Artifact]) 
     }
 }
 
+/// Shortest relative path matched without the artifacts directory before it:
+/// bots name artifacts after their task, but a short generic name could be
+/// any file a command touched.
+const MIN_BARE_NAME: usize = 12;
+
+/// What a command that made a file would contain, most certain first: its
+/// full path; its path inside the artifacts directory, which bots reach
+/// through a variable (`cp out.csv $A/run-42.csv`); for a file in a folder,
+/// the folder (`cp *.png $A/frames-42/`).
+fn mentions(path: &str, rel: &str) -> Vec<String> {
+    let mut needles = vec![path.to_string()];
+    if rel.len() >= MIN_BARE_NAME {
+        needles.push(format!("/{rel}"));
+    }
+    if let Some((folder, _)) = rel.rsplit_once('/') {
+        if folder.len() >= MIN_BARE_NAME
+            && !matches!(folder, "uploads")
+            && !folder.starts_with("peers")
+        {
+            needles.push(format!("/{folder}/"));
+            needles.push(format!("/{folder} "));
+        }
+    }
+    needles
+}
+
 /// Files whose folder says who made them: uploads, and a peer's results.
 fn by_place(app: &AppState, rel: &str) -> Option<Creator> {
     let mut parts = rel.split('/');
@@ -125,5 +156,27 @@ fn by_place(app: &AppState, rel: &str) -> Option<Creator> {
             Some(bot_creator(app, &bot, "sent"))
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_command_is_matched_by_path_then_by_distinct_name_then_by_folder() {
+        assert_eq!(
+            mentions("/a/artifacts/report.md", "report.md"),
+            vec!["/a/artifacts/report.md"]
+        );
+        assert_eq!(
+            mentions("/a/artifacts/31620468-vtrig.csv", "31620468-vtrig.csv"),
+            vec!["/a/artifacts/31620468-vtrig.csv", "/31620468-vtrig.csv"]
+        );
+        let nested = mentions(
+            "/a/artifacts/b8b97477-frames/on.png",
+            "b8b97477-frames/on.png",
+        );
+        assert!(nested.contains(&"/b8b97477-frames/".to_string()));
     }
 }
