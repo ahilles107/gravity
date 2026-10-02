@@ -154,7 +154,11 @@ export default function InfoPanel({
           {bot.created_by_bot_id != null && bot.created_by_bot_id.length > 0 ? (
             <>
               <dt>Origin</dt>
-              <dd>Created by another bot</dd>
+              <dd>
+                {bot.temporary === true
+                  ? "Temporary worker spawned by another bot; removed when its task closes"
+                  : "Created by another bot"}
+              </dd>
             </>
           ) : null}
         </dl>

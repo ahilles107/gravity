@@ -140,6 +140,10 @@ pub struct BotProvision<'a> {
     pub bot_token_env: &'a str,
     /// Stated verbatim in the generated prompt so bots can budget against it.
     pub max_bots_per_project: usize,
+    /// Workers the project may run at once on this machine.
+    pub max_workers_per_project: usize,
+    /// Whether this bot is a temporary worker, here for one task.
+    pub temporary: bool,
     /// Absolute path of the project's shared artifacts directory, stated in
     /// the prompt so bots know where substance goes.
     pub artifacts_dir: String,

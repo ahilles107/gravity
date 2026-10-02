@@ -98,6 +98,7 @@ pub fn spawn_workers(app: &Arc<AppState>) {
     tokio::spawn(crate::approval::watch(app.clone()));
     tokio::spawn(crate::peer::chat::forward(app.clone()));
     tokio::spawn(crate::decisions::run_watch(app.clone()));
+    tokio::spawn(crate::workers::run(app.clone()));
 
     if app.cfg.retention.enabled {
         let app = app.clone();

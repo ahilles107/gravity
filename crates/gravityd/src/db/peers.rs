@@ -221,11 +221,12 @@ impl Db {
             remote.runtime,
         )?;
         self.lock().execute(
-            "UPDATE bot SET peer_id = ?2, remote_bot_id = ?3 WHERE id = ?1",
-            params![bot.id, peer_id, remote.id],
+            "UPDATE bot SET peer_id = ?2, remote_bot_id = ?3, temporary = ?4 WHERE id = ?1",
+            params![bot.id, peer_id, remote.id, remote.temporary],
         )?;
         bot.peer_id = Some(peer_id.to_string());
         bot.remote_bot_id = Some(remote.id.clone());
+        bot.temporary = remote.temporary;
         Ok(bot)
     }
 

@@ -60,6 +60,7 @@ impl Db {
             peer_id: None,
             remote_bot_id: None,
             user_chrome: false,
+            temporary: false,
             created_at: now(),
         };
         let conn = self.lock();

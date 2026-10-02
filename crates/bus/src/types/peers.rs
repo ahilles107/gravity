@@ -41,6 +41,9 @@ pub struct RemoteBot {
     /// The project it works in on its own daemon. Informational only.
     #[serde(default)]
     pub project: String,
+    /// A temporary worker, archived on its machine once its task closes.
+    #[serde(default)]
+    pub temporary: bool,
 }
 
 /// A project here linked with a project on a peer: one team across two

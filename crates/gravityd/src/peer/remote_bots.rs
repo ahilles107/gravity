@@ -231,14 +231,26 @@ pub(super) fn serve_create(
     let creator = acting_bot(app, peer, &link.project_id, frame)?;
     let runtime = botmgmt::requested_runtime(frame)?.unwrap_or(app.cfg.default_bot_runtime);
     botmgmt::check_runtime_available(app, runtime).map_err(coded)?;
-    let created = botmgmt::create_bot_with_runtime(
+    // A worker counts against this machine's worker cap; when that is full,
+    // the asker keeps its spawn queued and tries elsewhere.
+    let temporary = frame.get("temporary").and_then(Value::as_bool) == Some(true);
+    let create = if temporary {
+        botmgmt::create_worker_bot
+    } else {
+        botmgmt::create_bot_with_runtime
+    };
+    let created = create(
         app,
         &link.project_id,
         &edit(frame, true),
         creator.as_ref(),
         &actor(creator.as_ref()),
         runtime,
-    )?;
+    )
+    .map_err(|error| match error.downcast_ref::<botmgmt::WorkersFull>() {
+        Some(full) => refuse("at_capacity", full.to_string()),
+        None => error,
+    })?;
     // Before the reply, not with the roster that follows it: the asker may
     // message its new bot the moment it hears back.
     app.db.expose_bot_to_peer(&peer.id, &created.bot.id)?;

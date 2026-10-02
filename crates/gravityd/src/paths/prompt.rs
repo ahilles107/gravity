@@ -19,6 +19,8 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         description,
         instructions,
         max_bots_per_project,
+        max_workers_per_project,
+        temporary,
         artifacts_dir,
         linked_machines,
         own_browser,
@@ -40,9 +42,19 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     };
     let browser_section = super::prompt_sections::browser(*own_browser, *user_chrome);
     let linked_section = super::prompt_sections::linked(linked_machines);
+    // A worker hears what it is for up front, and nothing about spawning:
+    // it may not.
+    let (worker_section, spawning_section) = if *temporary {
+        (super::prompt_sections::temporary(), String::new())
+    } else {
+        (
+            String::new(),
+            super::prompt_sections::spawning(*max_workers_per_project, linked_machines),
+        )
+    };
 
     format!(
-        "# {name}\n\n{description}\n\n{instructions_section}\
+        "# {name}\n\n{description}\n\n{worker_section}{instructions_section}\
          ## How to use the Gravity bus\n\n\
          You are the bot \"{name}\". You receive messages rendered as\n\
          `[msg #N from SENDER · kind] body`. A task delegated to you also\n\
@@ -191,6 +203,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
          slot and the name immediately. Deleted bots keep their history and\n\
          their workspace, so nothing you delegated is lost — but a bot you\n\
          delete cannot be brought back, so prefer editing one over replacing it.\n\n\
+         {spawning_section}\
          Do not read other bots' workspaces or transcripts.\n"
     )
 }
@@ -257,6 +270,8 @@ mod tests {
             daemon_port: 7777,
             bot_token_env: "GRAVITY_TOKEN",
             max_bots_per_project: 12,
+            max_workers_per_project: 4,
+            temporary: false,
             artifacts_dir: "/home/u/.gravity/projects/proj/artifacts".to_string(),
             linked_machines: Vec::new(),
             own_browser: false,

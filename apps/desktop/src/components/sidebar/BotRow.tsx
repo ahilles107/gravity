@@ -65,6 +65,11 @@ export default function BotRow({
         <span className="bot-row-body">
           <span className="bot-row-top">
             <span className="bot-row-name">{bot.name}</span>
+            {bot.temporary === true ? (
+              <span className="bot-row-tag" title="Temporary worker: removed when its task closes">
+                worker
+              </span>
+            ) : null}
             {activity !== undefined ? (
               <span className="bot-row-time">{fmtShortTime(activity.at)}</span>
             ) : null}

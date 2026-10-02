@@ -56,6 +56,8 @@ export interface Bot {
   readonly peer?: BotPeer | null;
   /** May drive the owner's own Chrome; absent on older daemons. */
   readonly user_chrome?: boolean;
+  /** A temporary worker, archived once its one task closes. */
+  readonly temporary?: boolean;
   readonly created_at: string;
 }
 

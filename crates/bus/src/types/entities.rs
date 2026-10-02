@@ -62,6 +62,10 @@ pub struct Bot {
     /// Chrome extension. Off by default: every bot has a browser of its own.
     #[serde(default)]
     pub user_chrome: bool,
+    /// A worker: created for one task and archived once that task closes.
+    /// Counted against the project's worker cap, not its bot cap.
+    #[serde(default)]
+    pub temporary: bool,
     pub created_at: DateTime<Utc>,
 }
 

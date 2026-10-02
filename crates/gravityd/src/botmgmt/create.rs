@@ -13,7 +13,9 @@ use crate::events::Push;
 use crate::messaging::{self, daemon_sender, Dm};
 use crate::paths;
 
-use super::{charter, parse_avatar, provision_spec, validate_name, IdentityEdit};
+use super::{
+    charter, parse_avatar, provision_spec, validate_bot_name, validate_name, IdentityEdit,
+};
 
 /// Outcome of creating a bot, including whether it actually started.
 pub struct Created {
@@ -71,8 +73,46 @@ pub fn create_bot_with_runtime(
     actor: &Actor<'_>,
     runtime: BotRuntime,
 ) -> anyhow::Result<Created> {
+    create(app, project_id, edit, creator, actor, runtime, false)
+}
+
+/// Create a temporary worker: a bot for one task, counted against the
+/// worker cap rather than the bot cap. It gets no greeting — its task is its
+/// first turn — and no toast, since a job can spawn dozens.
+pub fn create_worker_bot(
+    app: &Arc<AppState>,
+    project_id: &str,
+    edit: &IdentityEdit<'_>,
+    creator: Option<&Bot>,
+    actor: &Actor<'_>,
+    runtime: BotRuntime,
+) -> anyhow::Result<Created> {
+    create(app, project_id, edit, creator, actor, runtime, true)
+}
+
+/// The worker cap is full on this machine. Typed so a dispatcher can leave
+/// the spawn queued, and a peer can tell its asker to try elsewhere.
+#[derive(Debug, thiserror::Error)]
+#[error("this project already runs its limit of {0} workers here")]
+pub struct WorkersFull(pub usize);
+
+fn create(
+    app: &Arc<AppState>,
+    project_id: &str,
+    edit: &IdentityEdit<'_>,
+    creator: Option<&Bot>,
+    actor: &Actor<'_>,
+    runtime: BotRuntime,
+    temporary: bool,
+) -> anyhow::Result<Created> {
     let raw_name = edit.name.unwrap_or_default();
-    let name = validate_name(app, project_id, raw_name, None)?;
+    // A worker's name was reserved by its own queue entry, so only live bots
+    // can clash with it.
+    let name = if temporary {
+        validate_bot_name(app, project_id, raw_name, None)?
+    } else {
+        validate_name(app, project_id, raw_name, None)?
+    };
     // A caller that says nothing about the avatar gets one anyway: "create a
     // bot called Steve" should produce a bot with a face, not a bare initial.
     let avatar = match edit.avatar.map(str::trim).filter(|a| !a.is_empty()) {
@@ -80,15 +120,22 @@ pub fn create_bot_with_runtime(
         None => random_icon(),
     };
 
-    // The population cap is the only limit on creation, so it is checked here
-    // for every caller rather than at the MCP boundary.
-    let live = app.db.count_live_bots(project_id)?;
-    let cap = app.cfg.max_bots_per_project as i64;
-    if live >= cap {
-        bail!(
-            "project is at its limit of {cap} bots ({live} live). \
-             Delete a bot you no longer need to free a slot."
-        );
+    // The population caps are the only limit on creation, so they are
+    // checked here for every caller rather than at the MCP boundary.
+    if temporary {
+        let cap = app.cfg.max_workers_per_project;
+        if app.db.count_live_workers(project_id)? >= cap as i64 {
+            return Err(WorkersFull(cap).into());
+        }
+    } else {
+        let live = app.db.count_live_bots(project_id)?;
+        let cap = app.cfg.max_bots_per_project as i64;
+        if live >= cap {
+            bail!(
+                "project is at its limit of {cap} bots ({live} live). \
+                 Delete a bot you no longer need to free a slot."
+            );
+        }
     }
 
     // Asked before the insert below, and counting deleted bots too: someone
@@ -120,6 +167,15 @@ pub fn create_bot_with_runtime(
         creator.map(|c| c.id.as_str()),
         runtime,
     )?;
+    let bot = if temporary {
+        app.db.set_bot_temporary(&bot.id, true)?;
+        Bot {
+            temporary: true,
+            ..bot
+        }
+    } else {
+        bot
+    };
 
     // Issuing the token before provisioning means the runtime can authenticate
     // as soon as the files land.
@@ -131,16 +187,17 @@ pub fn create_bot_with_runtime(
         }
     }
 
-    let origin = match creator {
-        Some(c) => format!("created by {}", c.name),
-        None => "created".to_string(),
+    let origin = match (creator, temporary) {
+        (Some(c), true) => format!("spawned as a worker by {}", c.name),
+        (Some(c), false) => format!("created by {}", c.name),
+        (None, _) => "created".to_string(),
     };
     app.db
         .record_revision(&bot.id, actor, RevisionField::Created, "", &origin)?;
 
     // Nothing gates creation, so this notice is how the user finds out. It is
     // a toast, not a prompt: ignorable, and the audit trail keeps the record.
-    if let Some(c) = creator {
+    if let Some(c) = creator.filter(|_| !temporary) {
         app.events.push(Push::notice(
             "info",
             "Bot created",
@@ -153,6 +210,11 @@ pub fn create_bot_with_runtime(
     // anything. A failure here is not fatal — the supervision loop retries.
     if let Err(e) = app.supervisor.start_bot(&bot.id) {
         tracing::warn!(bot_id = %bot.id, error = %e, "created bot did not start; will retry");
+    }
+
+    if temporary {
+        app.events.push(Push::BotUpdated { bot: bot.clone() });
+        return Ok(Created { bot });
     }
 
     // Opening turn, so the new bot's window is not blank until someone types

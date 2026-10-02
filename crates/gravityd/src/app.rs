@@ -38,6 +38,7 @@ pub const CAPABILITIES: &[&str] = &[
     "peer_browser",
     "bot_commands",
     "restart_bot",
+    "workers",
 ];
 
 pub struct AppState {
@@ -58,6 +59,8 @@ pub struct AppState {
     pub approvals: crate::approval::Approvals,
     /// Bot browsers being watched, one shared stream each.
     pub browsers: crate::browser::streams::BrowserStreams,
+    /// The temporary-worker queue's wake-up and placement lock.
+    pub workers: crate::workers::Workers,
     pub started_at: Instant,
     /// Wall-clock start, kept alongside the monotonic `started_at` purely so
     /// [`AppState::stale_build`] can compare it against a file mtime.
@@ -98,6 +101,7 @@ impl AppState {
             chat: crate::chat::ChatStore::default(),
             approvals: crate::approval::Approvals::default(),
             browsers: crate::browser::streams::BrowserStreams::default(),
+            workers: crate::workers::Workers::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),
         });

@@ -23,7 +23,7 @@ mod revert;
 mod runtime;
 
 pub use archive::{archive_bot, prune_archived_workspaces};
-pub use create::{create_bot, create_bot_with_runtime, Created};
+pub use create::{create_bot, create_bot_with_runtime, create_worker_bot, Created, WorkersFull};
 pub use revert::revert_revision;
 pub use runtime::{
     check_runtime_available, requested_runtime, set_bot_runtime, set_bot_user_chrome,
@@ -59,10 +59,25 @@ impl IdentityEdit<'_> {
 #[error("a bot named '{0}' already exists in this project")]
 pub struct NameTaken(pub String);
 
-/// Validate a name for use in a project, rejecting duplicates.
+/// Validate a name for use in a project, rejecting duplicates — live bots,
+/// and the names queued workers have reserved.
 ///
 /// `existing` is the bot being renamed, so it does not collide with itself.
 pub fn validate_name(
+    app: &Arc<AppState>,
+    project_id: &str,
+    raw: &str,
+    existing: Option<&str>,
+) -> anyhow::Result<String> {
+    let name = validate_bot_name(app, project_id, raw, existing)?;
+    if app.db.worker_name_reserved(project_id, &name)? {
+        return Err(NameTaken(name).into());
+    }
+    Ok(name)
+}
+
+/// Validate a name against live bots only.
+pub fn validate_bot_name(
     app: &Arc<AppState>,
     project_id: &str,
     raw: &str,
@@ -92,6 +107,8 @@ pub(super) fn provision_spec<'a>(
         daemon_port: app.cfg.port,
         bot_token_env: BOT_TOKEN_ENV,
         max_bots_per_project: app.cfg.max_bots_per_project,
+        max_workers_per_project: app.cfg.max_workers_per_project,
+        temporary: bot.temporary,
         artifacts_dir: paths::artifacts_dir(&app.cfg, &project.dir_name)
             .display()
             .to_string(),

@@ -106,5 +106,6 @@ pub(super) fn remote_view(bot: &bus::Bot, project: String) -> RemoteBot {
         avatar: bot.avatar.clone(),
         runtime: bot.runtime,
         project,
+        temporary: bot.temporary,
     }
 }

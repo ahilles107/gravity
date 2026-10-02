@@ -159,6 +159,29 @@ fn core_tools() -> Vec<Value> {
                  "reason": {"type": "string"}
              }),
              vec!["name"]),
+        tool("spawn_worker",
+             "Spawn a temporary worker for one independent piece of a larger job (a chapter, a module, a source) and delegate 'task' to it. It returns at once: 'running' with the task_id whose `done` will carry the result, or 'queued' when every worker slot is busy — it then starts by itself as others finish. The worker is removed once its task closes. Spawn one per piece; workers count against neither the bot limit nor the open-task limit. Workers cannot spawn workers.",
+             json!({
+                 "task": {"type": "string", "description": "The complete brief: objective, inputs, where to write output, expected result format. The worker knows nothing else."},
+                 "name": {"type": "string", "description": "Optional. How you address it, e.g. 'chapter-3'; defaults to worker-N."},
+                 "instructions": {"type": "string", "description": "Optional. Standing instructions, e.g. a style guide every worker of this job shares."},
+                 "description": {"type": "string", "description": "Optional. Short summary other bots see in list_bots."},
+                 "runtime": {"type": "string", "enum": ["claude_code", "codex_cli"], "description": "Optional. Defaults to your runtime here, or the other machine's default there."},
+                 "machine": {"type": "string", "description": "Optional. 'here', or a linked machine's name, to pin the worker; omitted runs it on whichever machine has a free slot first."},
+                 "deadline_hours": {"type": "integer", "description": "Optional. Hours before the task expires (default 24, max 168)."}
+             }),
+             vec!["task"]),
+        tool("list_workers",
+             "List the workers you spawned: queued (with queue position), running (with machine and task_id) and recently finished.",
+             json!({}),
+             vec![]),
+        tool("cancel_worker",
+             "Cancel a worker you spawned, by name: a queued one is dropped, a running one is told to stop and removed.",
+             json!({
+                 "name": {"type": "string"},
+                 "reason": {"type": "string"}
+             }),
+             vec!["name"]),
     ]
 }
 

@@ -62,6 +62,11 @@ pub struct Config {
     /// own children, and archived bots free their slot, this bounds the whole
     /// population regardless of how deeply bots nest their teams.
     pub max_bots_per_project: usize,
+    /// Per-project cap on temporary workers running on this machine at once.
+    /// Separate from `max_bots_per_project`, so a project whose permanent
+    /// bots fill their cap can still fan work out; spawns past it wait in a
+    /// queue until a worker finishes.
+    pub max_workers_per_project: usize,
     /// How long, in seconds, a permission prompt waits for an answer from the
     /// app before it is denied. Capped below the hook's own timeout.
     pub permission_timeout_seconds: u64,
@@ -187,6 +192,7 @@ impl Default for Config {
             auto_compact_window: Some(DEFAULT_AUTO_COMPACT_WINDOW),
             classic_renderer: true,
             max_bots_per_project: 12,
+            max_workers_per_project: bus::DEFAULT_MAX_WORKERS_PER_PROJECT,
             permission_timeout_seconds: 600,
             resume_after_restart: true,
             delivery: DeliveryConfig::default(),
