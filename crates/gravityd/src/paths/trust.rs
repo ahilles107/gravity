@@ -191,7 +191,13 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let workspace = tmp.path().join("workspace");
         fs::create_dir(&workspace).unwrap();
-        let node_key = workspace.to_str().unwrap().replace('\\', "/");
+        // Canonical, so an 8.3 temp dir (`RUNNER~1` on CI) expands like the daemon's.
+        let canonical = workspace.canonicalize().unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let node_key = canonical
+            .strip_prefix(r"\\?\")
+            .unwrap_or(canonical)
+            .replace('\\', "/");
         let config_path = tmp.path().join(".claude.json");
         fs::write(
             &config_path,

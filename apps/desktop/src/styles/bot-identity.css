@@ -139,6 +139,12 @@ img.bot-avatar {
   opacity: 0.65;
 }
 
+.bot-runtime {
+  margin-top: 16px;
+  border-top: 1px solid var(--border, #2a2a2a);
+  padding-top: 12px;
+}
+
 /* Identity history: what a bot changed about itself, and the undo for it. */
 .bot-history {
   margin-top: 16px;
