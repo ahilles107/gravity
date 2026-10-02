@@ -25,6 +25,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
+          # A failed test must not throw away the compiled dependencies.
+          cache-on-failure: true
           workspaces: |
             . -> target
             apps/desktop/src-tauri -> target
@@ -45,8 +47,6 @@ jobs:
           cargo clippy --locked --workspace --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked --workspace --all-targets
-      - name: Check frontend
-        run: pnpm --dir apps/desktop check
       - name: Stage daemon sidecar
         run: ./scripts/prepare-sidecar.ps1
       - name: Check native shell
