@@ -114,7 +114,8 @@ validation failures before committing.
 
 ## Install (end users)
 
-Open the release DMG and drag **Gravity** to Applications. The app bundles
+Open the release DMG and drag **Gravity** to Applications. On Windows, run
+the release `x64-setup.exe` installer. The app bundles
 the daemon as a signed sidecar; on first launch a setup wizard either installs
 it as a launchd user agent on this Mac (one click, no sudo) or attaches to a
 remote daemon with a device token. Headless machines skip the app:
