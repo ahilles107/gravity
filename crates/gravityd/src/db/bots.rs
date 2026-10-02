@@ -18,7 +18,7 @@ const TOMBSTONE_SEP: char = '#';
 impl Db {
     // ---- bots ----
 
-    fn bot_from_row(r: &Row<'_>) -> rusqlite::Result<Bot> {
+    pub(super) fn bot_from_row(r: &Row<'_>) -> rusqlite::Result<Bot> {
         Ok(Bot {
             id: r.get(0)?,
             project_id: r.get(1)?,
@@ -35,6 +35,8 @@ impl Db {
                 "codex_cli" => BotRuntime::CodexCli,
                 _ => BotRuntime::ClaudeCode,
             },
+            peer_id: r.get(12)?,
+            remote_bot_id: r.get(13)?,
             // Runtime fields are overlaid by the supervisor.
             state: BotState::Stopped,
             state_reason: String::new(),
@@ -42,8 +44,10 @@ impl Db {
         })
     }
 
-    const BOT_COLS: &'static str = "id, project_id, name, description, avatar, instructions, \
-         workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime";
+    pub(super) const BOT_COLS: &'static str =
+        "id, project_id, name, description, avatar, instructions, \
+         workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime, peer_id, \
+         remote_bot_id";
 
     /// Restricts a query to bots that still exist for addressing purposes.
     const LIVE: &'static str = "deleted_at IS NULL";

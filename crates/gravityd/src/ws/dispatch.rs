@@ -30,6 +30,8 @@ const READ_ONLY: &[&str] = &[
     "get_decision",
     "list_tags",
     "count_pending_decisions",
+    "list_peers",
+    "list_peer_bots",
 ];
 
 /// Requests that exercise the owner's ruling authority.
@@ -130,6 +132,12 @@ impl Conn {
             "rename_tag" => self.rename_tag(&req_id, req),
             "delete_tag" => self.delete_tag(&req_id, req),
             "set_project_lead" => self.set_project_lead(&req_id, req),
+            "list_peers" => self.list_peers(&req_id),
+            "create_peer_invite" => self.create_peer_invite(&req_id, req),
+            "add_peer" => self.add_peer(&req_id, req),
+            "revoke_peer" => self.revoke_peer(&req_id, req),
+            "list_peer_bots" => self.list_peer_bots(&req_id, req),
+            "link_peer_bot" => self.link_peer_bot(&req_id, req),
             other => {
                 self.reply_err(
                     &req_id,

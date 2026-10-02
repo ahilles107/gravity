@@ -9,6 +9,9 @@ use super::*;
 impl Supervisor {
     pub fn start_bot(&self, bot_id: &str) -> anyhow::Result<()> {
         let bot = self.inner.db.get_bot(bot_id)?.context("bot not found")?;
+        if bot.is_linked() {
+            return Ok(()); // runs on its peer; nothing to start here
+        }
 
         // Creation and the supervision tick can both start a new bot. Held
         // until this call returns, so a second start finds the claim and
@@ -228,7 +231,7 @@ impl Supervisor {
                 return;
             }
         };
-        for bot in bots {
+        for bot in bots.into_iter().filter(|b| !b.is_linked()) {
             if !self.wants_start(&bot.id) {
                 continue;
             }

@@ -24,9 +24,31 @@ pub(crate) fn project_view(project: &bus::Project) -> Value {
 /// A bot as clients see it: the stored row plus the runtime fields the
 /// supervisor and the delivery tables own.
 pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
-    let (state, reason) = app.supervisor.state(&bot.id);
+    let (mut state, mut reason) = app.supervisor.state(&bot.id);
     let unread = app.db.unread_count(&bot.id).unwrap_or(0);
+    // A linked bot has no session here; what matters is whether its machine
+    // is reachable.
+    let peer = bot
+        .peer_id
+        .as_deref()
+        .and_then(|id| app.db.get_peer(id).ok().flatten());
+    if let Some(peer) = &peer {
+        let online = app.peers.is_online(&peer.id);
+        state = if online {
+            bus::BotState::Ready
+        } else {
+            bus::BotState::Stopped
+        };
+        reason = format!(
+            "runs on {}{}",
+            peer.name,
+            if online { "" } else { " (offline)" }
+        );
+    }
     json!({
+        "peer": peer.as_ref().map(|p| json!({
+            "id": p.id, "name": p.name, "online": app.peers.is_online(&p.id)
+        })),
         "id": bot.id,
         "project_id": bot.project_id,
         // Archived rows carry a tombstoned name so the original is free to

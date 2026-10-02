@@ -39,6 +39,9 @@ pub struct AppState {
     /// Runtime override for `cfg.auto_compact_window`, shared with the
     /// supervisor and persisted in the `meta` table.
     pub auto_compact: AutoCompactOverride,
+    /// Live links to peer daemons, shared by the delivery worker (forwarding
+    /// to linked bots) and the control plane (pairing and linking).
+    pub peers: crate::peer::PeerHub,
     pub started_at: Instant,
     /// Wall-clock start, kept alongside the monotonic `started_at` purely so
     /// [`AppState::stale_build`] can compare it against a file mtime.
@@ -75,6 +78,7 @@ impl AppState {
             secrets,
             supervisor,
             auto_compact,
+            peers: crate::peer::PeerHub::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),
         }))
