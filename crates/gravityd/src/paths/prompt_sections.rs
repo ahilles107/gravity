@@ -53,6 +53,35 @@ pub(super) fn temporary() -> String {
         .to_string()
 }
 
+/// The project's shared repository: a worker's checkout of it, or how a
+/// permanent bot reads what workers push there.
+pub(super) fn repo(repo: Option<&bus::ProjectRepo>, temporary: bool) -> String {
+    let Some(bus::ProjectRepo { url, branch }) = repo else {
+        return String::new();
+    };
+    if temporary {
+        format!(
+            "## Your checkout\n\n\
+             `repo/` in your workspace is a fresh checkout of {url} at the tip of \
+             `{branch}`, on a branch of your own. Do the work there. When you call \
+             `complete_task`, the daemon commits whatever you left, rebases it onto \
+             `{branch}` and pushes it — or, if that conflicts, pushes your branch \
+             for whoever spawned you to merge — and adds where it went to your \
+             result. Do not push yourself.\n\n"
+        )
+    } else {
+        format!(
+            "## The project repository\n\n\
+             This project shares {url} (branch `{branch}`). Every worker starts \
+             from a fresh checkout of the branch tip and its work is pushed there \
+             when it completes; its result says which commit, or which branch to \
+             merge when it conflicted. Keep a clone in your workspace to read or \
+             build on that work, and `git pull` before you start and after each \
+             worker reports.\n\n"
+        )
+    }
+}
+
 /// What a bot is told about its own browser, and the owner's Chrome when it
 /// may use it.
 pub(super) fn browser(own: bool, owners_chrome: bool) -> String {
@@ -92,6 +121,16 @@ mod tests {
         assert!(!here.contains("Workers also run on"));
         assert!(spawning(4, &["win".to_string()]).contains("Workers also run on win"));
         assert!(temporary().contains("`complete_task`"));
+    }
+
+    #[test]
+    fn tells_workers_and_their_parents_about_the_repository() {
+        assert_eq!(repo(None, true), "");
+        let shared = bus::ProjectRepo::parse("git@host:me/book.git", None).expect("repo");
+        assert!(repo(Some(&shared), true).contains("`repo/` in your workspace"));
+        let parent = repo(Some(&shared), false);
+        assert!(parent.contains("git@host:me/book.git (branch `main`)"));
+        assert!(parent.contains("`git pull`"));
     }
 
     #[test]

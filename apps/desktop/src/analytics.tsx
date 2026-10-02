@@ -35,6 +35,9 @@ interface AnalyticsEvents {
   readonly project_lead_set: {
     readonly cleared: boolean;
   };
+  readonly project_repo_set: {
+    readonly cleared: boolean;
+  };
   readonly project_deleted: Record<string, never>;
   readonly project_renamed: Record<string, never>;
   readonly routine_created: {
@@ -77,6 +80,7 @@ export type ErrorOperation =
   | "project_delete"
   | "project_lead_set"
   | "project_rename"
+  | "project_repo_set"
   | "routine_create"
   | "routine_list"
   | "routine_run"

@@ -167,6 +167,7 @@ export default function App(): ReactElement {
             onCreateProject={actions.createProjectWithBot}
             onRenameProject={actions.renameProject}
             onSetProjectLead={actions.setProjectLead}
+            onSetProjectRepo={actions.setProjectRepo}
             onDeleteProject={actions.deleteProject}
           />
         </main>

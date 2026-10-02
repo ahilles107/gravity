@@ -30,6 +30,7 @@ mod deliveries;
 mod devices;
 mod peers;
 mod project_links;
+mod project_repos;
 mod projects;
 mod revisions;
 mod routines;

@@ -13,7 +13,7 @@ use crate::messaging::Dm;
 
 use super::{bot_sender, caller};
 
-pub(super) fn complete_task(
+pub(crate) fn complete_task(
     app: &Arc<AppState>,
     bot_id: &str,
     args: &Value,

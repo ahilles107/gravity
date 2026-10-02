@@ -14,7 +14,15 @@ export interface Project {
    * goes stale the moment a teammate asks directly.
    */
   readonly lead_bot_id?: string | null;
+  /** The shared git repository workers check out and push to; absent on older daemons. */
+  readonly repo?: ProjectRepo | null;
   readonly created_at: string;
+}
+
+/** A project's shared git repository. */
+export interface ProjectRepo {
+  readonly url: string;
+  readonly branch: string;
 }
 
 export type BotState =

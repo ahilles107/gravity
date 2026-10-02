@@ -86,3 +86,66 @@ pub struct Worker {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<DateTime<Utc>>,
 }
+
+/// A project's shared git repository: where workers' checkouts come from and
+/// where their work is pushed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectRepo {
+    pub url: String,
+    pub branch: String,
+}
+
+impl ProjectRepo {
+    /// Check a repository as given, defaulting the branch to `main`.
+    ///
+    /// Both end up as arguments to `git`, so anything that could read as an
+    /// option, or that git would not take as a branch, is refused here.
+    pub fn parse(url: &str, branch: Option<&str>) -> Result<Self, String> {
+        let url = url.trim();
+        if url.is_empty() || url.len() > 2048 || url.starts_with('-') {
+            return Err("give the repository's clone URL".to_string());
+        }
+        if url.chars().any(char::is_whitespace) || url.contains("::") {
+            return Err(format!("'{url}' is not a clone URL git accepts here"));
+        }
+        let branch = branch
+            .map(str::trim)
+            .filter(|b| !b.is_empty())
+            .unwrap_or("main");
+        let valid = !branch.starts_with(['-', '/', '.'])
+            && !branch.ends_with(['/', '.'])
+            && !branch.contains("..")
+            && !branch.contains("//")
+            && !branch.ends_with(".lock")
+            && branch.len() <= 200
+            && branch
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
+        if !valid {
+            return Err(format!("'{branch}' is not a branch name git accepts"));
+        }
+        Ok(Self {
+            url: url.to_string(),
+            branch: branch.to_string(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProjectRepo;
+
+    #[test]
+    fn a_repo_needs_a_plain_url_and_branch() {
+        let repo = ProjectRepo::parse(" git@github.com:me/book.git ", None).unwrap();
+        assert_eq!(repo.branch, "main");
+        assert_eq!(repo.url, "git@github.com:me/book.git");
+        assert!(ProjectRepo::parse("https://x/y.git", Some("drafts/v2")).is_ok());
+        for bad in ["", "--upload-pack=x", "ext::sh -c x", "a b"] {
+            assert!(ProjectRepo::parse(bad, None).is_err(), "{bad}");
+        }
+        for bad in ["-x", "a..b", "a/", "x.lock", "a b", "a~1"] {
+            assert!(ProjectRepo::parse("u", Some(bad)).is_err(), "{bad}");
+        }
+    }
+}

@@ -156,6 +156,7 @@ impl Conn {
             "rename_tag" => self.rename_tag(&req_id, req),
             "delete_tag" => self.delete_tag(&req_id, req),
             "set_project_lead" => self.set_project_lead(&req_id, req),
+            "set_project_repo" => self.set_project_repo(&req_id, req),
             "list_peers" => self.list_peers(&req_id),
             "create_peer_invite" => self.create_peer_invite(&req_id, req),
             "add_peer" => self.add_peer(&req_id, req),

@@ -25,6 +25,7 @@ use crate::mcp::tasks::close_cancelled;
 use crate::messaging::daemon_sender;
 
 mod place;
+pub mod repo;
 mod spawn;
 
 pub use place::place_queued;
@@ -119,12 +120,37 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
         };
         if let Err(error) = botmgmt::archive_bot(app, &bot, &actor, Some("worker finished")) {
             tracing::warn!(bot_id = %bot.id, %error, "retiring a worker failed");
+            continue;
         }
+        let workspace = std::path::PathBuf::from(&bot.workspace_path);
+        tokio::task::spawn_blocking(move || repo::retire(&workspace))
+            .await
+            .ok();
     }
     for project_id in app.db.projects_with_queued_workers()? {
         place_queued(app, &project_id).await;
     }
     Ok(())
+}
+
+/// Give a just-created worker its checkout of the project's repository, or
+/// retire it again when that fails: a worker without its checkout would work
+/// from nothing.
+pub fn check_out_or_retire(
+    app: &Arc<AppState>,
+    bot: &bus::Bot,
+    repo: &bus::ProjectRepo,
+) -> anyhow::Result<std::path::PathBuf> {
+    let project = app
+        .db
+        .get_project(&bot.project_id)?
+        .ok_or_else(|| anyhow::anyhow!("project not found"))?;
+    let root = crate::paths::project_dir(&app.cfg, &project.dir_name);
+    let workspace = std::path::Path::new(&bot.workspace_path);
+    repo::check_out(&root, repo, workspace, &bot.id, &bot.name).or_else(|error| {
+        botmgmt::archive_bot(app, bot, &Actor::User, Some("its checkout failed"))?;
+        Err(error.context(format!("checking out {} for {}", repo.url, bot.name)))
+    })
 }
 
 /// A spawn whose parent was deleted: nobody waits on it any more.

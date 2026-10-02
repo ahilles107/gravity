@@ -27,6 +27,14 @@ export type ClientRequestBody =
       readonly project_id: string;
       readonly name: string;
     }
+  | {
+      readonly type: "set_project_repo";
+      readonly project_id: string;
+      /** `null` clears the repository. */
+      readonly url: string | null;
+      /** Defaults to `main`. */
+      readonly branch?: string;
+    }
   | { readonly type: "delete_project"; readonly project_id: string }
   | { readonly type: "list_bots"; readonly project_id?: string }
   | {

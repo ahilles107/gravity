@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
-import type { Bot, Project } from "../protocol/entities";
+import type { Bot, Project, ProjectRepo } from "../protocol/entities";
 import ConfirmDialog from "./overlay/ConfirmDialog";
+import ProjectRepoForm from "./ProjectRepoForm";
 
 interface ProjectViewProps {
   readonly project: Project;
@@ -10,6 +11,7 @@ interface ProjectViewProps {
   readonly canControl: boolean;
   readonly onRename: (projectId: string, name: string) => Promise<void>;
   readonly onSetLead: (projectId: string, botId: string | null) => Promise<void>;
+  readonly onSetRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly onDelete: (projectId: string) => Promise<void>;
 }
 
@@ -24,7 +26,7 @@ export function deletionBody(project: Project, botCount: number): string {
 
 /** Project settings: the name, what it holds, and deletion. */
 export default function ProjectView(props: ProjectViewProps): ReactElement {
-  const { project, bots, connected, canControl, onRename, onSetLead, onDelete } = props;
+  const { project, bots, connected, canControl, onRename, onSetLead, onSetRepo, onDelete } = props;
   const [name, setName] = useState(project.name);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -122,6 +124,12 @@ export default function ProjectView(props: ProjectViewProps): ReactElement {
           <dd>{project.created_at}</dd>
         </dl>
       </div>
+
+      <ProjectRepoForm
+        repo={project.repo ?? null}
+        disabled={!connected || !canControl}
+        onSave={(repo) => onSetRepo(project.id, repo)}
+      />
 
       {canControl ? (
         <div className="panel">

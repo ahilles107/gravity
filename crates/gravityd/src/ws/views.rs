@@ -35,6 +35,7 @@ pub(crate) fn project_view(app: &AppState, project: &bus::Project) -> Value {
         "dir_name": project.dir_name,
         "lead_bot_id": project.lead_bot_id,
         "links": links,
+        "repo": app.db.project_repo(&project.id).ok().flatten(),
         "deleted_at": project.deleted_at.map(|t| t.to_rfc3339()),
         "created_at": project.created_at.to_rfc3339()
     })

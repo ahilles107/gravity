@@ -59,7 +59,7 @@ async fn place_locked(app: &Arc<AppState>, project_id: &str) -> anyhow::Result<(
             let attempt = match &place {
                 Place::Here if here_full => continue,
                 Place::Peer(peer) if full.contains(&peer.id) => continue,
-                Place::Here => start_here(app, &worker, &parent),
+                Place::Here => start_here(app, &worker, &parent).await,
                 Place::Peer(peer) => start_there(app, &worker, &parent, peer).await,
             };
             match attempt {
@@ -178,7 +178,7 @@ fn instructions(worker: &Worker) -> &str {
     }
 }
 
-fn start_here(app: &Arc<AppState>, worker: &Worker, parent: &Bot) -> anyhow::Result<()> {
+async fn start_here(app: &Arc<AppState>, worker: &Worker, parent: &Bot) -> anyhow::Result<()> {
     let chain = delegation_chain(app, parent)?;
     let runtime = worker.runtime.unwrap_or(parent.runtime);
     botmgmt::check_runtime_available(app, runtime)?;
@@ -200,6 +200,11 @@ fn start_here(app: &Arc<AppState>, worker: &Worker, parent: &Bot) -> anyhow::Res
         &actor,
         runtime,
     )?;
+    if let Some(repo) = app.db.project_repo(&worker.project_id)? {
+        let (app, bot) = (app.clone(), created.bot.clone());
+        tokio::task::spawn_blocking(move || super::check_out_or_retire(&app, &bot, &repo))
+            .await??;
+    }
     hand_over(app, worker, parent, &created.bot, chain)
 }
 
@@ -218,6 +223,11 @@ async fn start_there(
     });
     if let Some(runtime) = worker.runtime {
         identity["runtime"] = json!(runtime.as_str());
+    }
+    // The worker's machine checks the repository out itself, with its own
+    // credentials, before it answers.
+    if let Some(repo) = app.db.project_repo(&worker.project_id)? {
+        identity["repo"] = json!(repo);
     }
     let stand_in =
         remote_bots::create(app, &worker.project_id, &peer.id, identity, Some(parent)).await?;

@@ -144,6 +144,8 @@ pub struct BotProvision<'a> {
     pub max_workers_per_project: usize,
     /// Whether this bot is a temporary worker, here for one task.
     pub temporary: bool,
+    /// The project's shared git repository, when it has one.
+    pub repo: Option<bus::ProjectRepo>,
     /// Absolute path of the project's shared artifacts directory, stated in
     /// the prompt so bots know where substance goes.
     pub artifacts_dir: String,

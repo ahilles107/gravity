@@ -234,6 +234,7 @@ pub(super) fn serve_create(
     // A worker counts against this machine's worker cap; when that is full,
     // the asker keeps its spawn queued and tries elsewhere.
     let temporary = frame.get("temporary").and_then(Value::as_bool) == Some(true);
+    let repo = shared_repo(app, &link.project_id, frame)?;
     let create = if temporary {
         botmgmt::create_worker_bot
     } else {
@@ -251,11 +252,36 @@ pub(super) fn serve_create(
         Some(full) => refuse("at_capacity", full.to_string()),
         None => error,
     })?;
+    // Handled off the link's read loop, so a clone may take its time here.
+    if let Some(repo) = repo {
+        crate::workers::check_out_or_retire(app, &created.bot, &repo)
+            .map_err(|error| refuse("repo_failed", format!("{error:#}")))?;
+    }
     // Before the reply, not with the roster that follows it: the asker may
     // message its new bot the moment it hears back.
     app.db.expose_bot_to_peer(&peer.id, &created.bot.id)?;
     tracing::info!(peer = %peer.name, bot = %created.bot.name, "peer created a bot in a linked project");
     Ok(json!({ "bot": super::inbound::remote_view(&created.bot, String::new()) }))
+}
+
+/// The repository a worker is to check out, from the asker. A linked project
+/// is one team, so the asker's repository becomes this side's too when it
+/// has none of its own.
+fn shared_repo(
+    app: &AppState,
+    project_id: &str,
+    frame: &Value,
+) -> anyhow::Result<Option<bus::ProjectRepo>> {
+    let Some(raw) = frame.get("repo").filter(|r| r.is_object()) else {
+        return Ok(None);
+    };
+    let url = raw.get("url").and_then(Value::as_str).unwrap_or_default();
+    let branch = raw.get("branch").and_then(Value::as_str);
+    let repo = bus::ProjectRepo::parse(url, branch).map_err(anyhow::Error::msg)?;
+    if app.db.project_repo(project_id)?.is_none() {
+        app.db.set_project_repo(project_id, Some(&repo))?;
+    }
+    Ok(Some(repo))
 }
 
 pub(super) fn serve_update(

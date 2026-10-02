@@ -5,6 +5,7 @@ import heroArt from "../assets/empty/hero.png";
 import quietArt from "../assets/empty/quiet.png";
 import type { DaemonApi } from "../protocol/api";
 import { connectionStatusLabel } from "../protocol/connection";
+import type { ProjectRepo } from "../protocol/entities";
 import BotView from "./BotView";
 import ControlCenterView from "./control/ControlCenterView";
 import ConversationsView from "./conversations/ConversationsView";
@@ -18,6 +19,7 @@ interface MainPaneProps {
   readonly onCreateProject: (name: string) => Promise<void>;
   readonly onRenameProject: (projectId: string, name: string) => Promise<void>;
   readonly onSetProjectLead: (projectId: string, botId: string | null) => Promise<void>;
+  readonly onSetProjectRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly onDeleteProject: (projectId: string) => Promise<void>;
 }
 
@@ -96,6 +98,7 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         canControl={canControl}
         onRename={props.onRenameProject}
         onSetLead={props.onSetProjectLead}
+        onSetRepo={props.onSetProjectRepo}
         onDelete={props.onDeleteProject}
       />
     );

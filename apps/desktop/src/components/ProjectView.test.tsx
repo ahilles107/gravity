@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { ProjectRepo } from "../protocol/entities";
 import * as fx from "../test/fixtures";
 import ProjectView from "./ProjectView";
 
@@ -12,6 +13,9 @@ function renderView(over: Partial<Parameters<typeof ProjectView>[0]> = {}) {
   const onSetLead = vi.fn<(projectId: string, botId: string | null) => Promise<void>>(() =>
     Promise.resolve(),
   );
+  const onSetRepo = vi.fn<(projectId: string, repo: ProjectRepo | null) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
   render(
     <ProjectView
       project={fx.project()}
@@ -20,6 +24,7 @@ function renderView(over: Partial<Parameters<typeof ProjectView>[0]> = {}) {
       canControl
       onRename={onRename}
       onSetLead={onSetLead}
+      onSetRepo={onSetRepo}
       onDelete={onDelete}
       {...over}
     />,

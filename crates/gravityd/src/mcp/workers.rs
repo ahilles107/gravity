@@ -1,6 +1,8 @@
 //! Temporary workers over MCP: `spawn_worker`, `list_workers` and
-//! `cancel_worker`. Spawning may wait on a peer, so it runs before the
-//! synchronous tool table, as calls bound for a peer do.
+//! `cancel_worker`, and a worker's `complete_task`, which first pushes its
+//! work to the project's repository. Spawning may wait on a peer and pushing
+//! on the network, so both run before the synchronous tool table, as calls
+//! bound for a peer do.
 
 use std::sync::Arc;
 
@@ -8,19 +10,48 @@ use serde_json::{json, Value};
 
 use crate::app::AppState;
 use crate::botmgmt;
-use crate::workers::{self, SpawnRequest, LISTED_FINISHED};
+use crate::workers::{self, repo, SpawnRequest, LISTED_FINISHED};
 
 use super::caller;
 
-/// The tool's result when it is `spawn_worker`, or `None` for any other tool.
+/// The tool's result when it is one handled here, or `None` otherwise.
 pub(super) async fn intercept(
     app: &Arc<AppState>,
     bot_id: &str,
     name: &str,
     args: &Value,
 ) -> Option<anyhow::Result<Value>> {
-    (name == "spawn_worker").then_some(())?;
-    Some(spawn_worker(app, bot_id, args).await)
+    match name {
+        "spawn_worker" => Some(spawn_worker(app, bot_id, args).await),
+        "complete_task" => complete_with_push(app, bot_id, args).await,
+        _ => None,
+    }
+}
+
+/// A worker with a checkout pushes its work before its result goes out, so
+/// the parent can pull it the moment it reads the `done`. The result says
+/// where the work went.
+async fn complete_with_push(
+    app: &Arc<AppState>,
+    bot_id: &str,
+    args: &Value,
+) -> Option<anyhow::Result<Value>> {
+    let me = caller(app, bot_id).ok().filter(|b| b.temporary)?;
+    let checkout = repo::checkout_of(std::path::Path::new(&me.workspace_path))?;
+    // Only for the task it holds, so a mistyped id pushes nothing.
+    let task_id = text(args, "task_id")?;
+    let task = app.db.get_task(task_id).ok().flatten()?;
+    if task.to_bot_id != me.id || task.state != bus::TaskState::Open {
+        return None;
+    }
+    let result = text(args, "result").unwrap_or_default().to_string();
+    let (name, summary, dir) = (me.name.clone(), result.clone(), checkout.clone());
+    let published = tokio::task::spawn_blocking(move || repo::publish(&dir, &name, &summary))
+        .await
+        .unwrap_or_else(|error| repo::Published::Failed(error.to_string()));
+    let mut args = args.clone();
+    args["result"] = json!(format!("{result}\n\n{}", published.report(&checkout)));
+    Some(super::tasks::complete_task(app, bot_id, &args))
 }
 
 fn text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {

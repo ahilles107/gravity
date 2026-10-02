@@ -34,3 +34,16 @@ CREATE TABLE worker (
 CREATE INDEX idx_worker_project ON worker(project_id, state, created_at);
 CREATE INDEX idx_worker_parent ON worker(parent_bot_id, state);
 "#;
+
+/// Migration 19: a project's shared git repository.
+///
+/// Workers start from a fresh checkout of its branch and push their work
+/// back to it, which is how workers on different machines share files.
+pub(super) const MIGRATION_19: &str = r#"
+CREATE TABLE project_repo (
+    project_id TEXT PRIMARY KEY REFERENCES project(id),
+    url        TEXT NOT NULL,
+    branch     TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"#;

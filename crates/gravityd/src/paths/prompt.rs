@@ -21,6 +21,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         max_bots_per_project,
         max_workers_per_project,
         temporary,
+        repo,
         artifacts_dir,
         linked_machines,
         own_browser,
@@ -44,6 +45,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     let linked_section = super::prompt_sections::linked(linked_machines);
     // A worker hears what it is for up front, and nothing about spawning:
     // it may not.
+    let repo_section = super::prompt_sections::repo(repo.as_ref(), *temporary);
     let (worker_section, spawning_section) = if *temporary {
         (super::prompt_sections::temporary(), String::new())
     } else {
@@ -54,7 +56,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     };
 
     format!(
-        "# {name}\n\n{description}\n\n{worker_section}{instructions_section}\
+        "# {name}\n\n{description}\n\n{worker_section}{repo_section}{instructions_section}\
          ## How to use the Gravity bus\n\n\
          You are the bot \"{name}\". You receive messages rendered as\n\
          `[msg #N from SENDER · kind] body`. A task delegated to you also\n\
@@ -272,6 +274,7 @@ mod tests {
             max_bots_per_project: 12,
             max_workers_per_project: 4,
             temporary: false,
+            repo: None,
             artifacts_dir: "/home/u/.gravity/projects/proj/artifacts".to_string(),
             linked_machines: Vec::new(),
             own_browser: false,
