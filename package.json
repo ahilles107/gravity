@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "verify": "bash scripts/verify.sh",
+    "verify": "node scripts/verify.mjs",
     "notices:generate": "python3 scripts/notices.py --generate",
     "notices:check": "python3 scripts/notices.py"
   }

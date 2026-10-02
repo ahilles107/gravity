@@ -73,7 +73,13 @@ pub(crate) fn transcript_dir(home: &Path, workspace: &Path) -> PathBuf {
     let mangled: String = workspace
         .to_string_lossy()
         .chars()
-        .map(|c| if c == '/' || c == '.' { '-' } else { c })
+        .map(|c| {
+            if c == '/' || c == '.' || cfg!(windows) && (c == '\\' || c == ':') {
+                '-'
+            } else {
+                c
+            }
+        })
         .collect();
     home.join(".claude").join("projects").join(mangled)
 }

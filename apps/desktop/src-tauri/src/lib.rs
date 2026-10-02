@@ -9,8 +9,7 @@ use tauri::{AppHandle, Manager};
 /// Reads the daemon client token from `~/.gravity/secrets/client.token`.
 #[tauri::command]
 fn read_client_token() -> Result<String, String> {
-    let home = std::env::var("HOME").map_err(|err| format!("HOME is not set: {err}"))?;
-    let path = PathBuf::from(home).join(".gravity/secrets/client.token");
+    let path = daemon::daemon_home()?.join("secrets/client.token");
     let token = std::fs::read_to_string(&path)
         .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
     Ok(token.trim().to_string())
@@ -92,10 +91,7 @@ fn reveal_project(dir_name: String) -> Result<(), String> {
     if dir_name.is_empty() || dir_name.contains('/') || dir_name.contains('\\') {
         return Err(format!("not a project directory name: {dir_name}"));
     }
-    let home = std::env::var("HOME").map_err(|err| format!("HOME is not set: {err}"))?;
-    let dir = PathBuf::from(home)
-        .join(".gravity/projects")
-        .join(&dir_name);
+    let dir = daemon::daemon_home()?.join("projects").join(&dir_name);
     if !dir.is_dir() {
         return Err(format!("no such project directory: {}", dir.display()));
     }

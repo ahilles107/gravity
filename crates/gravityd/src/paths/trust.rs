@@ -32,15 +32,13 @@ pub fn trust_workspace(user_home: &Path, workspace: &Path) -> anyhow::Result<()>
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("resolving workspace {}", workspace.display()))?;
-    let workspace_key = workspace
-        .to_str()
-        .context("canonical workspace path is not valid UTF-8")?;
+    let workspace_key = project_key(&workspace)?;
     let config_path = user_home.join(".claude.json");
 
     // The common case is a workspace that is already trusted. Read it unlocked:
     // taking the shared lock for a no-op would make a live session's own save
     // fail for nothing.
-    if is_trusted(&read_claude_config(&config_path)?, workspace_key) {
+    if is_trusted(&read_claude_config(&config_path)?, &workspace_key) {
         return Ok(());
     }
 
@@ -49,7 +47,7 @@ pub fn trust_workspace(user_home: &Path, workspace: &Path) -> anyhow::Result<()>
     // happen under the lock.
     let _lock = ClaudeConfigLock::acquire(&config_path)?;
     let mut config = read_claude_config(&config_path)?;
-    if is_trusted(&config, workspace_key) {
+    if is_trusted(&config, &workspace_key) {
         return Ok(());
     }
     let root = config
@@ -86,6 +84,23 @@ fn read_claude_config(path: &Path) -> anyhow::Result<serde_json::Value> {
 
 fn is_trusted(config: &serde_json::Value, workspace_key: &str) -> bool {
     config["projects"][workspace_key]["hasTrustDialogAccepted"] == serde_json::Value::Bool(true)
+}
+
+fn project_key(path: &Path) -> anyhow::Result<String> {
+    let path = path.to_str().context("workspace path is not valid UTF-8")?;
+    // Rust canonicalization returns verbatim paths; Node's cwd does not.
+    #[cfg(windows)]
+    {
+        if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+            return Ok(format!("//{}", rest.replace('\\', "/")));
+        }
+        Ok(path
+            .strip_prefix(r"\\?\")
+            .unwrap_or(path)
+            .replace('\\', "/"))
+    }
+    #[cfg(not(windows))]
+    Ok(path.to_string())
 }
 
 /// The advisory lock Claude Code takes before saving `~/.claude.json`: a
@@ -150,7 +165,54 @@ fn is_stale_lock(dir: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_keys_match_claudes_forward_slashes() {
+        assert_eq!(
+            project_key(Path::new(r"C:\bots\one")).unwrap(),
+            "C:/bots/one"
+        );
+        assert_eq!(
+            project_key(Path::new(r"\\?\C:\bots\one")).unwrap(),
+            "C:/bots/one"
+        );
+        assert_eq!(
+            project_key(Path::new(r"\\?\UNC\server\share\one")).unwrap(),
+            "//server/share/one"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn trust_updates_the_entry_claude_reads_without_forking_project_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = tmp.path().join("workspace");
+        fs::create_dir(&workspace).unwrap();
+        // Canonical, so an 8.3 temp dir (`RUNNER~1` on CI) expands like the daemon's.
+        let canonical = workspace.canonicalize().unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let node_key = canonical
+            .strip_prefix(r"\\?\")
+            .unwrap_or(canonical)
+            .replace('\\', "/");
+        let config_path = tmp.path().join(".claude.json");
+        fs::write(
+            &config_path,
+            serde_json::to_vec(&serde_json::json!({"projects": {
+                node_key.clone(): {"hasTrustDialogAccepted": false, "otherSetting": "preserved"}
+            }}))
+            .unwrap(),
+        )
+        .unwrap();
+        trust_workspace(tmp.path(), &workspace).unwrap();
+        let config = read_claude_config(&config_path).unwrap();
+        assert!(is_trusted(&config, &node_key));
+        assert_eq!(config["projects"][&node_key]["otherSetting"], "preserved");
+        assert_eq!(config["projects"].as_object().unwrap().len(), 1);
+    }
 
     /// A temp home with a workspace and a `.claude.json` holding `config`.
     fn trust_fixture(config: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
@@ -185,7 +247,7 @@ mod tests {
             serde_json::to_vec_pretty(&serde_json::json!({
                 "theme": "dark",
                 "projects": {
-                    canonical_workspace.display().to_string(): {
+                    project_key(&canonical_workspace).expect("project key"): {
                         "allowedTools": ["Read"],
                         "hasTrustDialogAccepted": false
                     },
@@ -204,11 +266,13 @@ mod tests {
         .expect("parse config");
         assert_eq!(config["theme"], "dark");
         assert_eq!(
-            config["projects"][canonical_workspace.display().to_string()]["allowedTools"][0],
+            config["projects"][project_key(&canonical_workspace).expect("project key")]
+                ["allowedTools"][0],
             "Read"
         );
         assert_eq!(
-            config["projects"][canonical_workspace.display().to_string()]["hasTrustDialogAccepted"],
+            config["projects"][project_key(&canonical_workspace).expect("project key")]
+                ["hasTrustDialogAccepted"],
             true
         );
         assert_eq!(
@@ -242,11 +306,22 @@ mod tests {
         let (tmp, workspace, config_path) = trust_fixture(r#"{"theme":"dark"}"#);
         let lock = config_lock_path(&config_path);
         fs::create_dir(&lock).expect("hold lock");
+        let mut options = fs::OpenOptions::new();
+        options.write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.custom_flags(0x02000000); // FILE_FLAG_BACKUP_SEMANTICS
+        }
+        #[cfg(unix)]
         let held = fs::File::open(&lock).expect("open lock");
+        #[cfg(windows)]
+        let held = options.open(&lock).expect("open lock");
         held.set_times(
             fs::FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(3600)),
         )
         .expect("age the lock");
+        drop(held);
 
         trust_workspace(tmp.path(), &workspace).expect("trust");
 
@@ -255,11 +330,7 @@ mod tests {
         assert_eq!(config["theme"], "dark");
         assert!(is_trusted(
             &config,
-            workspace
-                .canonicalize()
-                .expect("canonical")
-                .to_str()
-                .unwrap()
+            &project_key(&workspace.canonicalize().expect("canonical")).expect("project key")
         ));
     }
 
@@ -277,7 +348,7 @@ mod tests {
             &config_path,
             serde_json::to_vec_pretty(&serde_json::json!({
                 "projects": {
-                    canonical.display().to_string(): { "hasTrustDialogAccepted": true }
+                    project_key(&canonical).expect("project key"): { "hasTrustDialogAccepted": true }
                 }
             }))
             .expect("json"),
@@ -302,9 +373,11 @@ mod tests {
             serde_json::from_slice(&fs::read(&config_path).expect("read config"))
                 .expect("parse config");
         assert_eq!(
-            config["projects"][canonical_workspace.display().to_string()]["hasTrustDialogAccepted"],
+            config["projects"][project_key(&canonical_workspace).expect("project key")]
+                ["hasTrustDialogAccepted"],
             true
         );
+        #[cfg(unix)]
         assert_eq!(
             fs::metadata(config_path)
                 .expect("metadata")

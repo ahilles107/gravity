@@ -1,0 +1,54 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-2022
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Only main saves: every PR restores main's cache, and PR-scoped
+          # copies would only crowd it out of the repo's cache quota.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # A failed test must not throw away the compiled dependencies.
+          cache-on-failure: true
+          workspaces: |
+            . -> target
+            apps/desktop/src-tauri -> target
+      - name: Check daemon
+        run: |
+          cargo fmt --all --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --workspace --all-targets
+      # tauri-build only needs the sidecar to exist; the shell's tests never run it.
+      - name: Stage debug daemon sidecar
+        run: |
+          New-Item -ItemType Directory -Force -Path apps/desktop/src-tauri/binaries | Out-Null
+          Copy-Item -LiteralPath target/debug/gravityd.exe -Destination apps/desktop/src-tauri/binaries/gravityd-x86_64-pc-windows-msvc.exe
+      - name: Check native shell
+        run: |
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml

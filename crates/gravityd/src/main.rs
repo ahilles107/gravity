@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
                     println!(
                         "gravityd installed to {} and running ({})",
                         paths.bin_path().display(),
-                        gravityd::service::LAUNCHD_LABEL
+                        gravityd::service::SERVICE_LABEL
                     );
                     println!("Logs: {}", paths.log_dir().display());
                 }
@@ -92,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
                         paths.plist_path().display()
                     );
                     gravityd::service::reload(&paths)?;
-                    println!("gravityd restarted ({})", gravityd::service::LAUNCHD_LABEL);
+                    println!("gravityd restarted ({})", gravityd::service::SERVICE_LABEL);
                 }
                 Some("status") => {
                     if !gravityd::service::status(&paths, cfg.port) {
@@ -116,8 +116,8 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(
             configured_port = cfg.configured_port,
             port = cfg.port,
-            "serving on a negotiated port: the bot bus is no longer at the \
-             configured /mcp URL, which a policy-managed Mac silently drops"
+            "configured port unavailable; app and bot bus are using the active port; \
+             remote clients and MCP URL allowlists must use this port"
         );
     }
     let home = cfg.home.clone();

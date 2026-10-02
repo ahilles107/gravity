@@ -12,6 +12,7 @@ use std::process::Command;
 use anyhow::Context;
 
 pub const LAUNCHD_LABEL: &str = "in.mikolajczuk.gravityd";
+pub const SERVICE_LABEL: &str = LAUNCHD_LABEL;
 const DEFAULT_CONFIG: &str = include_str!("../../../ops/gravityd.example.toml");
 
 /// Where the managed installation lives, derived from the daemon home

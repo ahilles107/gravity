@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -28,14 +27,14 @@ fn random_token() -> String {
 
 fn write_secret(path: &Path, value: &str) -> anyhow::Result<()> {
     fs::write(path, value)?;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    crate::permissions::private(path, false)?;
     Ok(())
 }
 
 impl Secrets {
     pub fn open(dir: &Path) -> anyhow::Result<Self> {
         fs::create_dir_all(dir)?;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+        crate::permissions::private(dir, true)?;
 
         let client_path = dir.join("client.token");
         let client_token = if client_path.exists() {

@@ -196,9 +196,9 @@ fn resolve_home(gravity_home: Option<PathBuf>, user_home: PathBuf) -> PathBuf {
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var_os("HOME")
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 impl Config {

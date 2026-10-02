@@ -36,8 +36,8 @@ CI uses GitHub-hosted Ubuntu and Apple Silicon macOS runners. The examples in
 on another repository or an existing host fleet.
 
 Source builds have no updater endpoint or signing key and do not produce signed
-updater artifacts. Release workflows build an ad-hoc signed DMG and daemon
-tarball without maintainer secrets. A `v*` tag publishes GitHub release assets;
+updater artifacts. Release workflows build an ad-hoc signed DMG, an unsigned
+Windows installer and a daemon tarball without maintainer secrets. A `v*` tag publishes GitHub release assets;
 manual runs only upload workflow artifacts.
 
 Optional repository configuration:
@@ -66,8 +66,9 @@ launchd labels.
 
 ### Download hosting and existing installations
 
-Tagged releases publish the signed updater archive, DMG, daemon archive and
-`latest.json` on GitHub Releases. New official builds check
+Tagged releases publish the signed macOS updater archive, DMG, Windows
+installer and its updater signature, daemon archive and `latest.json` on
+GitHub Releases. New official builds check
 `https://github.com/ahilles107/gravity/releases/latest/download/latest.json`.
 The workflow uses its own repository name for forks. It uploads all assets to a
 draft release before marking it published/latest, so clients cannot discover a

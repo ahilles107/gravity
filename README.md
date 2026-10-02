@@ -4,6 +4,8 @@ Always-on, multi-bot desktop app with Claude Code as the agent runtime. A Rust
 daemon (`gravityd`) runs on a Mac mini; the Tauri desktop client attaches
 from any machine. See the [architecture](docs/architecture.md) for the system
 design and the [control-plane protocol](docs/protocol.md) for client APIs.
+Native Windows x64 builds and local-daemon setup are described in
+[Windows build instructions](docs/windows.md).
 
 Builds and tests require no Linear, PostHog, or Cloudflare account. Running real
 bots requires your own Claude Code installation and authentication; the test
@@ -109,7 +111,8 @@ validation failures before committing.
 
 ## Install (end users)
 
-Open the release DMG and drag **Gravity** to Applications. The app bundles
+Open the release DMG and drag **Gravity** to Applications. On Windows, run
+the release `x64-setup.exe` installer. The app bundles
 the daemon as a signed sidecar; on first launch a setup wizard either installs
 it as a launchd user agent on this Mac (one click, no sudo) or attaches to a
 remote daemon with a device token. Headless machines skip the app:

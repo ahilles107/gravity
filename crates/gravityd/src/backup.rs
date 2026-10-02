@@ -195,6 +195,8 @@ mod tests {
 
         // Existing database blocks restore without --overwrite.
         assert!(restore(&cfg2, &out, false).is_err());
+        // Windows refuses to rename a database while SQLite holds it open.
+        drop(db2);
         restore(&cfg2, &out, true).unwrap();
         assert!(std::fs::read_dir(home2.path())
             .unwrap()

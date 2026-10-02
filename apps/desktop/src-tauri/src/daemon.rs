@@ -48,31 +48,47 @@ fn sidecar_path_for_exe(exe: &Path) -> Result<PathBuf, String> {
     let dir = exe
         .parent()
         .ok_or_else(|| "the app path has no parent".to_string())?;
-    Ok(dir.join("gravityd"))
+    Ok(dir.join(format!("gravityd{}", std::env::consts::EXE_SUFFIX)))
 }
 
 /// Must match `LAUNCHD_LABEL` in `crates/gravityd/src/service.rs`.
 const LAUNCHD_LABEL: &str = "in.mikolajczuk.gravityd";
 
-fn user_home() -> Result<PathBuf, String> {
-    let home = std::env::var("HOME").map_err(|err| format!("HOME is not set: {err}"))?;
-    Ok(PathBuf::from(home))
+pub(crate) fn user_home() -> Result<PathBuf, String> {
+    let variable = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(variable)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("{variable} is not set"))
 }
 
 /// Mirrors `ServicePaths::bin_path` and `plist_path` in `crates/gravityd/src/service.rs`.
 fn managed_daemon_is_installed(home: &Path, user_home: &Path) -> bool {
-    home.join("bin/gravityd").is_file()
-        && user_home
+    home.join(format!("bin/gravityd{}", std::env::consts::EXE_SUFFIX))
+        .is_file()
+        && managed_marker(home, user_home).is_file()
+}
+
+fn managed_marker(home: &Path, user_home: &Path) -> PathBuf {
+    if cfg!(windows) {
+        home.join("gravityd-task.xml")
+    } else {
+        user_home
             .join("Library/LaunchAgents")
             .join(format!("{LAUNCHD_LABEL}.plist"))
-            .is_file()
+    }
 }
 
 /// Runs the bundled sidecar's own `service <action>`, the same code path the
 /// CLI uses.
 fn run_bundled_service(action: &str, failure: &str) -> Result<(), String> {
     let sidecar = sidecar_path()?;
-    let out = std::process::Command::new(&sidecar)
+    let mut command = std::process::Command::new(&sidecar);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let out = command
         .args(["service", action])
         .output()
         .map_err(|err| format!("failed to run {}: {err}", sidecar.display()))?;
@@ -155,7 +171,7 @@ pub(crate) fn update_local_daemon_if_installed() -> Result<(), String> {
 const DEFAULT_PORT: u16 = 49777;
 
 /// Root of the daemon's state, mirroring `gravityd`'s own resolution.
-fn daemon_home() -> Result<PathBuf, String> {
+pub(crate) fn daemon_home() -> Result<PathBuf, String> {
     if let Some(home) = std::env::var_os("GRAVITY_HOME") {
         return Ok(PathBuf::from(home));
     }
@@ -255,7 +271,10 @@ mod tests {
         let exe = Path::new("/Applications/Gravity.app/Contents/MacOS/Gravity");
         assert_eq!(
             sidecar_path_for_exe(exe).expect("sidecar path"),
-            PathBuf::from("/Applications/Gravity.app/Contents/MacOS/gravityd")
+            PathBuf::from(format!(
+                "/Applications/Gravity.app/Contents/MacOS/gravityd{}",
+                std::env::consts::EXE_SUFFIX
+            ))
         );
     }
 
@@ -270,10 +289,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let home = root.join("gravity");
         let user_home = root.join("user");
-        let bin = home.join("bin/gravityd");
-        let plist = user_home
-            .join("Library/LaunchAgents")
-            .join(format!("{LAUNCHD_LABEL}.plist"));
+        let bin = home.join(format!("bin/gravityd{}", std::env::consts::EXE_SUFFIX));
+        let plist = managed_marker(&home, &user_home);
         std::fs::create_dir_all(bin.parent().expect("binary parent")).expect("binary directory");
         std::fs::write(&bin, b"daemon").expect("daemon binary");
         assert!(!managed_daemon_is_installed(&home, &user_home));
@@ -314,10 +331,8 @@ mod tests {
         let root = daemon_test_home("is-managed");
         let home = root.join("gravity");
         let user_home = root.join("user");
-        let bin = home.join("bin/gravityd");
-        let plist = user_home
-            .join("Library/LaunchAgents")
-            .join(format!("{LAUNCHD_LABEL}.plist"));
+        let bin = home.join(format!("bin/gravityd{}", std::env::consts::EXE_SUFFIX));
+        let plist = managed_marker(&home, &user_home);
         std::fs::create_dir_all(bin.parent().expect("binary parent")).expect("binary directory");
         std::fs::create_dir_all(plist.parent().expect("plist parent")).expect("plist directory");
         std::fs::write(&bin, b"daemon").expect("daemon binary");

@@ -5,6 +5,8 @@
 //! inbox socket (see `channel`). The PTY carries only terminal I/O.
 
 pub mod double;
+#[cfg(windows)]
+mod inbox;
 pub mod pty;
 
 use std::path::PathBuf;
