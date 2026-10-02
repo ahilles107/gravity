@@ -71,6 +71,8 @@ pub struct PeerHub {
     counter: Arc<AtomicU64>,
     /// Local bot id → peers that have its chat open and want its turns.
     chat_watchers: Arc<Mutex<HashMap<String, HashSet<String>>>>,
+    /// Terminal feeds served to peers, and mirrors of peers' bot terminals.
+    pub terms: Arc<super::term::Terms>,
 }
 
 impl PeerHub {
@@ -196,6 +198,7 @@ impl PeerHub {
             let (app, peer_id) = (app.clone(), peer_id.clone());
             tokio::task::spawn_blocking(move || super::mirror::sync(&app, &peer_id));
         }
+        tokio::spawn(super::term::link_up(app.clone(), peer_id.clone()));
 
         // Events are applied in the order they were sent: a roster, then a
         // newer one, must not land the other way round.
@@ -258,6 +261,7 @@ impl PeerHub {
             links.remove(&peer_id);
         }
         drop(links);
+        self.terms.link_down(&peer_id);
         let _ = app.db.touch_peer(&peer_id);
         tracing::info!(peer_id, "peer link down");
     }

@@ -45,9 +45,12 @@ function clamp(value: number, minimum: number, maximum: number): number {
 export default function BotView(props: BotViewProps): ReactElement {
   const { client, bot, bots, connected, canControl, onToast } = props;
   const tabs = botTabs(
-    client.capabilities.includes("chat"),
+    {
+      chat: client.capabilities.includes("chat"),
+      browser: client.capabilities.includes("bot_browser"),
+      peerTerminal: client.capabilities.includes("peer_terminal"),
+    },
     bot.peer != null,
-    client.capabilities.includes("bot_browser"),
   );
   const [tab, setTab] = useState<BotTab>(tabs[0] ?? "terminal");
   const [side, setSide] = useState<SideTab>("info");

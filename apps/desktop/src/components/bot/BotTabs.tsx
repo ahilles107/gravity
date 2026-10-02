@@ -9,13 +9,23 @@ const TAB_LABEL: Readonly<Record<BotTab, string>> = {
   routines: "Routines",
 };
 
+/** What the daemon serves, which decides the tabs a bot offers. */
+export interface TabSupport {
+  readonly chat: boolean;
+  /** Each bot's own browser, watched live. */
+  readonly browser?: boolean;
+  /** A linked bot's terminal, relayed from its machine. */
+  readonly peerTerminal?: boolean;
+}
+
 /**
- * The tabs a bot offers. Chat and the bot's own browser need a daemon that
- * serves them, and a linked bot has only chat: its browser is on its machine.
+ * The tabs a bot offers. A linked bot has its chat, and its terminal when the
+ * daemon relays it; its browser stays on its own machine.
  */
-export function botTabs(chat: boolean, linked: boolean, browser = false): readonly BotTab[] {
+export function botTabs(support: TabSupport, linked: boolean): readonly BotTab[] {
+  const { chat, browser = false, peerTerminal = false } = support;
   if (linked) {
-    return ["chat"];
+    return peerTerminal ? ["chat", "terminal"] : ["chat"];
   }
   const tabs: BotTab[] = chat ? ["chat", "terminal"] : ["terminal"];
   if (browser) {

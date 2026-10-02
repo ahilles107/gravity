@@ -18,6 +18,7 @@ mod receive;
 pub mod remote_bots;
 mod roster;
 mod socket;
+pub mod term;
 
 pub use forward::{forward, ForwardError};
 pub use hub::{PeerError, PeerHub};

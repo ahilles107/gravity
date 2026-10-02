@@ -20,6 +20,8 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
         "list_bots" => list_bots(app),
         "link" => link(app, &peer, frame),
         "chat" | "chat_step" | "chat_image" | "read_file" => super::chat::serve(app, &peer, frame),
+        "term_attach" => super::term::serve_attach(app, &peer, frame),
+        "term_detach" => super::term::serve_detach(app, &peer, frame),
         "list_projects" => super::links::serve_list(app, &peer),
         "link_project" => super::links::serve_link(app, &peer, frame),
         "unlink_project" => super::links::serve_unlink(app, &peer, frame),
@@ -37,11 +39,15 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
 
 /// News a peer sends without asking anything back.
 pub(super) fn event(app: &Arc<AppState>, peer_id: &str, frame: &Value) {
-    let live = matches!(app.db.get_peer(peer_id), Ok(Some(p)) if p.revoked_at.is_none());
-    if !live {
+    let Ok(Some(peer)) = app.db.get_peer(peer_id) else {
+        return;
+    };
+    if peer.revoked_at.is_some() {
         return;
     }
     match frame["type"].as_str().unwrap_or("") {
+        "term_frames" => super::term::receive_frames(app, peer_id, frame),
+        "term_input" | "term_resize" | "term_detach" => super::term::serve_event(app, &peer, frame),
         "chat_turns" => super::chat::receive_turns(app, peer_id, frame),
         "project_roster" => super::mirror::receive_roster(app, peer_id, frame),
         "project_links" => super::mirror::receive_links(app, peer_id, frame),

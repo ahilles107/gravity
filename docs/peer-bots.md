@@ -295,8 +295,16 @@ Daemons advertise this as the `peer_chat` capability; with an older daemon the
 app falls back to the bot's bus conversation. Permission prompts of a linked
 bot are answered on its own machine.
 
-Watching the Windows bot's terminal from the Mac is left to the UI rework.
-It needs the app to hold connections to two daemons at once.
+A linked bot's terminal is relayed too (`peer_terminal`), so the Windows bot
+can be watched and typed into from the Mac, or from a phone connected to the
+Mac. The Mac keeps a mirror of it: the PC feeds the bot's terminal output over
+the link (`term_attach`, then `term_frames` events) into the stand-in's own
+terminal buffer, so clients `attach` to the stand-in exactly as to a local bot,
+with replay and resume, and one feed serves every viewer. `input` and `resize`
+on the stand-in go back as `term_input` and `term_resize` events. The feed runs
+while anyone watches, picks up after the last frame it sent when the link comes
+back, and stops (`term_detach`) when the last viewer leaves. A peer only feeds
+or takes input for bots linked to it.
 
 ## Schema
 

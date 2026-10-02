@@ -34,6 +34,7 @@ pub const CAPABILITIES: &[&str] = &[
     "linked_projects",
     "bot_browser",
     "agent_conversations",
+    "peer_terminal",
 ];
 
 pub struct AppState {
