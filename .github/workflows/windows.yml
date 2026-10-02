@@ -25,6 +25,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
+          # Only main saves: every PR restores main's cache, and PR-scoped
+          # copies would only crowd it out of the repo's cache quota.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           # A failed test must not throw away the compiled dependencies.
           cache-on-failure: true
           workspaces: |
