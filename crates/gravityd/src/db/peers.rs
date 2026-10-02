@@ -258,6 +258,21 @@ impl Db {
         )
     }
 
+    /// The local copy of a message the peer knows by an id starting with
+    /// `prefix`: how a folder of files a peer sent is traced to its message.
+    pub fn local_message_by_prefix(
+        &self,
+        peer_id: &str,
+        prefix: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let pattern = format!("{}%", prefix.replace(['%', '_'], ""));
+        self.peer_lookup(
+            "SELECT message_id FROM peer_message WHERE peer_id = ?1 AND remote_message_id LIKE ?2",
+            peer_id,
+            &pattern,
+        )
+    }
+
     /// The peer's id for a local message, when the message crossed the link.
     pub fn remote_message_for(
         &self,

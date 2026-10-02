@@ -118,7 +118,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_chat` | `bot_id, before?` (a turn id), `limit?` (default 30, max 200) | `chat` (`turns` oldest first, `has_more`) |
 | `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
 | `get_chat_image` | `bot_id, image_id` | `file` |
-| `list_artifacts` | `project_id` | `artifacts` (newest first) |
+| `list_artifacts` | `project_id` | `artifacts` (newest first). Each may carry `created_by: { bot_id?, name, avatar, machine?, via }`, who made the file: `wrote`/`edited` (the first bot whose file tools touched it, by its transcript), `command` (the first bot whose command named its path), `upload` (the owner, from the app; no `bot_id`), or `sent` (a bot on another machine, with a result). Absent when it cannot be told |
 | `write_artifact` | `project_id, name, base64` (one chunk, up to ~512 KB), `upload_id?` (from the first chunk's reply), `last` | `upload` (`upload_id`, and `path` once the last chunk is in); `control` grant. Files land in the project's `artifacts/uploads/`, up to 16 MB |
 | `list_tasks` | `bot_id, limit?` (default 100) | `tasks`: newest first, each with `state`, `role` (`assigned` \| `delegated`), `other` (`name`, `machine?`), `request` and `result?` as previews (`request_truncated`, `result_truncated` say when they were cut), `deadline_at?`, `closed_at?` |
 | `get_task` | `bot_id, task_id` | `task`: the same shape with the whole request and result |

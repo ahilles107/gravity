@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { FileBody } from "../../protocol/chat";
 import { FakeDaemon } from "../../test/fakeDaemon";
 import * as fx from "../../test/fixtures";
+import { createdByLabel } from "./CreatedBy";
 import FilesPanel from "./FilesPanel";
 
 function daemon(files: Readonly<Record<string, FileBody>>): FakeDaemon {
@@ -23,6 +24,7 @@ function daemon(files: Readonly<Record<string, FileBody>>): FakeDaemon {
           modified: null,
           mime: "text/markdown",
           title: "Weekly report",
+          created_by: { bot_id: "b2", name: "lead", avatar: "icon:comet", via: "wrote" },
         },
         {
           path: "/p/artifacts/app.ts",
@@ -30,6 +32,13 @@ function daemon(files: Readonly<Record<string, FileBody>>): FakeDaemon {
           name: "app.ts",
           size: 40,
           mime: "text/x-code",
+          created_by: {
+            bot_id: "b3",
+            name: "windev",
+            avatar: "",
+            machine: "win-pc",
+            via: "sent",
+          },
         },
       ],
     }))
@@ -125,5 +134,31 @@ describe("FilesPanel", () => {
       />,
     );
     expect(await screen.findByText("file not found")).toBeInTheDocument();
+  });
+});
+
+describe("who made a file", () => {
+  it("shows under each file", async () => {
+    render(
+      <FilesPanel
+        client={daemon({})}
+        bot={fx.bot()}
+        connected
+        selected={null}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(await screen.findByText("written by lead")).toBeInTheDocument();
+    expect(screen.getByText("sent by windev @ win-pc")).toBeInTheDocument();
+  });
+
+  it("says how", () => {
+    expect(createdByLabel({ name: "you", avatar: "", via: "upload" })).toBe("uploaded by you");
+    expect(createdByLabel({ bot_id: "b", name: "qa", avatar: "", via: "command" })).toBe(
+      "made by a command of qa",
+    );
+    expect(createdByLabel({ bot_id: "b", name: "qa", avatar: "", via: "edited" })).toBe(
+      "first edited by qa",
+    );
   });
 });

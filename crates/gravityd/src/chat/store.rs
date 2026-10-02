@@ -29,6 +29,8 @@ struct BotChat {
     builder: Builder,
     /// The commands the bot ran, read from the same lines.
     commands: super::commands::CommandLog,
+    /// The files it wrote, likewise.
+    writes: super::writes::WriteLog,
 }
 
 #[derive(Default)]
@@ -48,15 +50,18 @@ impl ChatStore {
                 offset: 0,
                 builder: Builder::new(&bot.id, names(app, bot)),
                 commands: Default::default(),
+                writes: Default::default(),
             };
         }
         if let Some(path) = &path {
             let offset = chat.offset;
             let chat = &mut *chat;
-            let (builder, commands) = (&mut chat.builder, &mut chat.commands);
+            let (builder, commands, writes) =
+                (&mut chat.builder, &mut chat.commands, &mut chat.writes);
             chat.offset = read_from(path, offset, |at, line| {
                 builder.push_line(at, line);
                 commands.push_line(line);
+                writes.push_line(line);
             })?;
         }
         let changed = chat.builder.take_changed();
@@ -99,6 +104,19 @@ impl ChatStore {
             .last()
             .filter(|turn| turn.open)
             .map(|turn| turn.trigger.clone()))
+    }
+
+    /// Reads the bot's command and write logs, brought up to date.
+    pub fn with_logs<R>(
+        &self,
+        app: &AppState,
+        bot: &Bot,
+        read: impl FnOnce(&super::commands::CommandLog, &super::writes::WriteLog) -> R,
+    ) -> anyhow::Result<R> {
+        self.refresh(app, bot)?;
+        let (chat, _) = self.entry(app, bot)?;
+        let chat = lock(&chat);
+        Ok(read(&chat.commands, &chat.writes))
     }
 
     /// The commands the bot ran, the running ones first, then the newest. A
@@ -253,6 +271,7 @@ impl ChatStore {
             offset: 0,
             builder: Builder::new(&bot.id, names(app, bot)),
             commands: Default::default(),
+            writes: Default::default(),
         }));
         bots.insert(bot.id.clone(), chat.clone());
         Ok((chat, true))

@@ -6,6 +6,7 @@ import type { Artifact } from "../../protocol/chat";
 import type { Bot } from "../../protocol/entities";
 import { errText, fmtTimestamp } from "../../util";
 import FilePreview from "./FilePreview";
+import CreatedBy from "./CreatedBy";
 
 interface FilesPanelProps {
   readonly client: DaemonApi;
@@ -88,6 +89,9 @@ export default function FilesPanel(props: FilesPanelProps): ReactElement {
                 {sizeLabel(artifact.size)}
                 {artifact.modified == null ? "" : ` · ${fmtTimestamp(artifact.modified)}`}
               </span>
+              {artifact.created_by === undefined ? null : (
+                <CreatedBy creator={artifact.created_by} />
+              )}
             </button>
           </li>
         ))}

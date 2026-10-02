@@ -121,6 +121,19 @@ export interface Artifact {
   readonly modified?: string | null;
   readonly mime: string;
   readonly title?: string;
+  /** Who made the file, when the daemon can tell. */
+  readonly created_by?: FileCreator;
+}
+
+/** The bot (or the owner) a file came from, and how. */
+export interface FileCreator {
+  /** Absent for the owner. */
+  readonly bot_id?: string;
+  readonly name: string;
+  readonly avatar: string;
+  /** The machine a linked bot runs on. */
+  readonly machine?: string;
+  readonly via: "wrote" | "edited" | "command" | "upload" | "sent";
 }
 
 /** A file's contents: `text` when it is text, otherwise `base64`. */

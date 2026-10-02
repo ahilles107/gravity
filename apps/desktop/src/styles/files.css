@@ -84,3 +84,13 @@
   border-radius: 6px;
   border: 1px solid var(--border);
 }
+
+/* Who made a file, under its name. */
+.files-creator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}

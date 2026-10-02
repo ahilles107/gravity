@@ -260,6 +260,14 @@ impl CommandLog {
         command.ended_at = Some(timestamp(record));
     }
 
+    /// When a command mentioning `needle` (a file's path) first ran.
+    pub fn first_mention(&self, needle: &str) -> Option<DateTime<Utc>> {
+        self.commands
+            .iter()
+            .find(|command| command.command.contains(needle))
+            .map(|command| command.started_at)
+    }
+
     /// Every command, the running ones first, then the newest. A command
     /// still running in an earlier session stopped with it, and a foreground
     /// one cannot be running while the bot is idle.

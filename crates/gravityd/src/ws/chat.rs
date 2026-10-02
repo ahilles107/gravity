@@ -91,7 +91,8 @@ impl Conn {
         let project_id = Self::str_field(req, "project_id")?.to_string();
         self.blocking(req_id, move |app| {
             let project = live_project(app, &project_id)?;
-            let artifacts = files::list_artifacts(app, &project);
+            let mut artifacts = files::list_artifacts(app, &project);
+            crate::chat::authors::attribute(app, &project, &mut artifacts);
             Ok(json!({ "type": "artifacts", "project_id": project_id, "artifacts": artifacts }))
         });
         Ok(())

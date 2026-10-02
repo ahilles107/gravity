@@ -27,6 +27,9 @@ pub struct Artifact {
     pub mime: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// Who made the file, when that can be told; see `super::authors`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by: Option<super::authors::Creator>,
 }
 
 #[derive(Debug, Serialize)]
@@ -91,6 +94,7 @@ fn walk(root: &Path, dir: &Path, depth: usize, out: &mut Vec<Artifact>) {
             path: path.display().to_string(),
             rel,
             title: (mime == "text/markdown").then(|| heading(&path)).flatten(),
+            created_by: None,
             name,
             size: meta.len(),
             modified: meta

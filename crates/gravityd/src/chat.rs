@@ -7,6 +7,7 @@ use std::time::Duration;
 use crate::app::AppState;
 use crate::events::Push;
 
+pub mod authors;
 mod browser_steps;
 mod builder;
 #[cfg(test)]
@@ -18,6 +19,7 @@ pub mod model;
 mod steps;
 mod store;
 mod triggers;
+pub mod writes;
 
 pub(crate) use envelope::unwrap_peer;
 pub(crate) use steps::truncate;
