@@ -33,7 +33,9 @@ attached to, typed into and resized here, relayed from its machine, and
 `peer_browser` when a linked bot's browser can be watched here the same way
 (`watch_browser`, `list_browser_activity` on the stand-in), and `bot_commands` when
 `list_bot_commands` lists what each bot is running, and `restart_bot` when bots
-can be restarted or cleared (`restart_bot`, `clear_bot_session`).
+can be restarted or cleared (`restart_bot`, `clear_bot_session`), and `workers`
+when bots can spawn temporary workers (`temporary` on bots, `repo` on projects,
+`set_project_repo`; see [workers](workers.md)).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -71,6 +73,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_projects` | – | `projects` |
 | `create_project` | `name` | `project` |
 | `update_project` | `project_id, name` | `project` |
+| `set_project_repo` | `project_id, url \| null, branch?` (default `main`) | `project`: the shared git repository workers check out and push to; `url: null` clears it. Bots' prompts are rewritten for their next start |
 | `delete_project` | `project_id` | `ok` — archives the project and every bot in it; see Semantics |
 | `list_bots` | `project_id?` | `bots` |
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
@@ -243,12 +246,13 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 ## Entity shapes (JSON)
 
 ```jsonc
-Project  { "id", "name", "dir_name", "lead_bot_id"?, "links", "deleted_at"?, "created_at" }
+Project  { "id", "name", "dir_name", "lead_bot_id"?, "links", "repo": {"url","branch"}|null,
+           "deleted_at"?, "created_at" }
 ProjectLink { "peer_id", "peer_name", "online", "remote_project_id",
            "remote_project_name", "linked_at" }
 Bot      { "id", "project_id", "name", "description", "avatar", "instructions",
            "state", "state_reason", "unread_count", "workspace_path", "dir_name",
-           "created_by_bot_id"?, "user_chrome", "deleted_at"?, "created_at" }
+           "created_by_bot_id"?, "user_chrome", "temporary", "deleted_at"?, "created_at" }
 BotRevision { "id", "bot_id", "changed_by", "field", "old_value", "new_value",
            "created_at" }
 Conversation { "id", "project_id", "bot_id", "title" }
@@ -293,7 +297,8 @@ PublishResult { "decision_id", "notified": ["<bot name>"],
 `Project` gains `lead_bot_id?`; `Message` gains `decision_id?`. `links` is
 always present (empty when the project is not linked); `project_updated` is
 pushed whenever a project's links change. A bot standing in for one on a peer
-carries `peer: { id, name, online }`.
+carries `peer: { id, name, online }`. A bot with `temporary: true` is a worker:
+created for one task and archived once that task closes.
 
 Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
 
@@ -354,7 +359,9 @@ Bots manage their own identity and each other over the MCP bus
 `delete_bot`). Nothing is queued for approval — a bot's change is live the
 moment the tool returns. Three things bound that:
 
-- **`max_bots_per_project`** (default 12) is the only limit on creation. Since
+- **`max_bots_per_project`** (default 12) is the only limit on creation of
+  permanent bots; temporary workers have their own `max_workers_per_project`
+  and queue (see [workers](workers.md)). Since
   a bot may delete only its own children, and archived bots free their slot,
   this caps the live population however deeply bots nest their teams. There is
   no spawn-depth or rate limit; neither would constrain anything the population

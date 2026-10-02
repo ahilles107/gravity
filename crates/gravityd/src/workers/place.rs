@@ -54,7 +54,13 @@ async fn place_locked(app: &Arc<AppState>, project_id: &str) -> anyhow::Result<(
                 continue;
             }
         };
-        let mut waiting = None;
+        // A spawn pinned to a machine that is offline has nowhere to go yet.
+        let mut waiting = places.is_empty().then(|| {
+            format!(
+                "waiting for {} to come online",
+                worker.machine.as_deref().unwrap_or("a machine")
+            )
+        });
         for place in places {
             let attempt = match &place {
                 Place::Here if here_full => continue,

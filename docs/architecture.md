@@ -90,6 +90,9 @@ and reconciles missing sessions periodically. Crashed sessions restart with
 backoff. Archiving a bot stops its process, revokes its token, cancels open
 tasks, and retains its workspace until the configured retention period expires.
 The per-project population limit bounds how many live bot records can exist.
+Temporary workers, which bots spawn for one task each, have a separate cap and
+a queue, and can share work through a project's git repository; see
+[workers](workers.md).
 
 Process events and authenticated lifecycle hooks update observable states such
 as `starting`, `ready`, `working`, `waiting_for_approval`, and `crashed`. A
