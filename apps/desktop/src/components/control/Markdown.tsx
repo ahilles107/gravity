@@ -15,7 +15,7 @@ interface MarkdownProps {
  * owner opened the decision. Nothing stops it downstream — `tauri.conf.json`
  * sets no CSP.
  */
-const COMPONENTS = {
+export const SAFE_LINKS = {
   a: ({ children, href }: { children?: ReactNode; href?: string }) => (
     <span className="markdown-link" title={href}>
       {children}
@@ -41,7 +41,7 @@ const COMPONENTS = {
 export default function Markdown({ children }: MarkdownProps): ReactElement {
   return (
     <div className="markdown">
-      <ReactMarkdown components={COMPONENTS}>{children}</ReactMarkdown>
+      <ReactMarkdown components={SAFE_LINKS}>{children}</ReactMarkdown>
     </div>
   );
 }

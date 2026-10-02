@@ -18,12 +18,18 @@ mod worker;
 
 pub use native::NativeCodexAdapter;
 
+/// Where a Codex bot's thread id is kept, in its bot directory: the next
+/// session resumes that thread.
+pub const THREAD_FILE: &str = "codex-thread-id";
+
 #[derive(Debug, Clone)]
 pub struct CodexSpec {
     pub bin: String,
     pub args: Vec<String>,
     pub port: u16,
     pub artifacts: Option<PathBuf>,
+    /// The bot's own browser server, `{command, args, env}`, when it has one.
+    pub browser: Option<Value>,
 }
 
 pub struct CodexAdapter;
@@ -33,6 +39,8 @@ pub(super) enum Wire {
     Closed,
     Input(Vec<u8>),
     Deliver(String, mpsc::SyncSender<anyhow::Result<()>>),
+    /// The owner's answer to a permission request, by its number.
+    Answer(u64, super::PermissionAnswer),
     Stop,
 }
 
@@ -215,6 +223,15 @@ impl RuntimeSession for CodexSession {
                 .recv_timeout(Duration::from_secs(12))
                 .context("Codex delivery timed out")?
         })())
+    }
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: super::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.tx
+            .send(Wire::Answer(key, answer))
+            .map_err(|_| anyhow::anyhow!("Codex session stopped"))
     }
     fn resize(&mut self, _cols: u16, _rows: u16) -> anyhow::Result<()> {
         Ok(())

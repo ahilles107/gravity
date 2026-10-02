@@ -44,3 +44,31 @@ CREATE TABLE peer_task (
 );
 CREATE INDEX idx_peer_task_local ON peer_task(peer_id, task_id);
 "#;
+
+/// Migration 15: a revoked peer frees its name and its daemon.
+///
+/// The name is tombstoned the way an archived bot's is, and the daemon id
+/// released, so pairing the same machine again can reuse both. New
+/// revocations do the same in `Db::revoke_peer`.
+pub(super) const MIGRATION_15: &str = r#"
+UPDATE peer SET name = name || '#' || substr(id, 1, 8)
+    WHERE revoked_at IS NOT NULL AND instr(name, '#') = 0;
+UPDATE peer SET daemon_id = NULL WHERE revoked_at IS NOT NULL;
+"#;
+
+/// Migration 16: projects linked across peers.
+///
+/// A link is recorded on both daemons, each holding the other's project id.
+/// A project links with at most one project per peer, and the same remote
+/// project with at most one project here.
+pub(super) const MIGRATION_16: &str = r#"
+CREATE TABLE project_link (
+    project_id          TEXT NOT NULL REFERENCES project(id),
+    peer_id             TEXT NOT NULL REFERENCES peer(id),
+    remote_project_id   TEXT NOT NULL,
+    remote_project_name TEXT NOT NULL,
+    linked_at           TEXT NOT NULL,
+    PRIMARY KEY (project_id, peer_id)
+);
+CREATE UNIQUE INDEX idx_project_link_remote ON project_link(peer_id, remote_project_id);
+"#;

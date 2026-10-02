@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
+import type { Permissions } from "../permissions/usePermissions";
 import type { DaemonApi } from "../../protocol/api";
 import type { Decision } from "../../protocol/decisions";
 import type { Bot, NotifyLevel, Project } from "../../protocol/entities";
@@ -31,6 +32,9 @@ export interface ControlCenterOptions {
   readonly canControl: boolean;
   readonly decisionId?: string;
   readonly onToast: (level: NotifyLevel, title: string, body: string) => void;
+  /** Every bot's permission prompts, shown above the decisions. */
+  readonly permissions?: Permissions;
+  readonly onOpenBot?: (botId: string) => void;
 }
 
 export interface ControlCenter extends BotLookups, RegistryFilterState {

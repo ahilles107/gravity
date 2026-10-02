@@ -44,8 +44,12 @@ Gravity supervision restarts a bot after its terminal exits.
 
 Bus messages arrive through structured turn requests and never consume a partially
 typed terminal prompt. Gravity observes both native and bus turns for activity and
-routine completion. The native CLI handles approval decisions; Gravity does not
-automatically answer them. Each bot has a separate App Server with a fresh random
+routine completion. Command, file-change and permission approvals also appear as
+permission cards in the app while it is open with the `control` grant; whichever
+answers first, the card or the native CLI, decides, and the other is withdrawn.
+Gravity never answers an approval by itself: an unanswered card is declined when
+its window closes. Questions and elicitations stay in the native CLI. Each bot
+has a separate App Server with a fresh random
 capability token. The raw token is passed through the terminal environment and RPC
 authorization header; only its SHA-256 verifier appears in server arguments.
 
@@ -57,6 +61,9 @@ App Server config enables the local Gravity MCP endpoint. Codex uses workspace-w
 sandboxing with the project's shared artifacts directory included. It reads the
 shared system instructions, `CLAUDE.md` and `FACTS.md`. Thread IDs and activity
 observations are saved beside the workspace for restarts and routine correlation.
+The observations (`codex-observations.jsonl`) record text, each command, file
+change (with its diff) and MCP call, and each turn's end in the shape of a Claude
+Code transcript, so the chat reads Codex and Claude bots the same way.
 Interrupted or failed turns do not report successful routine completion.
 
 ## Upgrade

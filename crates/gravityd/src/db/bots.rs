@@ -37,6 +37,8 @@ impl Db {
             },
             peer_id: r.get(12)?,
             remote_bot_id: r.get(13)?,
+            user_chrome: r.get(14)?,
+            temporary: r.get(15)?,
             // Runtime fields are overlaid by the supervisor.
             state: BotState::Stopped,
             state_reason: String::new(),
@@ -47,7 +49,7 @@ impl Db {
     pub(super) const BOT_COLS: &'static str =
         "id, project_id, name, description, avatar, instructions, \
          workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime, peer_id, \
-         remote_bot_id";
+         remote_bot_id, user_chrome, temporary";
 
     /// Restricts a query to bots that still exist for addressing purposes.
     const LIVE: &'static str = "deleted_at IS NULL";
@@ -292,12 +294,15 @@ impl Db {
             .optional()?)
     }
 
-    /// Live bots in a project — the number the population cap applies to.
+    /// Live bots that run here in a project — the number the population cap
+    /// applies to. A linked bot runs on its peer and counts there, and a
+    /// worker counts against the worker cap instead.
     pub fn count_live_bots(&self, project_id: &str) -> anyhow::Result<i64> {
         let conn = self.lock();
         Ok(conn.query_row(
             &format!(
-                "SELECT count(*) FROM bot WHERE project_id = ?1 AND {}",
+                "SELECT count(*) FROM bot
+                 WHERE project_id = ?1 AND peer_id IS NULL AND temporary = 0 AND {}",
                 Self::LIVE
             ),
             params![project_id],

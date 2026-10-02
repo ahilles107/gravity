@@ -1,7 +1,7 @@
 use super::{approvals::Prompt, observations, transcript_path, BotSpec, SessionEvent, Wire};
 use anyhow::Context;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::PathBuf;
 use std::process::Child;
 use std::sync::{mpsc, Arc, Mutex};
@@ -24,6 +24,10 @@ pub(super) struct Worker {
     pub transcript: PathBuf,
     pub dead: bool,
     pub completed_turns: u64,
+    /// When the running turn started, for its recorded duration.
+    pub turn_started: Option<Instant>,
+    /// Paths a file change item touches, by item id, for its approval card.
+    pub file_changes: HashMap<String, Vec<String>>,
 }
 
 pub(super) fn run(
@@ -53,6 +57,8 @@ pub(super) fn run(
         transcript,
         dead: false,
         completed_turns: 0,
+        turn_started: None,
+        file_changes: HashMap::new(),
     };
     let result = worker.initialize();
     match result {
@@ -145,22 +151,26 @@ impl Worker {
         if let Some(artifacts) = &codex.artifacts {
             roots.push(artifacts.display().to_string());
         }
+        let mut config = json!({
+            "mcp_servers.gravity-bus": { "url": format!("http://127.0.0.1:{}/mcp", codex.port), "bearer_token_env_var": "GRAVITY_TOKEN" },
+            "sandbox_workspace_write.writable_roots": roots
+        });
+        if let Some(browser) = &codex.browser {
+            config[format!("mcp_servers.{}", crate::browser::setup::SERVER)] = browser.clone();
+        }
         let mut params = json!({
             "cwd": self.spec.workspace,
             "approvalPolicy": "on-request", "sandbox": "workspace-write",
             "developerInstructions": self.spec.workspace.parent().and_then(|root| std::fs::read_to_string(root.join("system.md")).ok()).unwrap_or_default()
                 + "\nRead CLAUDE.md and FACTS.md for your saved context. Keep durable facts in FACTS.md.",
-            "config": {
-                "mcp_servers.gravity-bus": { "url": format!("http://127.0.0.1:{}/mcp", codex.port), "bearer_token_env_var": "GRAVITY_TOKEN" },
-                "sandbox_workspace_write.writable_roots": roots
-            }
+            "config": config
         });
         let path = self
             .spec
             .workspace
             .parent()
             .unwrap_or(&self.spec.workspace)
-            .join("codex-thread-id");
+            .join(super::THREAD_FILE);
         let saved = std::fs::read_to_string(&path)
             .ok()
             .map(|id| id.trim().to_string())
@@ -218,6 +228,7 @@ impl Worker {
                     let _ = reply.send(result);
                     Ok(())
                 }
+                Wire::Answer(number, answer) => self.answer_card(number, answer),
                 Wire::Closed | Wire::Stop => break,
             };
             if let Err(error) = result {
@@ -283,6 +294,7 @@ impl Worker {
         }
         match method {
             "turn/started" => {
+                self.turn_started = Some(Instant::now());
                 self.turn = params
                     .pointer("/turn/id")
                     .and_then(Value::as_str)
@@ -292,6 +304,8 @@ impl Worker {
             "turn/completed" => {
                 self.completed_turns += 1;
                 self.turn = None;
+                let duration = self.turn_started.take().map(|at| at.elapsed().as_millis());
+                observations::turn_end(&self.transcript, duration)?;
                 self.output("\n");
                 if let Some(error) = params
                     .pointer("/turn/error/message")
@@ -311,6 +325,7 @@ impl Worker {
                 }
             }
             "item/started" => {
+                self.remember_file_change(params);
                 if let Some(command) = params.pointer("/item/command").and_then(Value::as_str) {
                     self.output(&format!("\n$ {command}\n"));
                 }
@@ -333,12 +348,15 @@ impl Worker {
                         observations::append(&self.transcript, "assistant", text)?;
                     }
                 }
+                if let Some(item) = params.get("item") {
+                    observations::tool_item(&self.transcript, item)?;
+                    if let Some(id) = item.get("id").and_then(Value::as_str) {
+                        self.file_changes.remove(id);
+                    }
+                }
                 self.hook("PostToolUse", None);
             }
-            "serverRequest/resolved" => {
-                let request = params.get("requestId");
-                self.prompts.retain(|_, prompt| Some(&prompt.id) != request);
-            }
+            "serverRequest/resolved" => self.resolved(params.get("requestId")),
             "error" => {
                 if let Some(message) = params.pointer("/error/message").and_then(Value::as_str) {
                     self.output(&format!("\n[Codex] {message}\n"));
@@ -347,5 +365,24 @@ impl Worker {
             _ => {}
         }
         Ok(())
+    }
+}
+
+impl Worker {
+    /// Keeps a file change's paths until it completes: its approval request
+    /// names only the item.
+    fn remember_file_change(&mut self, params: &Value) {
+        let Some(item) = params.get("item").filter(|i| i["type"] == "fileChange") else {
+            return;
+        };
+        let paths = item["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|change| change["path"].as_str().map(str::to_string))
+            .collect();
+        if let Some(id) = item["id"].as_str() {
+            self.file_changes.insert(id.to_string(), paths);
+        }
     }
 }

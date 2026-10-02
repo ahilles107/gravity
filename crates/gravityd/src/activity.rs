@@ -68,18 +68,14 @@ const TAIL_BYTES: u64 = 1 << 20;
 const MAX_CHARS: usize = 200;
 
 /// Claude Code's transcript directory for a workspace: the absolute path with
-/// every `/` and `.` replaced by `-`, under `~/.claude/projects`.
+/// every character that is not an ASCII letter or digit replaced by `-`, under
+/// `~/.claude/projects`. Underscores count: a workspace under `my_app` is
+/// filed as `my-app`.
 pub(crate) fn transcript_dir(home: &Path, workspace: &Path) -> PathBuf {
     let mangled: String = workspace
         .to_string_lossy()
         .chars()
-        .map(|c| {
-            if c == '/' || c == '.' || cfg!(windows) && (c == '\\' || c == ':') {
-                '-'
-            } else {
-                c
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect();
     home.join(".claude").join("projects").join(mangled)
 }
@@ -259,6 +255,7 @@ pub async fn watch(app: Arc<AppState>) {
             Ok(Internal::BotDone { bot_id, .. }) => {
                 tokio::spawn(settle_and_push(app.clone(), bot_id, Utc::now()));
             }
+            Ok(_) => {}
             // A burst of finished turns must not retire the watcher for the
             // rest of the daemon's life: the turns it skipped surface on the
             // next snapshot, the ones after it keep flowing.

@@ -2,6 +2,10 @@
 //! lease: the terminal belongs to the user, and typing is gated only by the
 //! `control` grant. Bus deliveries go through each session's inbox socket
 //! and never touch the terminal.
+//!
+//! A linked bot's terminal is its peer's, mirrored into the stand-in's buffer
+//! while anyone watches (see `crate::peer::term`): attaching works the same,
+//! and input and resizes are relayed to the real one.
 
 use std::sync::Arc;
 
@@ -75,17 +79,41 @@ async fn forward_live(
     }
 }
 
+/// Answers an attach and replays what the ring holds after `after_seq`;
+/// returns the cursor and receiver the live forwarder continues from.
+fn replay(
+    out: &UnboundedSender<Value>,
+    term: &TermBuffer,
+    bot_id: &str,
+    after_seq: u64,
+    req_id: &Value,
+) -> (u64, Receiver<TermFrame>) {
+    // Subscribe before the replay and pass this receiver to the forwarder,
+    // so a frame landing in between is in the replay or wakes the forwarder,
+    // which skips anything at or below the replay cursor.
+    let rx = term.subscribe();
+    let replay = term.replay_after(after_seq);
+    let _ = out.send(json!({
+        "type": "attached", "req_id": req_id, "bot_id": bot_id,
+        "seq": replay.latest, "resumed": replay.resumed
+    }));
+    for frame in coalesce(replay.frames, MAX_TERM_PUSH_BYTES) {
+        let _ = out.send(term_push(bot_id, &frame));
+    }
+    (replay.latest, rx)
+}
+
 impl Conn {
     // ---- terminal ----
 
     pub(super) fn attach(&mut self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
         let bot_id = Self::str_field(req, "bot_id")?.to_string();
         let after_seq = req.get("after_seq").and_then(|v| v.as_u64()).unwrap_or(0);
-        self.app
+        let bot = self
+            .app
             .db
             .get_bot(&bot_id)?
             .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
-        let term = self.app.supervisor.ensure_term(&bot_id);
 
         // Drop an earlier attachment to this bot first: its forwarder writes to
         // the same connection from its own task, so leaving it running would
@@ -94,26 +122,31 @@ impl Conn {
         if let Some(old) = self.attachments.remove(&bot_id) {
             old.abort();
         }
-        // Subscribe before the replay and pass this receiver to the forwarder,
-        // so a frame landing in between is in the replay or wakes the forwarder,
-        // which skips anything at or below the replay cursor.
-        let rx = term.subscribe();
-        let replay = term.replay_after(after_seq);
-        let latest = replay.latest;
-        self.send(json!({
-            "type": "attached", "req_id": req_id, "bot_id": bot_id,
-            "seq": latest, "resumed": replay.resumed
-        }));
-        for frame in coalesce(replay.frames, MAX_TERM_PUSH_BYTES) {
-            self.send(term_push(&bot_id, &frame));
-        }
-        let task = tokio::spawn(forward_live(
-            self.out.clone(),
-            term,
-            bot_id.clone(),
-            latest,
-            rx,
-        ));
+        let (app, out, req_id) = (self.app.clone(), self.out.clone(), req_id.clone());
+        let task = if bot.is_linked() {
+            // The peer feeds the mirror for as long as this task holds its
+            // viewer; detaching aborts the task and lets it go.
+            tokio::spawn(async move {
+                match crate::peer::term::view(&app, &bot).await {
+                    Ok(viewer) => {
+                        let term = app.supervisor.ensure_term(&bot.id);
+                        let (latest, rx) = replay(&out, &term, &bot.id, after_seq, &req_id);
+                        forward_live(out, term, bot.id, latest, rx).await;
+                        drop(viewer);
+                    }
+                    Err(e) => {
+                        let _ = out.send(json!({
+                            "type": "error", "req_id": req_id, "code": "unavailable",
+                            "message": format!("{}'s terminal: {e:#}", bot.name)
+                        }));
+                    }
+                }
+            })
+        } else {
+            let term = app.supervisor.ensure_term(&bot_id);
+            let (latest, rx) = replay(&out, &term, &bot_id, after_seq, &req_id);
+            tokio::spawn(forward_live(out, term, bot_id.clone(), latest, rx))
+        };
         self.attachments.insert(bot_id, task);
         Ok(())
     }
@@ -130,6 +163,10 @@ impl Conn {
     pub(super) fn input(&self, req: &Value) -> anyhow::Result<()> {
         let bot_id = Self::str_field(req, "bot_id")?;
         let data = Self::str_field(req, "data")?;
+        if let Some(bot) = self.app.db.get_bot(bot_id)?.filter(bus::Bot::is_linked) {
+            crate::peer::term::input(&self.app, &bot, data);
+            return Ok(());
+        }
         if let Err(e) = self.app.supervisor.input(bot_id, data.as_bytes()) {
             self.reply_err(&Value::Null, "runtime_unavailable", &e.to_string());
         }
@@ -144,6 +181,10 @@ impl Conn {
         // unchanged it needs the full-screen runtime to repaint, because
         // replay alone cannot rebuild a screen older than the ring buffer.
         let force = req.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+        if let Some(bot) = self.app.db.get_bot(bot_id)?.filter(bus::Bot::is_linked) {
+            crate::peer::term::resize(&self.app, &bot, cols, rows, force);
+            return Ok(());
+        }
         let _ = self.app.supervisor.resize(bot_id, cols, rows, force);
         Ok(())
     }

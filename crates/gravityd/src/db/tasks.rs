@@ -195,10 +195,13 @@ impl Db {
     ) -> anyhow::Result<Vec<Task>> {
         let conn = self.lock();
         let ids: Vec<String> = match origin_chain {
+            // Tasks held by workers are left out: the worker cap and its queue
+            // bound those, so a bot can fan a job out wider than three.
             Some(chain) => conn
                 .prepare(
                     "SELECT id FROM task
                      WHERE from_bot_id = ?1 AND state = 'open' AND origin_chain = ?2
+                       AND to_bot_id NOT IN (SELECT id FROM bot WHERE temporary = 1)
                      ORDER BY created_at DESC",
                 )?
                 .query_map(params![from_bot_id, chain], |r| r.get(0))?

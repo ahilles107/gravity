@@ -9,13 +9,33 @@ use serde_json::{json, Value};
 
 use crate::app::AppState;
 
-/// A project as clients see it, with an archived row's original name restored.
-pub(crate) fn project_view(project: &bus::Project) -> Value {
+/// A project as clients see it, with an archived row's original name restored
+/// and the peers it is linked through.
+pub(crate) fn project_view(app: &AppState, project: &bus::Project) -> Value {
+    let links: Vec<Value> = app
+        .db
+        .project_links(&project.id)
+        .unwrap_or_default()
+        .iter()
+        .map(|link| {
+            let peer = app.db.get_peer(&link.peer_id).ok().flatten();
+            json!({
+                "peer_id": link.peer_id,
+                "peer_name": peer.as_ref().map(crate::db::Db::display_peer_name),
+                "online": app.peers.is_online(&link.peer_id),
+                "remote_project_id": link.remote_project_id,
+                "remote_project_name": link.remote_project_name,
+                "linked_at": link.linked_at.to_rfc3339()
+            })
+        })
+        .collect();
     json!({
         "id": project.id,
         "name": crate::db::Db::display_project_name(project),
         "dir_name": project.dir_name,
         "lead_bot_id": project.lead_bot_id,
+        "links": links,
+        "repo": app.db.project_repo(&project.id).ok().flatten(),
         "deleted_at": project.deleted_at.map(|t| t.to_rfc3339()),
         "created_at": project.created_at.to_rfc3339()
     })
@@ -41,7 +61,7 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         };
         reason = format!(
             "runs on {}{}",
-            peer.name,
+            crate::db::Db::display_peer_name(peer),
             if online { "" } else { " (offline)" }
         );
     }
@@ -58,6 +78,8 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         "avatar": bot.avatar,
         "instructions": bot.instructions,
         "runtime": bot.runtime,
+        "user_chrome": bot.user_chrome,
+        "temporary": bot.temporary,
         "state": state.as_str(),
         "state_reason": reason,
         "unread_count": unread,

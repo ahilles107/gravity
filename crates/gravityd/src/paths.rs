@@ -29,9 +29,12 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 
 mod prompt;
+mod prompt_sections;
 #[cfg(test)]
 mod tests;
 mod trust;
+#[cfg(unix)]
+mod unix_hooks;
 #[cfg(windows)]
 mod windows_hooks;
 
@@ -137,9 +140,22 @@ pub struct BotProvision<'a> {
     pub bot_token_env: &'a str,
     /// Stated verbatim in the generated prompt so bots can budget against it.
     pub max_bots_per_project: usize,
+    /// Workers the project may run at once on this machine.
+    pub max_workers_per_project: usize,
+    /// Whether this bot is a temporary worker, here for one task.
+    pub temporary: bool,
+    /// The project's shared git repository, when it has one.
+    pub repo: Option<bus::ProjectRepo>,
     /// Absolute path of the project's shared artifacts directory, stated in
     /// the prompt so bots know where substance goes.
     pub artifacts_dir: String,
+    /// The peers this project is linked through, by name. Empty when the
+    /// team lives on this machine alone.
+    pub linked_machines: Vec<String>,
+    /// Whether the bot has a browser of its own (see `crate::browser`), and
+    /// whether it may also drive the owner's Chrome.
+    pub own_browser: bool,
+    pub user_chrome: bool,
 }
 
 /// Create the bot's directory tree: `bot.json`, `system.md`, `mcp.json`, and a
@@ -162,7 +178,9 @@ pub fn provision_bot(cfg: &Config, spec: &BotProvision<'_>) -> anyhow::Result<Bo
 
     write_system_md(&root, spec)?;
 
-    write_mcp_config(&root, spec.daemon_port, spec.bot_token_env)?;
+    // The browser entry is added at spawn, when the session's config is
+    // refreshed with whatever Node and Chrome the machine has then.
+    write_mcp_config(&root, spec.daemon_port, spec.bot_token_env, None)?;
 
     seed_memory_files(&workspace, spec.name)?;
 
@@ -176,8 +194,13 @@ pub fn provision_bot(cfg: &Config, spec: &BotProvision<'_>) -> anyhow::Result<Bo
 /// re-provisioning — the same reason `write_hook_settings` runs each start. The
 /// token is referenced through an environment variable the daemon injects when
 /// it starts the runtime.
-pub fn write_mcp_config(root: &Path, daemon_port: u16, bot_token_env: &str) -> anyhow::Result<()> {
-    let mcp = serde_json::json!({
+pub fn write_mcp_config(
+    root: &Path,
+    daemon_port: u16,
+    bot_token_env: &str,
+    browser: Option<&serde_json::Value>,
+) -> anyhow::Result<()> {
+    let mut mcp = serde_json::json!({
         "mcpServers": {
             "gravity-bus": {
                 "type": "http",
@@ -188,6 +211,12 @@ pub fn write_mcp_config(root: &Path, daemon_port: u16, bot_token_env: &str) -> a
             }
         }
     });
+    // The bot's own browser, when one can be started; see `crate::browser`.
+    if let Some(browser) = browser {
+        let mut server = browser.clone();
+        server["type"] = serde_json::json!("stdio");
+        mcp["mcpServers"][crate::browser::setup::SERVER] = server;
+    }
     atomic_write_json(&root.join("mcp.json"), &mcp)
 }
 
@@ -238,7 +267,7 @@ pub fn write_hook_settings(
     let dir = workspace.join(".claude");
     fs::create_dir_all(&dir)?;
     #[cfg(unix)]
-    let settings = hook_settings(daemon_port, bot_token_env);
+    let settings = unix_hooks::settings(daemon_port, bot_token_env);
     #[cfg(windows)]
     let settings = windows_hooks::settings(workspace, daemon_port, bot_token_env)?;
     atomic_write_json(&dir.join("settings.json"), &settings)
@@ -258,86 +287,6 @@ pub fn write_hook_settings(
 pub fn artifacts_allow_rules(artifacts_dir: &Path) -> Vec<String> {
     let dir = artifacts_dir.display();
     vec![format!("Read({dir}/**)"), format!("Edit({dir}/**)")]
-}
-
-/// Cooperative permission rules and lifecycle hooks. Hooks POST lifecycle
-/// events to the daemon; failures are swallowed (`|| true`) so a daemon
-/// hiccup never blocks the session, and hook failure is never interpreted as
-/// approval or denial.
-#[cfg(unix)]
-fn hook_settings(daemon_port: u16, bot_token_env: &str) -> serde_json::Value {
-    let hook_cmd = |event: &str| {
-        serde_json::json!([{
-            "hooks": [{
-                "type": "command",
-                "command": format!(
-                    "curl -fsS -m 3 -X POST http://127.0.0.1:{daemon_port}/hook \
-                     -H \"Authorization: Bearer ${{{bot_token_env}}}\" \
-                     -H 'Content-Type: application/json' \
-                     -d '{{\"event\":\"{event}\"}}' >/dev/null 2>&1 || true"
-                )
-            }]
-        }])
-    };
-    // Notification carries Claude Code's stdin payload through untouched, so
-    // the daemon can read its `message` and tell a permission prompt apart
-    // from the "waiting for your input" idle ping. The event name rides in the
-    // query string because the body is no longer ours to shape.
-    let notification = serde_json::json!([{
-        "hooks": [{
-            "type": "command",
-            "command": format!(
-                "curl -fsS -m 3 -X POST \
-                 'http://127.0.0.1:{daemon_port}/hook?event=Notification' \
-                 -H \"Authorization: Bearer ${{{bot_token_env}}}\" \
-                 -H 'Content-Type: application/json' --data-binary @- \
-                 >/dev/null 2>&1 || true"
-            )
-        }]
-    }]);
-    // SessionStart additionally reports the session's inbox socket (and its
-    // messaging token) so the daemon can deliver bus messages through it
-    // instead of the terminal.
-    let session_start = serde_json::json!([{
-        "hooks": [{
-            "type": "command",
-            "command": format!(
-                "curl -fsS -m 3 -X POST http://127.0.0.1:{daemon_port}/hook \
-                 -H \"Authorization: Bearer ${{{bot_token_env}}}\" \
-                 -H 'Content-Type: application/json' \
-                 -d \"{{\\\"event\\\":\\\"SessionStart\\\",\\\"socket\\\":\\\"$CLAUDE_CODE_MESSAGING_SOCKET\\\",\\\"msg_token\\\":\\\"$CLAUDE_CODE_MESSAGING_TOKEN\\\"}}\" \
-                 >/dev/null 2>&1 || true"
-            )
-        }]
-    }]);
-    serde_json::json!({
-        // Bus deliveries arrive over the cross-session inbox socket; accept
-        // them unattended so bot-to-bot traffic flows without approval stops.
-        "crossSessionInbound": "accept",
-        // Artifacts access is granted at spawn time (`artifacts_allow_rules`
-        // via `--allowedTools`), never here: allow rules in a folder's
-        // settings.json make Claude Code's trust dialog warn about
-        // pre-approved permissions.
-        "permissions": {
-            "allow": [],
-            "deny": [
-                "Read(../**)",
-                "Read(~/.gravity/secrets/**)",
-                "Bash(rm -rf /*)"
-            ]
-        },
-        "hooks": {
-            "SessionStart": session_start,
-            "UserPromptSubmit": hook_cmd("UserPromptSubmit"),
-            // A tool that has finished running is proof the session is
-            // executing again: nothing else reports that a pending permission
-            // prompt was answered.
-            "PostToolUse": hook_cmd("PostToolUse"),
-            "Stop": hook_cmd("Stop"),
-            "Notification": notification,
-            "SessionEnd": hook_cmd("SessionEnd")
-        }
-    })
 }
 
 pub fn atomic_write_json(path: &Path, value: &serde_json::Value) -> anyhow::Result<()> {

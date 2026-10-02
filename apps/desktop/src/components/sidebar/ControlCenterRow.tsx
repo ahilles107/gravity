@@ -22,7 +22,7 @@ export default function ControlCenterRow({
   const tooltip =
     urgent || counts.due_soon > 0
       ? `${counts.urgent} urgent, ${counts.due_soon} due within a day`
-      : "Decisions waiting on you";
+      : "Decisions and permission prompts waiting on you";
 
   return (
     <div className="sidebar-control">

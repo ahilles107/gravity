@@ -129,7 +129,9 @@ async fn a_real_pty_burst_is_merged_into_few_frames() {
                 bytes += data.len();
             }
             SessionEvent::Exited { .. } => break,
-            SessionEvent::Lifecycle { .. } => {}
+            SessionEvent::Lifecycle { .. }
+            | SessionEvent::Permission { .. }
+            | SessionEvent::PermissionGone { .. } => {}
         }
     }
     // Each write is two 4-byte escape sequences plus 4 digits.

@@ -9,6 +9,9 @@ use super::{parse_ts, ts, Db};
 /// `meta` key holding this daemon's stable id, which peers bind a token to.
 const DAEMON_ID_KEY: &str = "daemon_id";
 
+/// Separates a revoked peer's name from the id suffix that frees it.
+const TOMBSTONE_SEP: char = '#';
+
 impl Db {
     // ---- this daemon ----
 
@@ -115,12 +118,28 @@ impl Db {
         Ok(())
     }
 
+    /// Revokes a peer, tombstoning its name as archiving does a bot's and
+    /// releasing the daemon it was bound to, so pairing the same machine again
+    /// can reuse both.
     pub fn revoke_peer(&self, peer_id: &str) -> anyhow::Result<bool> {
         let changed = self.lock().execute(
-            "UPDATE peer SET revoked_at = ?2 WHERE id = ?1 AND revoked_at IS NULL",
-            params![peer_id, ts(now())],
+            "UPDATE peer SET revoked_at = ?2, name = name || ?3 || substr(id, 1, 8),
+                 daemon_id = NULL
+             WHERE id = ?1 AND revoked_at IS NULL",
+            params![peer_id, ts(now()), TOMBSTONE_SEP.to_string()],
         )?;
         Ok(changed > 0)
+    }
+
+    /// The name the owner gave a peer, without a revoked peer's tombstone.
+    pub fn display_peer_name(peer: &Peer) -> String {
+        match peer.revoked_at {
+            Some(_) => peer
+                .name
+                .rsplit_once(TOMBSTONE_SEP)
+                .map_or_else(|| peer.name.clone(), |(base, _)| base.to_string()),
+            None => peer.name.clone(),
+        }
     }
 
     // ---- links ----
@@ -168,6 +187,18 @@ impl Db {
             .optional()?)
     }
 
+    /// Every live linked bot standing in for `remote_bot_id`, in any project.
+    pub fn linked_bots_for(&self, peer_id: &str, remote_bot_id: &str) -> anyhow::Result<Vec<Bot>> {
+        let conn = self.lock();
+        let sql = format!(
+            "SELECT {} FROM bot WHERE peer_id = ?1 AND remote_bot_id = ?2 AND deleted_at IS NULL",
+            Self::BOT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![peer_id, remote_bot_id], Self::bot_from_row)?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// A bot row standing in for a bot that runs on `peer_id`. It gets a DM
     /// conversation like any bot, an empty workspace path, and a directory
     /// name no local bot can have, so nothing ever provisions files for it.
@@ -190,11 +221,12 @@ impl Db {
             remote.runtime,
         )?;
         self.lock().execute(
-            "UPDATE bot SET peer_id = ?2, remote_bot_id = ?3 WHERE id = ?1",
-            params![bot.id, peer_id, remote.id],
+            "UPDATE bot SET peer_id = ?2, remote_bot_id = ?3, temporary = ?4 WHERE id = ?1",
+            params![bot.id, peer_id, remote.id, remote.temporary],
         )?;
         bot.peer_id = Some(peer_id.to_string());
         bot.remote_bot_id = Some(remote.id.clone());
+        bot.temporary = remote.temporary;
         Ok(bot)
     }
 
@@ -224,6 +256,21 @@ impl Db {
             "SELECT message_id FROM peer_message WHERE peer_id = ?1 AND remote_message_id = ?2",
             peer_id,
             remote_message_id,
+        )
+    }
+
+    /// The local copy of a message the peer knows by an id starting with
+    /// `prefix`: how a folder of files a peer sent is traced to its message.
+    pub fn local_message_by_prefix(
+        &self,
+        peer_id: &str,
+        prefix: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let pattern = format!("{}%", prefix.replace(['%', '_'], ""));
+        self.peer_lookup(
+            "SELECT message_id FROM peer_message WHERE peer_id = ?1 AND remote_message_id LIKE ?2",
+            peer_id,
+            &pattern,
         )
     }
 

@@ -5,8 +5,11 @@ import heroArt from "../assets/empty/hero.png";
 import quietArt from "../assets/empty/quiet.png";
 import type { DaemonApi } from "../protocol/api";
 import { connectionStatusLabel } from "../protocol/connection";
+import type { ProjectRepo } from "../protocol/entities";
 import BotView from "./BotView";
 import ControlCenterView from "./control/ControlCenterView";
+import type { Permissions } from "./permissions/usePermissions";
+import ConversationsView from "./conversations/ConversationsView";
 import ProjectView from "./ProjectView";
 import NewProjectForm from "./sidebar/NewProjectForm";
 
@@ -17,7 +20,11 @@ interface MainPaneProps {
   readonly onCreateProject: (name: string) => Promise<void>;
   readonly onRenameProject: (projectId: string, name: string) => Promise<void>;
   readonly onSetProjectLead: (projectId: string, botId: string | null) => Promise<void>;
+  readonly onSetProjectRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly onDeleteProject: (projectId: string) => Promise<void>;
+  /** Every bot's permission prompts, answered in the Control Center. */
+  readonly permissions?: Permissions;
+  readonly onOpenBot?: (botId: string) => void;
 }
 
 interface EmptyStateProps {
@@ -78,6 +85,8 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         canControl={canControl}
         decisionId={selection.decisionId}
         onToast={addToast}
+        permissions={props.permissions}
+        onOpenBot={props.onOpenBot}
       />
     );
   }
@@ -89,13 +98,30 @@ export default function MainPane(props: MainPaneProps): ReactElement {
     ) : (
       <ProjectView
         key={project.id}
+        client={props.client}
         project={project}
         bots={bots.filter((item) => item.project_id === project.id)}
         connected={connected}
         canControl={canControl}
         onRename={props.onRenameProject}
         onSetLead={props.onSetProjectLead}
+        onSetRepo={props.onSetProjectRepo}
         onDelete={props.onDeleteProject}
+      />
+    );
+  }
+
+  if (selection.kind === "conversations") {
+    const project = daemon.projects.find((item) => item.id === selection.projectId);
+    return project === undefined ? (
+      <EmptyState daemon={daemon} onCreateProject={props.onCreateProject} />
+    ) : (
+      <ConversationsView
+        key={project.id}
+        client={client}
+        project={project}
+        bots={bots.filter((item) => item.project_id === project.id)}
+        connected={connected}
       />
     );
   }
@@ -115,6 +141,9 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         onBotUpdated={daemon.applyBotUpdate}
         onRoutinesChanged={daemon.updateBotRoutines}
         onToast={addToast}
+        onOpenDecision={(decisionId) => {
+          daemon.select({ kind: "control", decisionId });
+        }}
       />
     );
   }

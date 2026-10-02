@@ -35,6 +35,14 @@ pub fn archive_bot(
     actor: &Actor<'_>,
     reason: Option<&str>,
 ) -> anyhow::Result<()> {
+    // Twice is once: a second archive would tombstone the name again.
+    if app
+        .db
+        .get_bot(&bot.id)?
+        .is_none_or(|b| b.deleted_at.is_some())
+    {
+        return Ok(());
+    }
     // Stop first: the runtime must not outlive its credential, or it would keep
     // making authenticated calls that then fail confusingly.
     app.supervisor.stop_bot(&bot.id)?;
@@ -53,14 +61,18 @@ pub fn archive_bot(
         reason.unwrap_or("deleted"),
     )?;
 
-    app.events.push(Push::notice(
-        "info",
-        "Bot deleted",
-        match reason {
-            Some(r) => format!("{} was deleted: {r}", bot.name),
-            None => format!("{} was deleted.", bot.name),
-        },
-    ));
+    // A worker retiring is routine, and a job can retire dozens.
+    if !bot.temporary {
+        app.events.push(Push::notice(
+            "info",
+            "Bot deleted",
+            match reason {
+                Some(r) => format!("{} was deleted: {r}", bot.name),
+                None => format!("{} was deleted.", bot.name),
+            },
+        ));
+    }
+    app.workers.nudge();
     if let Some(archived) = app.db.get_bot(&bot.id)? {
         app.events.push(Push::BotUpdated { bot: archived });
     }

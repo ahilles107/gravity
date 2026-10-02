@@ -20,6 +20,7 @@ fn native_codex_initializes_and_resumes_without_a_model_request() {
             args: Vec::new(),
             port: 1,
             artifacts: None,
+            browser: None,
         }),
         env: vec![
             ("GRAVITY_TOKEN".into(), "smoke-not-a-real-token".into()),
@@ -74,6 +75,7 @@ async fn native_terminal_renders_the_official_codex_interface() {
             args: vec!["-c".into(), "model_provider=\"gravity_test\"".into(), "-c".into(), format!("model_providers.gravity_test={{name=\"Local test\",base_url=\"{}\",wire_api=\"responses\",requires_openai_auth=false}}", endpoint.trim())],
             port: 1,
             artifacts: None,
+            browser: None,
         }),
         env: vec![("CODEX_HOME".into(), home.display().to_string()), ("NO_PROXY".into(), "127.0.0.1,localhost".into())],
         cols: 100,

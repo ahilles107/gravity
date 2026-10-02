@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { ProjectRepo } from "../protocol/entities";
+import { FakeDaemon } from "../test/fakeDaemon";
 import * as fx from "../test/fixtures";
 import ProjectView from "./ProjectView";
 
@@ -12,14 +14,19 @@ function renderView(over: Partial<Parameters<typeof ProjectView>[0]> = {}) {
   const onSetLead = vi.fn<(projectId: string, botId: string | null) => Promise<void>>(() =>
     Promise.resolve(),
   );
+  const onSetRepo = vi.fn<(projectId: string, repo: ProjectRepo | null) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
   render(
     <ProjectView
+      client={new FakeDaemon()}
       project={fx.project()}
       bots={[fx.bot()]}
       connected
       canControl
       onRename={onRename}
       onSetLead={onSetLead}
+      onSetRepo={onSetRepo}
       onDelete={onDelete}
       {...over}
     />,

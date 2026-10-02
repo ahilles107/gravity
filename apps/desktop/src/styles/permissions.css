@@ -1,0 +1,83 @@
+/* Permission cards: a bot's tool waiting on the owner's answer. */
+
+.permission-cards {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--amber) 6%, var(--bg));
+  max-height: 45%;
+  overflow-y: auto;
+}
+
+.permission-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--border));
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.permission-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.permission-label {
+  color: var(--amber);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.permission-expiry,
+.permission-readonly {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.permission-summary {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.permission-toggle {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.permission-reason {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.permission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.permission-actions kbd {
+  margin-left: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.6;
+}

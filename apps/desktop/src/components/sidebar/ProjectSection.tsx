@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import type { Bot, Project } from "../../protocol/entities";
 import BotRow from "./BotRow";
+import ConversationsRow from "./ConversationsRow";
 import { MoreIcon } from "./icons";
 import PinnedBots from "./PinnedBots";
 import type { SidebarTreeProps } from "./tree";
@@ -73,6 +74,14 @@ export default function ProjectSection(props: ProjectSectionProps): ReactElement
 
       {collapsed ? null : (
         <>
+          {props.showConversations === true ? (
+            <ConversationsRow
+              selected={selection.kind === "conversations" && selection.projectId === project.id}
+              onSelect={() => {
+                onSelect({ kind: "conversations", projectId: project.id });
+              }}
+            />
+          ) : null}
           <PinnedBots
             bots={pinnedBots}
             unreadBots={props.unreadBots}

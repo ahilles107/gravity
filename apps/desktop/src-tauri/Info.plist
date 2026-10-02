@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Dictation in the chat composer. Merged into the app's Info.plist by the Tauri bundler. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Gravity listens while you dictate a message to a bot in the chat.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Gravity turns your dictation into text on this Mac, for messages to your bots.</string>
+</dict>
+</plist>

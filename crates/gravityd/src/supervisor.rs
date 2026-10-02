@@ -25,7 +25,7 @@ use crate::config::Config;
 use crate::db::Db;
 use crate::events::{Events, Internal, Push};
 use crate::overrides::AutoCompactOverride;
-use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession, SessionEvent};
+use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession};
 use crate::secrets::Secrets;
 use crate::terminal::TermBuffer;
 
@@ -33,6 +33,7 @@ mod claim;
 mod hooks;
 mod lifecycle;
 mod restart;
+mod session_events;
 mod termio;
 
 pub const BOT_TOKEN_ENV: &str = "GRAVITY_TOKEN";
@@ -174,7 +175,14 @@ struct SupervisorInner {
     secrets: Arc<Secrets>,
     auto_compact: AutoCompactOverride,
     bots: Mutex<HashMap<String, BotHandle>>,
+    /// Called just before each session starts, while the transcript still
+    /// ends where the last session stopped; see [`Supervisor::on_start`].
+    before_start: std::sync::OnceLock<StartHook>,
 }
+
+/// What runs before a bot's session starts: the bot id, and whether the
+/// session picks its conversation back up (false for a fresh one).
+pub type StartHook = Box<dyn Fn(&str, bool) + Send + Sync>;
 
 impl Supervisor {
     pub fn new(
@@ -194,8 +202,15 @@ impl Supervisor {
                 secrets,
                 auto_compact,
                 bots: Mutex::new(HashMap::new()),
+                before_start: std::sync::OnceLock::new(),
             }),
         }
+    }
+
+    /// Runs `hook` before every session start: at boot, after a crash, after
+    /// a restart. Set once, by the app state.
+    pub fn on_start(&self, hook: StartHook) {
+        let _ = self.inner.before_start.set(hook);
     }
 
     pub fn adapter(&self) -> &Arc<dyn RuntimeAdapter> {

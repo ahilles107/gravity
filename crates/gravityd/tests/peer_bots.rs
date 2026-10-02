@@ -8,109 +8,10 @@ mod common;
 use std::time::Duration;
 
 use bus::TaskState;
+use common::peers::{find, pair, team, wait_until};
 use common::tasks::{drain_until, error_text};
 use common::*;
-use serde_json::{json, Value};
-
-struct Team {
-    mac: TestDaemon,
-    win: TestDaemon,
-    mac_client: WsClient,
-    /// The Windows daemon's id for the peer row standing for the Mac.
-    win_peer_id: String,
-    /// The Mac's linked bot standing in for `windev`.
-    linked_windev: String,
-    lead: McpClient,
-    windev: McpClient,
-    windev_id: String,
-}
-
-async fn wait_until(what: &str, mut check: impl FnMut() -> bool) {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-    while !check() {
-        assert!(tokio::time::Instant::now() < deadline, "timed out: {what}");
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-}
-
-async fn project(c: &mut WsClient, name: &str) -> String {
-    let created = c
-        .request(json!({"type": "create_project", "name": name}))
-        .await;
-    created["project"]["id"].as_str().expect("pid").to_string()
-}
-
-/// A lead on "the Mac" and a Windows developer on "the PC", paired, with the
-/// developer linked into the lead's project.
-async fn team() -> Team {
-    let mac = spawn_daemon().await;
-    let win = spawn_daemon().await;
-    let mut mac_client = WsClient::connect(&mac).await;
-    let mut win_client = WsClient::connect(&win).await;
-
-    let mac_project = project(&mut mac_client, "app").await;
-    let lead = create_bot(&mut mac_client, &mac_project, "lead").await;
-    let win_project = project(&mut win_client, "app").await;
-    let windev = create_bot(&mut win_client, &win_project, "windev").await;
-    let windev_id = windev["id"].as_str().expect("id").to_string();
-
-    let invite = win_client
-        .request(json!({
-            "type": "create_peer_invite", "name": "mac",
-            "url": format!("ws://{}/peer", win.addr)
-        }))
-        .await;
-    assert_eq!(invite["type"], "peer", "{invite}");
-    let win_peer_id = invite["peer"]["id"].as_str().expect("peer id").to_string();
-    let added = mac_client
-        .request(json!({
-            "type": "add_peer", "name": "win", "invite": invite["invite"]
-        }))
-        .await;
-    assert_eq!(added["type"], "peer", "{added}");
-    let mac_peer_id = added["peer"]["id"].as_str().expect("peer id").to_string();
-    wait_until("the link comes up", || {
-        mac.app.peers.is_online(&mac_peer_id)
-    })
-    .await;
-
-    let bots = mac_client
-        .request(json!({"type": "list_peer_bots", "peer_id": mac_peer_id}))
-        .await;
-    assert_eq!(bots["bots"][0]["name"], "windev", "{bots}");
-    let linked = mac_client
-        .request(json!({
-            "type": "link_peer_bot", "peer_id": mac_peer_id,
-            "remote_bot_id": windev_id, "project_id": mac_project
-        }))
-        .await;
-    assert_eq!(linked["type"], "bot", "{linked}");
-    assert_eq!(linked["bot"]["peer"]["name"], "win");
-
-    let lead_token = mac
-        .app
-        .secrets
-        .bot_token(lead["id"].as_str().expect("id"))
-        .expect("token");
-    let windev_token = win.app.secrets.bot_token(&windev_id).expect("token");
-    Team {
-        lead: McpClient::new(&mac, &lead_token),
-        windev: McpClient::new(&win, &windev_token),
-        linked_windev: linked["bot"]["id"].as_str().expect("id").to_string(),
-        mac,
-        win,
-        mac_client,
-        win_peer_id,
-        windev_id,
-    }
-}
-
-fn find<'a>(messages: &'a [Value], needle: &str) -> &'a Value {
-    messages
-        .iter()
-        .find(|m| m["body"].as_str().is_some_and(|b| b.contains(needle)))
-        .unwrap_or_else(|| panic!("no message containing {needle:?} in {messages:?}"))
-}
+use serde_json::json;
 
 #[tokio::test]
 async fn a_task_crosses_to_the_peer_and_its_result_and_files_come_back() {
@@ -319,4 +220,25 @@ async fn the_peer_bot_can_ask_back_on_an_open_task() {
         )
         .await;
     assert!(error_text(&refused).contains("loop"));
+}
+
+#[tokio::test]
+async fn a_revoked_peer_frees_its_name_so_the_machines_pair_again() {
+    let mut t = team().await;
+    let mut win_client = WsClient::connect(&t.win).await;
+    let revoked = win_client
+        .request(json!({"type": "revoke_peer", "peer_id": t.win_peer_id}))
+        .await;
+    // The owner's name for it, not the tombstone that frees it.
+    assert_eq!(revoked["peer"]["name"], "mac", "{revoked}");
+    let mac_peer_id = t.mac.app.db.list_peers().expect("peers")[0].id.clone();
+    let revoked = t
+        .mac_client
+        .request(json!({"type": "revoke_peer", "peer_id": mac_peer_id}))
+        .await;
+    assert_eq!(revoked["type"], "peer", "{revoked}");
+
+    let (win_peer_id, again) = pair(&t.mac, &t.win, &mut t.mac_client, &mut win_client).await;
+    assert_ne!(win_peer_id, t.win_peer_id);
+    assert_ne!(again, mac_peer_id);
 }

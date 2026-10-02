@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::*;
 
 impl BotHandle {
@@ -26,6 +28,22 @@ impl Supervisor {
                 .push(Push::notice("error", "Bot could not start", reason));
         }
     }
+    /// Restarts a bot with a fresh conversation: the next session does not
+    /// pick the last one back up. Its workspace, memory files and tasks stay.
+    pub fn clear_session(&self, bot_id: &str, bot_root: Option<&Path>) -> anyhow::Result<()> {
+        self.lock_bots()
+            .entry(bot_id.to_string())
+            .or_insert_with(|| BotHandle::new(self.inner.cfg.scrollback_bytes))
+            .skip_resume = true;
+        if let Some(root) = bot_root {
+            let thread = root.join(crate::runtime::codex::THREAD_FILE);
+            if thread.exists() {
+                std::fs::remove_file(&thread)?;
+            }
+        }
+        self.restart_bot(bot_id)
+    }
+
     pub fn restart_bot(&self, bot_id: &str) -> anyhow::Result<()> {
         let previous = self.state(bot_id);
         let session = {
@@ -39,7 +57,7 @@ impl Supervisor {
             handle.session.clone()
         };
         if let Some(session) = session {
-            self.set_state(bot_id, BotState::Stopping, "runtime changed");
+            self.set_state(bot_id, BotState::Stopping, "restarting");
             let result = session.lock().unwrap_or_else(|e| e.into_inner()).kill();
             if let Err(error) = result {
                 if let Some(handle) = self.lock_bots().get_mut(bot_id) {

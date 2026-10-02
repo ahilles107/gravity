@@ -50,7 +50,7 @@ pub async fn forward(app: &Arc<AppState>, target: &Bot, msg: &Message) -> Result
     let result = match app.peers.request(&peer.id, request).await {
         Ok(result) => result,
         Err(PeerError::Offline) => return Err(ForwardError::Offline),
-        Err(PeerError::Rejected(reason)) => {
+        Err(PeerError::Rejected(reason) | PeerError::Refused { reason, .. }) => {
             return Err(fail(anyhow::anyhow!("{} refused it: {reason}", peer.name)))
         }
     };

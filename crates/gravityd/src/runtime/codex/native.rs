@@ -24,7 +24,7 @@ impl RuntimeAdapter for NativeCodexAdapter {
             spec.workspace
                 .parent()
                 .unwrap_or(&spec.workspace)
-                .join("codex-thread-id"),
+                .join(super::THREAD_FILE),
         )?;
         let mut terminal = spec.clone();
         terminal.claude_bin = super::super::executable::command(&codex.bin)
@@ -128,6 +128,17 @@ impl RuntimeSession for NativeSession {
             .unwrap_or_else(|e| e.into_inner())
             .backend
             .deliver(text)
+    }
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: crate::runtime::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .backend
+            .answer_permission(key, answer)
     }
     fn kill(&mut self) -> anyhow::Result<()> {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).kill()

@@ -14,13 +14,15 @@ use serde_json::{json, Value};
 use crate::app::AppState;
 
 mod decisions;
+mod remote;
 mod routines;
 mod schema;
 mod schema_decisions;
 mod selfmgmt;
 mod tags;
-mod tasks;
+pub(crate) mod tasks;
 mod tools;
+mod workers;
 
 use decisions::{
     comment_decision, get_decision, list_decisions, raise_decision, record_decision,
@@ -34,6 +36,7 @@ use selfmgmt::{create_bot, delete_bot, get_self, rename_self, update_bot, update
 use tags::{list_tags, retire_tag, upsert_tag};
 use tasks::{cancel_task, complete_task};
 use tools::{check_inbox, list_bots, send_message};
+use workers::{cancel_worker, list_workers};
 
 fn bearer(headers: &HeaderMap) -> Option<String> {
     headers
@@ -122,7 +125,10 @@ pub async fn mcp_handler(
         "tools/list" => Ok(tool_list()),
         // Tool-level failures travel as `isError` content; an Err here means
         // the request itself was malformed, which is invalid params (-32602).
-        "tools/call" => tool_call(&app, &bot_id, &params).map_err(|msg| (-32602, msg)),
+        "tools/call" => match remote_call(&app, &bot_id, &params).await {
+            Some(result) => Ok(result),
+            None => tool_call(&app, &bot_id, &params).map_err(|msg| (-32602, msg)),
+        },
         _ => Err((-32601, format!("method not found: {method}"))),
     };
 
@@ -142,6 +148,20 @@ fn text_result(v: &Value) -> Value {
 
 fn tool_error(msg: &str) -> Value {
     json!({ "content": [{ "type": "text", "text": msg }], "isError": true })
+}
+
+/// A tool call that belongs on a peer, answered once the peer has.
+async fn remote_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Option<Value> {
+    let name = params.get("name").and_then(|n| n.as_str())?;
+    let args = params.get("arguments").cloned().unwrap_or(json!({}));
+    let result = match workers::intercept(app, bot_id, name, &args).await {
+        Some(result) => result,
+        None => remote::intercept(app, bot_id, name, &args).await?,
+    };
+    Some(match result {
+        Ok(v) => text_result(&v),
+        Err(e) => tool_error(&e.to_string()),
+    })
 }
 
 fn tool_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Result<Value, String> {
@@ -168,6 +188,8 @@ fn tool_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Result<Value,
         "create_bot" => create_bot(app, bot_id, &args),
         "update_bot" => update_bot(app, bot_id, &args),
         "delete_bot" => delete_bot(app, bot_id, &args),
+        "list_workers" => list_workers(app, bot_id),
+        "cancel_worker" => cancel_worker(app, bot_id, &args),
         "raise_decision" => raise_decision(app, bot_id, &args),
         "list_decisions" => list_decisions(app, bot_id, &args),
         "get_decision" => get_decision(app, bot_id, &args),
@@ -191,7 +213,7 @@ fn caller(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<bus::Bot> {
         .ok_or_else(|| anyhow::anyhow!("caller bot not found"))
 }
 
-fn bot_sender(bot: &bus::Bot) -> Sender {
+pub(crate) fn bot_sender(bot: &bus::Bot) -> Sender {
     Sender {
         kind: SenderKind::Bot,
         bot_id: Some(bot.id.clone()),

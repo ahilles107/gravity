@@ -1,15 +1,20 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
-import type { Bot, Project } from "../protocol/entities";
+import type { DaemonApi } from "../protocol/api";
+import type { Bot, Project, ProjectRepo } from "../protocol/entities";
 import ConfirmDialog from "./overlay/ConfirmDialog";
+import ProjectRepoForm from "./ProjectRepoForm";
+import WorkersPanel from "./WorkersPanel";
 
 interface ProjectViewProps {
+  readonly client: DaemonApi;
   readonly project: Project;
   readonly bots: readonly Bot[];
   readonly connected: boolean;
   readonly canControl: boolean;
   readonly onRename: (projectId: string, name: string) => Promise<void>;
   readonly onSetLead: (projectId: string, botId: string | null) => Promise<void>;
+  readonly onSetRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly onDelete: (projectId: string) => Promise<void>;
 }
 
@@ -24,7 +29,8 @@ export function deletionBody(project: Project, botCount: number): string {
 
 /** Project settings: the name, what it holds, and deletion. */
 export default function ProjectView(props: ProjectViewProps): ReactElement {
-  const { project, bots, connected, canControl, onRename, onSetLead, onDelete } = props;
+  const { client, project, bots, connected, canControl } = props;
+  const { onRename, onSetLead, onSetRepo, onDelete } = props;
   const [name, setName] = useState(project.name);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -122,6 +128,21 @@ export default function ProjectView(props: ProjectViewProps): ReactElement {
           <dd>{project.created_at}</dd>
         </dl>
       </div>
+
+      {client.capabilities.includes("workers") ? (
+        <WorkersPanel
+          client={client}
+          projectId={project.id}
+          connected={connected}
+          canControl={canControl}
+        />
+      ) : null}
+
+      <ProjectRepoForm
+        repo={project.repo ?? null}
+        disabled={!connected || !canControl}
+        onSave={(repo) => onSetRepo(project.id, repo)}
+      />
 
       {canControl ? (
         <div className="panel">

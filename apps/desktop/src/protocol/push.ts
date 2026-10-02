@@ -12,6 +12,7 @@ export function emptyHandlers(): PushHandlerSets {
     message_new: new Set(),
     bot_updated: new Set(),
     project_updated: new Set(),
+    workers_updated: new Set(),
     activity_update: new Set(),
     delivery_update: new Set(),
     routine_run_update: new Set(),
@@ -20,6 +21,11 @@ export function emptyHandlers(): PushHandlerSets {
     decision_update: new Set(),
     decision_deleted: new Set(),
     decision_comment_new: new Set(),
+    chat_turns: new Set(),
+    permission_request: new Set(),
+    permission_resolved: new Set(),
+    browser_tabs: new Set(),
+    browser_frame: new Set(),
   };
 }
 
@@ -69,6 +75,9 @@ export function dispatchPush(handlers: PushHandlerSets, push: ServerPush): void 
     case "project_updated":
       emitPush(handlers, "project_updated", push);
       break;
+    case "workers_updated":
+      emitPush(handlers, "workers_updated", push);
+      break;
     case "notify":
       emitPush(handlers, "notify", push);
       break;
@@ -80,6 +89,21 @@ export function dispatchPush(handlers: PushHandlerSets, push: ServerPush): void 
       break;
     case "decision_comment_new":
       emitPush(handlers, "decision_comment_new", push);
+      break;
+    case "chat_turns":
+      emitPush(handlers, "chat_turns", push);
+      break;
+    case "permission_request":
+      emitPush(handlers, "permission_request", push);
+      break;
+    case "permission_resolved":
+      emitPush(handlers, "permission_resolved", push);
+      break;
+    case "browser_tabs":
+      emitPush(handlers, "browser_tabs", push);
+      break;
+    case "browser_frame":
+      emitPush(handlers, "browser_frame", push);
       break;
     default:
       push satisfies never;

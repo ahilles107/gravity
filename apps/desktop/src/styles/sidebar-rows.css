@@ -173,6 +173,13 @@
   font-weight: 600;
 }
 
+.bot-row-tag {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
 .bot-row-time {
   flex: none;
   font-size: 11px;

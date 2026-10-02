@@ -21,6 +21,7 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   message_new: true,
   bot_updated: true,
   project_updated: true,
+  workers_updated: true,
   activity_update: true,
   delivery_update: true,
   routine_run_update: true,
@@ -29,6 +30,11 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   decision_update: true,
   decision_deleted: true,
   decision_comment_new: true,
+  chat_turns: true,
+  permission_request: true,
+  permission_resolved: true,
+  browser_tabs: true,
+  browser_frame: true,
 };
 
 const REPLY_TYPES: ReadonlySet<string> = new Set(
@@ -64,6 +70,21 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     publish_result: true,
     tag: true,
     tags: true,
+    chat: true,
+    chat_step: true,
+    file: true,
+    artifacts: true,
+    permissions: true,
+    permission: true,
+    tasks: true,
+    workers: true,
+    worker: true,
+    upload: true,
+    task: true,
+    browser_activity: true,
+    bot_commands: true,
+    agent_conversations: true,
+    agent_conversation: true,
   } satisfies Record<ServerReplyType, true>),
 );
 

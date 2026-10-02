@@ -71,7 +71,13 @@ impl Conn {
             return Ok(());
         }
         self.app.secrets.remove_peer_token(peer_id)?;
-        self.app.peers.disconnect(peer_id);
+        // Revoking unlinks every project linked through the peer, on both
+        // sides: it is told while its link is still up, then cut off.
+        let (app, id) = (self.app.clone(), peer_id.to_string());
+        tokio::spawn(async move {
+            crate::peer::links::unlink_all(&app, &id).await;
+            app.peers.disconnect(&id);
+        });
         let peer = self
             .app
             .db
@@ -182,7 +188,7 @@ fn listening_url(app: &AppState) -> anyhow::Result<String> {
 pub(crate) fn peer_view(app: &AppState, peer: &bus::Peer) -> Value {
     json!({
         "id": peer.id,
-        "name": peer.name,
+        "name": crate::db::Db::display_peer_name(peer),
         "url": peer.url,
         "daemon_id": peer.daemon_id,
         "online": app.peers.is_online(&peer.id),

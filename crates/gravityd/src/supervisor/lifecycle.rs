@@ -57,9 +57,18 @@ impl Supervisor {
         // Refresh `mcp.json` so a change to the daemon's port reaches existing
         // bots on their next start, just like the hook settings above. Written
         // once at creation otherwise, it would keep pointing at the old port.
+        // The bot's own browser is (re)configured here too, so Node or Chrome
+        // installed since the last start is picked up.
+        let browser = bot_root
+            .as_deref()
+            .and_then(|root| crate::browser::setup::server(&self.inner.cfg, root));
         if let Some(root) = &bot_root {
-            if let Err(e) = crate::paths::write_mcp_config(root, self.inner.cfg.port, BOT_TOKEN_ENV)
-            {
+            if let Err(e) = crate::paths::write_mcp_config(
+                root,
+                self.inner.cfg.port,
+                BOT_TOKEN_ENV,
+                browser.as_ref(),
+            ) {
                 tracing::warn!(bot_id, error = %e, "failed to refresh mcp config");
             }
         }
@@ -81,6 +90,20 @@ impl Supervisor {
         if let Some(model) = &model {
             claude_args.push("--model".to_string());
             claude_args.push(model.clone());
+        }
+        // The owner's own Chrome is opt-in per bot: by default a bot drives
+        // the browser of its own that its MCP config provides, so tabs never
+        // open in the owner's Chrome without saying which bot asked. Claude
+        // Code would otherwise follow the owner's global setting.
+        if bot.runtime == bus::BotRuntime::ClaudeCode {
+            claude_args.push(
+                if bot.user_chrome {
+                    "--chrome"
+                } else {
+                    "--no-chrome"
+                }
+                .to_string(),
+            );
         }
         if let Some(root) = &bot_root {
             let mcp = root.join("mcp.json");
@@ -133,6 +156,7 @@ impl Supervisor {
                     args: self.inner.cfg.codex_args.clone(),
                     port: self.inner.cfg.port,
                     artifacts,
+                    browser,
                 }
             }),
             bot_id: bot.id.clone(),
@@ -145,13 +169,25 @@ impl Supervisor {
             rows: 36,
         };
 
+        // Whatever the last session left unfinished is read now, before the
+        // new one writes to the transcript; the note it queues waits for the
+        // session to be ready.
+        if let Some(hook) = self.inner.before_start.get() {
+            let continues = match bot.runtime {
+                bus::BotRuntime::ClaudeCode => resume,
+                bus::BotRuntime::CodexCli => bot_root
+                    .as_deref()
+                    .is_some_and(|root| root.join(crate::runtime::codex::THREAD_FILE).exists()),
+            };
+            hook(bot_id, continues);
+        }
         let started = self.inner.adapter.start(&spec)?;
         // From here on the workspace has a conversation to come back to.
         if let Err(e) = self.inner.db.mark_bot_session(bot_id) {
             tracing::warn!(bot_id, error = %e, "could not record the bot's session");
         }
         let session = Arc::new(Mutex::new(started.session));
-        let mut rx = started.events;
+        let rx = started.events;
         let term = {
             let mut bots = self.lock_bots();
             let handle = bots
@@ -182,41 +218,12 @@ impl Supervisor {
         });
 
         // Consume session events until exit.
-        let sup = self.clone();
-        let bot_id_owned = bot_id.to_string();
-        tokio::spawn(async move {
-            let mut saw_output = false;
-            while let Some(ev) = rx.recv().await {
-                match ev {
-                    SessionEvent::Output(data) => {
-                        term.push(data);
-                        if !saw_output {
-                            saw_output = true;
-                            let (state, _) = sup.state(&bot_id_owned);
-                            if state == BotState::Starting {
-                                sup.set_state(&bot_id_owned, BotState::Ready, "runtime output");
-                            }
-                        }
-                    }
-                    SessionEvent::Exited { code } => {
-                        sup.on_exit(&bot_id_owned, code);
-                        break;
-                    }
-                    SessionEvent::Lifecycle {
-                        event,
-                        detail,
-                        transcript,
-                    } => {
-                        sup.on_hook_with_transcript(
-                            &bot_id_owned,
-                            event,
-                            detail.as_deref(),
-                            transcript.as_deref(),
-                        );
-                    }
-                }
-            }
-        });
+        tokio::spawn(super::session_events::consume(
+            self.clone(),
+            bot_id.to_string(),
+            term,
+            rx,
+        ));
         Ok(())
     }
 
@@ -337,7 +344,7 @@ impl Supervisor {
         handle.next_start_at = Some(Instant::now() + backoff(handle.consecutive_crashes));
     }
 
-    fn on_exit(&self, bot_id: &str, code: Option<i32>) {
+    pub(super) fn on_exit(&self, bot_id: &str, code: Option<i32>) {
         let (was_stopping, crashes) = {
             let mut bots = self.lock_bots();
             let Some(h) = bots.get_mut(bot_id) else {

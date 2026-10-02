@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { capture, captureException } from "../analytics";
 import type { DaemonApi } from "../protocol/api";
-import type { Bot } from "../protocol/entities";
+import type { Bot, ProjectRepo } from "../protocol/entities";
 import { errText } from "../util";
 import type { Selection } from "./selection";
 import type { AddToast } from "./useToasts";
@@ -11,6 +11,7 @@ export interface DaemonActions {
   readonly createProject: (name: string) => Promise<string | undefined>;
   readonly renameProject: (projectId: string, name: string) => Promise<void>;
   readonly setProjectLead: (projectId: string, botId: string | null) => Promise<void>;
+  readonly setProjectRepo: (projectId: string, repo: ProjectRepo | null) => Promise<void>;
   readonly deleteProject: (projectId: string) => Promise<void>;
   readonly createBot: (projectId: string) => Promise<void>;
   /** Creates a project and its first bot, so a fresh install lands on a bot. */
@@ -81,6 +82,30 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
     [addToast, client, refreshAll],
   );
 
+  const setProjectRepo = useCallback(
+    async (projectId: string, repo: ProjectRepo | null): Promise<void> => {
+      try {
+        await client.request(
+          repo === null
+            ? { type: "set_project_repo", project_id: projectId, url: null }
+            : {
+                type: "set_project_repo",
+                project_id: projectId,
+                url: repo.url,
+                branch: repo.branch,
+              },
+          "project",
+        );
+        capture("project_repo_set", { cleared: repo === null });
+        await refreshAll();
+      } catch (error) {
+        captureException(error, "project_repo_set");
+        addToast("error", "Failed to set the repository", errText(error));
+      }
+    },
+    [addToast, client, refreshAll],
+  );
+
   /**
    * Deleting a project archives every bot inside it, so anything the main pane
    * was showing is gone by the time this returns; the selection is cleared
@@ -146,6 +171,7 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
       createProject,
       renameProject,
       setProjectLead,
+      setProjectRepo,
       deleteProject,
       createBot,
       createProjectWithBot,
@@ -159,6 +185,7 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
       deleteProject,
       renameProject,
       setProjectLead,
+      setProjectRepo,
     ],
   );
 }

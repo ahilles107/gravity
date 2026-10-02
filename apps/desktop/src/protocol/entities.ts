@@ -14,7 +14,15 @@ export interface Project {
    * goes stale the moment a teammate asks directly.
    */
   readonly lead_bot_id?: string | null;
+  /** The shared git repository workers check out and push to; absent on older daemons. */
+  readonly repo?: ProjectRepo | null;
   readonly created_at: string;
+}
+
+/** A project's shared git repository. */
+export interface ProjectRepo {
+  readonly url: string;
+  readonly branch: string;
 }
 
 export type BotState =
@@ -52,7 +60,20 @@ export interface Bot {
   readonly created_by_bot_id?: string | null;
   /** Set when archived: the row and its history survive, the bot does not. */
   readonly deleted_at?: string | null;
+  /** Set on a linked bot: one that runs on a paired peer daemon. */
+  readonly peer?: BotPeer | null;
+  /** May drive the owner's own Chrome; absent on older daemons. */
+  readonly user_chrome?: boolean;
+  /** A temporary worker, archived once its one task closes. */
+  readonly temporary?: boolean;
   readonly created_at: string;
+}
+
+/** The peer daemon a linked bot runs on. */
+interface BotPeer {
+  readonly id: string;
+  readonly name: string;
+  readonly online: boolean;
 }
 
 /**

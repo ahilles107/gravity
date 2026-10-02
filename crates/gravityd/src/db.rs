@@ -14,7 +14,9 @@ pub use decisions_list::DecisionFilter;
 pub use routines::RoutineLimits;
 pub use runs::NewRun;
 pub use signals::NewSignal;
+pub use workers::NewWorker;
 
+pub mod agent_talk;
 mod bot_runtime;
 mod bots;
 mod conversations;
@@ -27,6 +29,8 @@ mod decisions_tests;
 mod deliveries;
 mod devices;
 mod peers;
+mod project_links;
+mod project_repos;
 mod projects;
 mod revisions;
 mod routines;
@@ -39,9 +43,13 @@ mod signals;
 mod tags;
 #[cfg(test)]
 mod tags_tests;
+mod task_views;
 mod tasks;
 #[cfg(test)]
 mod tests;
+mod workers;
+#[cfg(test)]
+mod workers_tests;
 
 /// Handle to the SQLite bus. All access is serialized through one connection;
 /// statements are short so contention stays negligible at this scale.

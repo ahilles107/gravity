@@ -213,6 +213,10 @@ pub(super) fn list_bots(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<Val
                 "status": state.as_str(),
                 "created_by_me": b.created_by_bot_id.as_deref() == Some(bot_id)
             });
+            // A worker exists for one task and is gone once it closes.
+            if b.temporary {
+                item["worker"] = json!(true);
+            }
             // A linked bot runs on another of the owner's machines: it can be
             // messaged like anyone here, but its files are not on this disk.
             if let Some(peer_id) = &b.peer_id {

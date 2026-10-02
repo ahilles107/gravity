@@ -1,5 +1,5 @@
 use gravityd::runtime::codex::{CodexAdapter, CodexSpec, NativeCodexAdapter};
-use gravityd::runtime::{BotSpec, RuntimeAdapter, SessionEvent, StartedSession};
+use gravityd::runtime::{BotSpec, PermissionAnswer, RuntimeAdapter, SessionEvent, StartedSession};
 use serde_json::Value;
 use std::path::Path;
 use std::time::Duration;
@@ -22,6 +22,7 @@ fn spec(root: &Path) -> BotSpec {
                 .to_string()],
             port: 49777,
             artifacts: Some(root.join("artifacts")),
+            browser: None,
         }),
         env: vec![
             ("GRAVITY_TOKEN".into(), "test-token".into()),
@@ -182,4 +183,98 @@ async fn approvals_are_explicit_and_interruption_never_reports_success() {
     })
     .await
     .unwrap();
+}
+
+/// The next permission request the session raises, and its key.
+async fn permission(started: &mut StartedSession) -> (u64, String, Value) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let SessionEvent::Permission { key, tool, input } =
+                started.events.recv().await.unwrap()
+            {
+                return (key, tool, input);
+            }
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_card_answers_a_native_approval_for_the_session() {
+    let root = tempfile::tempdir().unwrap();
+    let mut started = NativeCodexAdapter.start(&spec(root.path())).unwrap();
+    started.session.deliver("approval").unwrap().unwrap();
+    let (key, tool, input) = permission(&mut started).await;
+    assert_eq!(tool, "Bash");
+    assert_eq!(input["command"], "echo hello");
+    started
+        .session
+        .answer_permission(key, PermissionAnswer::Session)
+        .unwrap();
+    hook(&mut started, "Stop").await;
+    assert!(log(root.path())
+        .iter()
+        .any(|v| v["id"] == "approval-1" && v["result"]["decision"] == "acceptForSession"));
+    started.session.kill().unwrap();
+}
+
+#[tokio::test]
+async fn an_approval_answered_in_the_terminal_withdraws_its_card() {
+    let root = tempfile::tempdir().unwrap();
+    let mut started = CodexAdapter.start(&spec(root.path())).unwrap();
+    started.session.deliver("approval").unwrap().unwrap();
+    let (key, _, _) = permission(&mut started).await;
+    started.session.send_input(b"/deny 1\r").unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let SessionEvent::PermissionGone { key: gone } = started.events.recv().await.unwrap()
+            {
+                assert_eq!(gone, key);
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    // Too late: the request is gone, and the card's answer is not sent.
+    started
+        .session
+        .answer_permission(key, PermissionAnswer::Once)
+        .unwrap();
+    hook(&mut started, "Stop").await;
+    assert!(!log(root.path())
+        .iter()
+        .any(|v| v["id"] == "approval-1" && v["result"]["decision"] == "accept"));
+    started.session.kill().unwrap();
+}
+
+#[tokio::test]
+async fn tool_items_are_recorded_for_the_chat() {
+    let root = tempfile::tempdir().unwrap();
+    let mut started = CodexAdapter.start(&spec(root.path())).unwrap();
+    started.session.deliver("tools").unwrap().unwrap();
+    hook(&mut started, "Stop").await;
+    let records: Vec<Value> = std::fs::read_to_string(root.path().join("codex-observations.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let tools: Vec<&str> = records
+        .iter()
+        .filter_map(|r| r["message"]["content"][0]["name"].as_str())
+        .collect();
+    assert_eq!(tools, ["Bash", "Edit", "mcp__gravity-bus__send_message"]);
+    let patch = records
+        .iter()
+        .find_map(|r| r["toolUseResult"]["structuredPatch"].as_array())
+        .expect("the edit's patch");
+    assert_eq!(
+        patch[0]["lines"],
+        serde_json::json!(["-old", "+new", "+more"])
+    );
+    assert!(records
+        .iter()
+        .any(|r| r["type"] == "system" && r["subtype"] == "turn_duration"));
+    started.session.kill().unwrap();
 }

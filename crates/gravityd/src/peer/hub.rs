@@ -1,7 +1,7 @@
 //! Live peer links. Each paired daemon has at most one connection, whichever
 //! side dialed it; requests go out over it and wait for the matching response.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -22,16 +22,34 @@ pub enum PeerError {
     Offline,
     /// The peer answered with a refusal, or never answered.
     Rejected(String),
+    /// The peer refused with a code a client can act on (`conflict`,
+    /// `not_linked`, `not_found`), carried from a [`super::Refusal`].
+    Refused { code: String, reason: String },
+}
+
+impl PeerError {
+    /// The client-facing error code: the peer's own when it gave one.
+    pub fn code(&self) -> &str {
+        match self {
+            PeerError::Offline => "unavailable",
+            PeerError::Rejected(_) => "invalid_request",
+            PeerError::Refused { code, .. } => code,
+        }
+    }
 }
 
 impl std::fmt::Display for PeerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PeerError::Offline => write!(f, "peer is offline"),
-            PeerError::Rejected(reason) => write!(f, "{reason}"),
+            PeerError::Rejected(reason) | PeerError::Refused { reason, .. } => {
+                write!(f, "{reason}")
+            }
         }
     }
 }
+
+impl std::error::Error for PeerError {}
 
 type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Value>>>>;
 
@@ -42,12 +60,21 @@ struct Link {
     /// one closing does not unregister its replacement.
     generation: u64,
     closed: Arc<Notify>,
+    /// When this link came up. Anything recorded through it since, the peer
+    /// knows about.
+    since: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Clone, Default)]
 pub struct PeerHub {
     links: Arc<Mutex<HashMap<String, Link>>>,
     counter: Arc<AtomicU64>,
+    /// Local bot id → peers that have its chat open and want its turns.
+    chat_watchers: Arc<Mutex<HashMap<String, HashSet<String>>>>,
+    /// Terminal feeds served to peers, and mirrors of peers' bot terminals.
+    pub terms: Arc<super::term::Terms>,
+    /// Bot browsers watched for peers, and peers' bot browsers watched here.
+    pub browsers: Arc<super::browser::Browsers>,
 }
 
 impl PeerHub {
@@ -57,6 +84,40 @@ impl PeerHub {
 
     pub fn is_online(&self, peer_id: &str) -> bool {
         self.lock().contains_key(peer_id)
+    }
+
+    /// When the live link to this peer came up.
+    pub fn online_since(&self, peer_id: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.lock().get(peer_id).map(|link| link.since)
+    }
+
+    /// Sends an event frame: no `req_id`, and no answer expected.
+    pub fn notify(&self, peer_id: &str, frame: Value) {
+        if let Some(link) = self.lock().get(peer_id) {
+            let _ = link.out.send(frame);
+        }
+    }
+
+    /// Remembers that a peer has this bot's chat open.
+    pub fn watch_chat(&self, peer_id: &str, bot_id: &str) {
+        self.chat_watchers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(bot_id.to_string())
+            .or_default()
+            .insert(peer_id.to_string());
+    }
+
+    /// The online peers watching this bot's chat.
+    pub fn chat_watchers(&self, bot_id: &str) -> Vec<String> {
+        let watchers = self.chat_watchers.lock().unwrap_or_else(|e| e.into_inner());
+        watchers
+            .get(bot_id)
+            .into_iter()
+            .flatten()
+            .filter(|peer| self.is_online(peer))
+            .cloned()
+            .collect()
     }
 
     /// Drops the peer's link, if any. Used when the peer is revoked.
@@ -95,8 +156,15 @@ impl PeerHub {
             let reason = response
                 .get("error")
                 .and_then(Value::as_str)
-                .unwrap_or("peer refused the request");
-            Err(PeerError::Rejected(reason.to_string()))
+                .unwrap_or("peer refused the request")
+                .to_string();
+            match response.get("code").and_then(Value::as_str) {
+                Some(code) => Err(PeerError::Refused {
+                    code: code.to_string(),
+                    reason,
+                }),
+                None => Err(PeerError::Rejected(reason)),
+            }
         }
     }
 
@@ -119,6 +187,7 @@ impl PeerHub {
                 pending: pending.clone(),
                 generation,
                 closed: closed.clone(),
+                since: chrono::Utc::now(),
             },
         );
         if let Some(old) = replaced {
@@ -126,6 +195,25 @@ impl PeerHub {
         }
         tracing::info!(peer_id, "peer link up");
         let _ = app.db.touch_peer(&peer_id);
+        // Whatever changed in linked projects while the link was down.
+        {
+            let (app, peer_id) = (app.clone(), peer_id.clone());
+            tokio::task::spawn_blocking(move || super::mirror::sync(&app, &peer_id));
+        }
+        tokio::spawn(super::term::link_up(app.clone(), peer_id.clone()));
+        tokio::spawn(super::browser::link_up(app.clone(), peer_id.clone()));
+
+        // Events are applied in the order they were sent: a roster, then a
+        // newer one, must not land the other way round.
+        let (events, ordered) = std::sync::mpsc::channel::<Value>();
+        {
+            let (app, peer_id) = (app.clone(), peer_id.clone());
+            tokio::task::spawn_blocking(move || {
+                for frame in ordered {
+                    super::inbound::event(&app, &peer_id, &frame);
+                }
+            });
+        }
 
         loop {
             let frame = tokio::select! {
@@ -142,6 +230,11 @@ impl PeerHub {
                 }
                 continue;
             }
+            // An event: news from the peer, answered by nothing.
+            if frame.get("req_id").is_none() {
+                let _ = events.send(frame);
+                continue;
+            }
             // Handled off the read loop, so one slow request (a result with
             // artifacts to write) does not hold up the responses behind it.
             let app = app.clone();
@@ -155,7 +248,8 @@ impl PeerHub {
                     }),
                     Err(e) => json!({
                         "type": "response", "req_id": req_id, "ok": false,
-                        "error": format!("{e:#}")
+                        "error": format!("{e:#}"),
+                        "code": e.downcast_ref::<super::Refusal>().map(|r| r.code)
                     }),
                 };
                 let _ = out.send(response);
@@ -170,6 +264,8 @@ impl PeerHub {
             links.remove(&peer_id);
         }
         drop(links);
+        self.terms.link_down(&peer_id);
+        self.browsers.link_down(&app, &peer_id);
         let _ = app.db.touch_peer(&peer_id);
         tracing::info!(peer_id, "peer link down");
     }

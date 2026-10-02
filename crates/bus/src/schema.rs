@@ -8,6 +8,7 @@ mod base;
 mod decisions;
 mod history;
 mod peers;
+mod workers;
 
 use base::MIGRATION_1;
 use decisions::MIGRATION_12;
@@ -15,7 +16,8 @@ use history::{
     MIGRATION_10, MIGRATION_11, MIGRATION_2, MIGRATION_3, MIGRATION_4, MIGRATION_5, MIGRATION_6,
     MIGRATION_7, MIGRATION_8, MIGRATION_9,
 };
-use peers::MIGRATION_14;
+use peers::{MIGRATION_14, MIGRATION_15, MIGRATION_16};
+use workers::{MIGRATION_18, MIGRATION_19};
 
 pub const MIGRATIONS: &[&str] = &[
     MIGRATION_1,
@@ -32,4 +34,10 @@ pub const MIGRATIONS: &[&str] = &[
     MIGRATION_12,
     "ALTER TABLE bot ADD COLUMN runtime TEXT NOT NULL DEFAULT 'claude_code' CHECK(runtime IN ('claude_code', 'codex_cli'));",
     MIGRATION_14,
+    MIGRATION_15,
+    MIGRATION_16,
+    // Bots drive a browser of their own; the owner's Chrome is opt-in per bot.
+    "ALTER TABLE bot ADD COLUMN user_chrome INTEGER NOT NULL DEFAULT 0;",
+    MIGRATION_18,
+    MIGRATION_19,
 ];

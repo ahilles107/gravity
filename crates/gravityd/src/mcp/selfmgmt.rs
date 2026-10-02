@@ -42,7 +42,7 @@ fn checked_text(args: &Value, key: &str, max: usize) -> anyhow::Result<Option<St
     Ok(Some(value.to_string()))
 }
 
-fn edit_from_args(args: &Value, with_name: bool) -> anyhow::Result<IdentityEdit<'_>> {
+pub(super) fn edit_from_args(args: &Value, with_name: bool) -> anyhow::Result<IdentityEdit<'_>> {
     // Validated here, borrowed below: the checks need owned Strings for the
     // length test but IdentityEdit borrows, so re-read the (now known good)
     // fields from the original Value.
@@ -174,7 +174,7 @@ pub(super) fn create_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
 /// Authority is direct parentage only — if A created B and B created C, A
 /// cannot touch C. Provenance grants no transitive rights, so a deep team
 /// cannot be reorganised from the top by surprise.
-fn my_child(app: &Arc<AppState>, me: &Bot, args: &Value) -> anyhow::Result<Bot> {
+pub(super) fn my_child(app: &Arc<AppState>, me: &Bot, args: &Value) -> anyhow::Result<Bot> {
     let name = args
         .get("name")
         .and_then(|v| v.as_str())

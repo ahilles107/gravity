@@ -82,6 +82,8 @@ pub(super) fn complete_task(
         let delivery = app.db.enqueue_delivery(&msg.id, from_bot, &key)?;
         app.events.push(Push::DeliveryUpdate { delivery });
     }
+    // A worker's task closing frees its slot for the queue.
+    app.workers.nudge();
     Ok(json!({ "message_id": msg.id, "num": msg.num }))
 }
 
@@ -130,28 +132,41 @@ pub(super) fn cancel_task(
     if body.len() > MAX_MESSAGE_BYTES {
         anyhow::bail!("reason exceeds {MAX_MESSAGE_BYTES} bytes");
     }
-    if !app.db.try_close_task(task_id, TaskState::Cancelled)? {
+    let Some(notified) = close_cancelled(app, &bot_sender(&me), &task, &body)? else {
         anyhow::bail!(
             "task is already {}",
             current_task_state(app, task_id, task.state)
         );
-    }
-
-    let mut notified = false;
-    if let Some(assignee) = app.db.get_live_bot(&task.to_bot_id)? {
-        let sender = bot_sender(&me);
-        messaging::send_dm(
-            &app.db,
-            &app.events,
-            Dm::new(&assignee.id, &sender, MessageKind::Note, &body).re(&task.origin_message_id),
-        )?;
-        notified = true;
-    }
+    };
+    app.workers.nudge();
     Ok(json!({
         "task_id": task_id,
         "state": TaskState::Cancelled.as_str(),
         "notified": notified
     }))
+}
+
+/// Flip an open task to cancelled and tell its assignee with `body`, sent as
+/// `sender`. `None` when the task was already closed; otherwise whether a
+/// live assignee was told. Shared with workers, whose parent cancels them.
+pub(crate) fn close_cancelled(
+    app: &Arc<AppState>,
+    sender: &bus::Sender,
+    task: &bus::Task,
+    body: &str,
+) -> anyhow::Result<Option<bool>> {
+    if !app.db.try_close_task(&task.id, TaskState::Cancelled)? {
+        return Ok(None);
+    }
+    let Some(assignee) = app.db.get_live_bot(&task.to_bot_id)? else {
+        return Ok(Some(false));
+    };
+    messaging::send_dm(
+        &app.db,
+        &app.events,
+        Dm::new(&assignee.id, sender, MessageKind::Note, body).re(&task.origin_message_id),
+    )?;
+    Ok(Some(true))
 }
 
 /// A task's state as stored, for an error message written after a failed
