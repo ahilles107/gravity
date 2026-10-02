@@ -24,7 +24,11 @@ Server replies:
 A client connected to two daemons uses it to tell which peer row is which
 daemon. `capabilities` includes `linked_projects` when the daemon supports
 linked projects (`list_peer_projects`, `link_project`, `unlink_project`,
-`create_bot` with `peer_id`, and `links` on projects).
+`create_bot` with `peer_id`, and `links` on projects), `bot_browser` when each bot
+has a browser of its own the app can watch (`watch_browser`, `list_browser_activity`,
+`set_bot_user_chrome`, `user_chrome` on bots), and `agent_conversations` when it serves
+the conversations between a project's bots (`list_agent_conversations`,
+`list_agent_conversation`).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -67,6 +71,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
 | `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?, peer_id?` | `bot` (starts running immediately). With `peer_id`, the peer creates the bot in the project linked with this one (`runtime` defaults to the peer's `default_bot_runtime`), and the reply is its stand-in here, with `peer` set; `not_linked` when the project is not linked through that peer, `unavailable` when it is offline |
 | `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
+| `set_bot_user_chrome` | `bot_id, enabled` | `bot`: whether the bot may also drive the owner's own Chrome (Claude in Chrome). Off by default; restarts the session. See [bot-browser.md](bot-browser.md) |
 | `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot`; on a stand-in in a linked project, forwarded to its machine |
 | `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics. On a stand-in in a linked project, deletes the bot on its machine |
 | `list_bot_revisions` | `bot_id, limit?` | `bot_revisions` |
@@ -110,6 +115,11 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `write_artifact` | `project_id, name, base64` (one chunk, up to ~512 KB), `upload_id?` (from the first chunk's reply), `last` | `upload` (`upload_id`, and `path` once the last chunk is in); `control` grant. Files land in the project's `artifacts/uploads/`, up to 16 MB |
 | `list_tasks` | `bot_id, limit?` (default 100) | `tasks`: newest first, each with `state`, `role` (`assigned` \| `delegated`), `other` (`name`, `machine?`), `request` and `result?` as previews (`request_truncated`, `result_truncated` say when they were cut), `deadline_at?`, `closed_at?` |
 | `get_task` | `bot_id, task_id` | `task`: the same shape with the whole request and result |
+| `watch_browser` | `bot_id, tab_id?` | `ok`, then `browser_tabs` and `browser_frame` pushes to this connection. `tab_id` shows that tab; without it the view follows the tab the bot used last. One watch per connection: a new one replaces it. Requires `read` |
+| `unwatch_browser` | – | `ok`; stops the stream |
+| `list_browser_activity` | `bot_id, limit?` (default 100) | `browser_activity`: `activity`, newest first, each `{ turn_id, step_id, at, browser: own\|owners_chrome, title, subtitle?, status, trigger }`; `trigger` is what started the turn, as in the chat |
+| `list_agent_conversations` | `project_id` | `agent_conversations`: `conversations`, most recent first, each `{ bot_ids: [a, b], message_count, last_at, last }`, and `bots` (`id, name, avatar, machine?, deleted`) naming everyone in them |
+| `list_agent_conversation` | `project_id, bot_ids: [a, b], before?, limit?` (default 50) | `agent_conversation`: `messages` between the two, oldest first, each `{ id, num, from_bot_id, to_bot_id, kind, body, ref_message_id?, task?: { id, state }, created_at }`, `has_more`, and `bots`. `before` is a message `num` |
 | `list_permissions` | `bot_id?` | `permissions` (prompts waiting on the owner) |
 | `answer_permission` | `request_id, decision` (`allow_once` \| `allow_session` \| `deny`), `reason?` | `permission`; `control` grant |
 | `read_file` | `path` and `bot_id` (its directory and its project's artifacts) or `project_id` (artifacts only) | `file` (`text` or `base64`, capped at 16 MiB) |
@@ -203,6 +213,11 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
   `permission_timeout_seconds`, default 600) it is denied.
 - `permission_resolved`: `{ "request_id", "bot_id", "outcome" }` — outcome ∈
   `allowed_once|allowed_session|denied|expired|abandoned` (the hook went away first).
+- `browser_tabs`: `{ "bot_id", "open", "tabs": [{ "id", "title", "url" }], "active", "following", "reason"? }`
+  — sent to a connection watching that bot's browser (`watch_browser`) whenever its tabs
+  change. `open` is false while the bot has no browser running.
+- `browser_frame`: `{ "bot_id", "tab_id", "data", "width", "height" }` — the newest screen of
+  the tab on show, a base64 JPEG. Only sent while watching.
 - `chat_turns`: `{ "bot_id", "turns": [...] }` — turns of a loaded chat that are new or
   changed, usually the open one. Merge by turn `id`. Only bots whose chat a client has
   listed are followed. The turn model is described in
@@ -225,7 +240,7 @@ ProjectLink { "peer_id", "peer_name", "online", "remote_project_id",
            "remote_project_name", "linked_at" }
 Bot      { "id", "project_id", "name", "description", "avatar", "instructions",
            "state", "state_reason", "unread_count", "workspace_path", "dir_name",
-           "created_by_bot_id"?, "deleted_at"?, "created_at" }
+           "created_by_bot_id"?, "user_chrome", "deleted_at"?, "created_at" }
 BotRevision { "id", "bot_id", "changed_by", "field", "old_value", "new_value",
            "created_at" }
 Conversation { "id", "project_id", "bot_id", "title" }

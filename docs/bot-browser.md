@@ -1,0 +1,71 @@
+# Each bot's own browser
+
+Status: implemented in the daemon (`crates/gravityd/src/browser/`) and the
+desktop app (the bot's Browser tab). Tests: `crates/gravityd/tests/agent_browser.rs`.
+
+## Why
+
+Bots used to browse through the owner's own Chrome. Claude Code's Claude in
+Chrome integration follows the user's global setting
+(`claudeInChromeDefaultEnabled` in `~/.claude.json`), and bot sessions run as
+the user, so every bot drove the one Chrome the owner was using. Tabs opened
+there with nothing saying which bot opened them, or why.
+
+## What a bot gets
+
+- **A browser of its own.** Each bot session runs the
+  [Playwright MCP](https://github.com/microsoft/playwright-mcp) server as
+  `playwright`, against a Chrome whose profile lives in the bot's directory
+  (`<bot>/browser/profile`). Logins persist between sessions and are the bot's
+  alone. It runs headless, so no windows appear on the desktop.
+- **The same reach as before.** The tools cover navigating, reading the page,
+  clicking, typing, forms, tabs (`browser_tabs`: list, open, select, close),
+  screenshots, the console and the network. The `vision` capability adds mouse
+  tools that act at coordinates on a screenshot, the equivalent of Claude in
+  Chrome's `computer` tool. Nothing is taken away: the server is added
+  alongside the bot's other MCP servers (no `--strict-mcp-config`).
+- **The owner's Chrome only when allowed.** Bots start with `--no-chrome`. A
+  per-bot switch, "Can use your Chrome" in the bot's Info panel
+  (`set_bot_user_chrome`), starts it with `--chrome` instead, for a task that
+  needs the owner's logged-in sessions. Changing it restarts the session. The
+  system prompt tells the bot which browsers it has, and to prefer its own.
+
+Claude Code and Codex bots both get the browser: Claude Code through the
+session's `mcp.json`, Codex through its `mcp_servers` config.
+
+## Watching it
+
+The bot's **Browser** tab shows:
+
+- **Its tabs.** The view follows whichever tab the bot used last. Clicking
+  another tab shows that one instead, and "Follow bot" goes back to following.
+- **The page, live.** The daemon streams screencast frames of the tab on show.
+- **Activity.** Every browser action the bot took, newest first, grouped under
+  the request that started its turn ("Task from lead: compare the pricing
+  tiers"). Actions in the owner's Chrome are marked "your Chrome".
+
+How the daemon finds the browser: Chrome is launched with
+`--remote-debugging-port=0` and writes the port it chose to `DevToolsActivePort`
+in the profile. The daemon reads that file, lists the tabs over the DevTools
+HTTP endpoint, and attaches to the tab on show for `Page.startScreencast`.
+Streaming happens only while the app's Browser tab is open on that bot.
+
+## Configuration
+
+`[browser]` in `gravityd.toml`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | Give every bot a browser of its own. |
+| `node_dir` | found | The directory holding `node` and `npx`. The daemon looks on PATH, then in mise, nvm, asdf, fnm, Volta, Homebrew and, on Windows, Program Files, scoop and nvm-windows. Set it if Node lives elsewhere. |
+| `channel` | found | `chrome`, `msedge` or `chromium`: Chrome when installed, else Edge, else Playwright's own Chromium. |
+| `headless` | `true` | Set `false` to see the bots' browser windows on the desktop. |
+| `package` | `@playwright/mcp@0.0.83` | The npm package serving the tools, pinned. |
+
+Without Node the bot starts without a browser of its own, and the daemon logs
+a warning. `npx` downloads the pinned package on first use.
+
+## Not yet
+
+A linked bot's browser runs on its own machine and is watched there; the
+Browser tab is not shown for linked bots.
