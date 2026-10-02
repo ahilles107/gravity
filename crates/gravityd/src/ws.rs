@@ -18,12 +18,21 @@ use tokio::task::JoinHandle;
 use crate::app::{AppState, DAEMON_VERSION, PROTOCOL_VERSION};
 
 mod admin;
+mod browser;
+mod chat;
+mod commands;
+mod conversations;
 mod decisions;
 mod decisions_publish;
 mod dispatch;
 mod entities;
+mod links;
 mod messaging;
+mod peers;
+mod permissions;
 mod routines;
+mod runtime;
+mod tasks;
 mod terminal;
 mod views;
 
@@ -71,6 +80,8 @@ struct Conn {
     out: mpsc::UnboundedSender<Value>,
     /// bot_id -> forwarding task for live terminal frames.
     attachments: HashMap<String, JoinHandle<()>>,
+    /// The bot browser this connection is watching, if any.
+    browser_watch: Option<JoinHandle<()>>,
     caps: Vec<Capability>,
     /// None for the owner token; the issuing device otherwise. A ruling made
     /// from a device stays attributable after that device is revoked.
@@ -93,14 +104,21 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
 
     // Handshake: first frame must be a valid hello.
     let session = match stream.next().await {
-        Some(Ok(WsMessage::Text(text))) => handshake(&app, &out_tx, &text),
+        Some(Ok(WsMessage::Text(text))) => {
+            handshake(&app, &out_tx, &text).map(|session| (session, shows_permission_cards(&text)))
+        }
         _ => None,
     };
-    let Some((caps, device_id)) = session else {
+    let Some(((caps, device_id), cards)) = session else {
         drop(out_tx);
         let _ = writer.await;
         return;
     };
+
+    // A client that renders permission cards and may answer them is what lets
+    // the daemon hold a prompt for the app instead of the terminal.
+    let _answerer =
+        (cards && caps.contains(&Capability::Control)).then(|| crate::approval::answerer(&app));
 
     // Forward server pushes to this client.
     let push_tx = out_tx.clone();
@@ -131,9 +149,9 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
                 }
                 // Archiving tombstones the name so it can be reused; clients
                 // should see the name the project actually had.
-                crate::events::Push::ProjectUpdated { project } => {
-                    Ok(json!({ "type": "project_updated", "project": project_view(project) }))
-                }
+                crate::events::Push::ProjectUpdated { project } => Ok(
+                    json!({ "type": "project_updated", "project": project_view(&push_app, project) }),
+                ),
                 other => serde_json::to_value(other),
             };
             if let Ok(v) = value {
@@ -148,6 +166,7 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
         app: app.clone(),
         out: out_tx.clone(),
         attachments: HashMap::new(),
+        browser_watch: None,
         caps,
         device_id,
     };
@@ -172,10 +191,22 @@ async fn handle_socket(app: Arc<AppState>, socket: WebSocket) {
     for (_, task) in conn.attachments.drain() {
         task.abort();
     }
+    if let Some(task) = conn.browser_watch.take() {
+        task.abort();
+    }
     push_task.abort();
     drop(out_tx);
     drop(conn);
     let _ = writer.await;
+}
+
+/// Whether the client's hello says it shows permission cards.
+fn shows_permission_cards(hello: &str) -> bool {
+    serde_json::from_str::<Value>(hello).is_ok_and(|hello| {
+        hello["features"]
+            .as_array()
+            .is_some_and(|features| features.iter().any(|f| f == "permission_cards"))
+    })
 }
 
 /// Returns the authenticated connection's capability grants and issuing
@@ -240,7 +271,10 @@ fn handshake(
         "server_version": DAEMON_VERSION,
         "capabilities": crate::app::CAPABILITIES,
         "grants": cap_strs,
-        "device_id": device_id
+        "device_id": device_id,
+        // The id peers learn, so a client paired with two daemons can tell
+        // which peer row is which daemon.
+        "daemon_id": app.db.daemon_id().ok()
     }));
     Some((caps, device_id))
 }

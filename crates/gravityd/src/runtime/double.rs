@@ -3,7 +3,9 @@
 //! cross-session messaging) and echoes delivered messages and typed input to
 //! its terminal output, so the full channel-delivery path is exercised.
 
+#[cfg(unix)]
 use std::io::{BufRead, BufReader};
+#[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -11,10 +13,14 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use super::{BotSpec, Capabilities, RuntimeAdapter, RuntimeSession, SessionEvent, StartedSession};
+#[cfg(unix)]
 use crate::channel::MsgSocket;
 
 /// Ctrl-D: ends the double session as an unsolicited exit.
 const EOF: u8 = 0x04;
+/// Ctrl-P: asks permission the way Codex does, as a structured request, so
+/// tests can drive the card path end to end.
+const ASK: u8 = 0x10;
 
 pub struct DoubleAdapter;
 
@@ -51,16 +57,25 @@ impl RuntimeAdapter for DoubleAdapter {
         // Real inbox socket speaking the cross-session wire protocol. Unix
         // socket paths are capped at ~104 bytes on macOS, so keep it short:
         // /tmp + pid + a bot-id prefix.
+        #[cfg(unix)]
         let sock_dir = std::path::PathBuf::from(format!("/tmp/cbd-{}", std::process::id()));
+        #[cfg(unix)]
         std::fs::create_dir_all(&sock_dir)?;
+        #[cfg(unix)]
         let short_id: String = spec.bot_id.chars().take(8).collect();
+        #[cfg(unix)]
         let sock_path = sock_dir.join(format!("{short_id}.sock"));
+        #[cfg(unix)]
         let _ = std::fs::remove_file(&sock_path);
+        #[cfg(unix)]
         let listener = UnixListener::bind(&sock_path)?;
         let alive = Arc::new(AtomicBool::new(true));
 
+        #[cfg(unix)]
         let inbox_tx = tx.clone();
+        #[cfg(unix)]
         let inbox_alive = alive.clone();
+        #[cfg(unix)]
         std::thread::spawn(move || {
             for conn in listener.incoming() {
                 if !inbox_alive.load(Ordering::SeqCst) {
@@ -89,17 +104,25 @@ impl RuntimeAdapter for DoubleAdapter {
             }
         });
 
+        #[cfg(unix)]
+        let socket = MsgSocket {
+            path: sock_path,
+            token: None,
+        };
+        #[cfg(windows)]
+        let (socket, inbox_task) = super::inbox::start(tx.clone())?;
+
         Ok(StartedSession {
             session: Box::new(DoubleSession {
                 tx,
                 alive,
-                sock_path: sock_path.clone(),
+                #[cfg(unix)]
+                sock_path: socket.path.clone(),
+                #[cfg(windows)]
+                inbox_task,
             }),
             events: rx,
-            msg_socket: Some(MsgSocket {
-                path: sock_path,
-                token: None,
-            }),
+            msg_socket: Some(socket),
         })
     }
 
@@ -111,7 +134,10 @@ impl RuntimeAdapter for DoubleAdapter {
 struct DoubleSession {
     tx: mpsc::UnboundedSender<SessionEvent>,
     alive: Arc<AtomicBool>,
+    #[cfg(unix)]
     sock_path: std::path::PathBuf,
+    #[cfg(windows)]
+    inbox_task: tokio::task::AbortHandle,
 }
 
 impl RuntimeSession for DoubleSession {
@@ -125,6 +151,16 @@ impl RuntimeSession for DoubleSession {
         if bytes.contains(&EOF) {
             self.end(Some(0));
             return Ok(());
+        }
+        if bytes.contains(&ASK) {
+            return self
+                .tx
+                .send(SessionEvent::Permission {
+                    key: 1,
+                    tool: "Bash".to_string(),
+                    input: serde_json::json!({ "command": "echo from the double" }),
+                })
+                .map_err(|_| anyhow::anyhow!("output channel closed"));
         }
         self.tx
             .send(SessionEvent::Output(bytes.to_vec()))
@@ -144,6 +180,18 @@ impl RuntimeSession for DoubleSession {
             .map_err(|_| anyhow::anyhow!("output channel closed"))
     }
 
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: super::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.tx
+            .send(SessionEvent::Output(
+                format!("[permission {key}: {answer:?}]").into_bytes(),
+            ))
+            .map_err(|_| anyhow::anyhow!("output channel closed"))
+    }
+
     fn kill(&mut self) -> anyhow::Result<()> {
         self.end(Some(0));
         Ok(())
@@ -153,7 +201,10 @@ impl RuntimeSession for DoubleSession {
 impl DoubleSession {
     fn end(&mut self, code: Option<i32>) {
         self.alive.store(false, Ordering::SeqCst);
+        #[cfg(unix)]
         let _ = std::fs::remove_file(&self.sock_path);
+        #[cfg(windows)]
+        self.inbox_task.abort();
         let _ = self.tx.send(SessionEvent::Exited { code });
     }
 }

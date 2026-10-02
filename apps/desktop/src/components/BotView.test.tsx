@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeDaemon } from "../test/fakeDaemon";
@@ -74,7 +74,10 @@ describe("BotView", () => {
     renderView();
     expect(screen.getByTestId("terminal")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Bot info" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Info" })).not.toBeInTheDocument();
+    // Info is the side panel's tab, never one of the bot's own tabs.
+    const botTabs = screen.getByRole("button", { name: "Terminal" }).closest("nav");
+    expect(botTabs).not.toBeNull();
+    expect(within(botTabs ?? document.body).queryByRole("button", { name: "Info" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Routines" }));
     expect(screen.getByText("Routines", { selector: ".panel-title" })).toBeInTheDocument();

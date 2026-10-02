@@ -20,10 +20,15 @@ mod archive;
 mod charter;
 mod create;
 mod revert;
+mod runtime;
 
 pub use archive::{archive_bot, prune_archived_workspaces};
-pub use create::{create_bot, Created};
+pub use create::{create_bot, create_bot_with_runtime, Created};
 pub use revert::revert_revision;
+pub use runtime::{
+    check_runtime_available, requested_runtime, set_bot_runtime, set_bot_user_chrome,
+    RuntimeUnavailable,
+};
 
 /// Fields that may change on a bot. `None` leaves the stored value alone,
 /// which is what lets `update_self(avatar: "…")` avoid touching instructions.
@@ -90,7 +95,21 @@ pub(super) fn provision_spec<'a>(
         artifacts_dir: paths::artifacts_dir(&app.cfg, &project.dir_name)
             .display()
             .to_string(),
+        linked_machines: linked_machines(app, &project.id),
+        own_browser: app.cfg.browser.enabled,
+        user_chrome: bot.user_chrome,
     }
+}
+
+/// The peers a project is linked through, by name, for the system prompt.
+fn linked_machines(app: &AppState, project_id: &str) -> Vec<String> {
+    app.db
+        .project_links(project_id)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|link| app.db.get_peer(&link.peer_id).ok().flatten())
+        .map(|peer| peer.name)
+        .collect()
 }
 pub(super) fn parse_avatar(raw: &str) -> anyhow::Result<String> {
     bus::avatar::parse(raw)
@@ -181,6 +200,10 @@ pub fn apply_identity_edit(
 
 /// Rewrite the daemon-owned files for a bot after its identity changed.
 pub fn reprovision(app: &Arc<AppState>, bot: &Bot) -> anyhow::Result<()> {
+    // A linked bot's files live on its peer; there is nothing to write here.
+    if bot.is_linked() {
+        return Ok(());
+    }
     let project = app
         .db
         .get_project(&bot.project_id)?
@@ -195,7 +218,12 @@ pub fn reprovision(app: &Arc<AppState>, bot: &Bot) -> anyhow::Result<()> {
 /// `CLAUDE.md` pick up the new layout. The write is content-hash guarded, so
 /// this is a no-op once each bot is current.
 pub fn regenerate_all_system_md(app: &Arc<AppState>) -> anyhow::Result<()> {
-    for bot in app.db.list_bots(None)? {
+    for bot in app
+        .db
+        .list_bots(None)?
+        .into_iter()
+        .filter(|b| !b.is_linked())
+    {
         if let Err(e) = reprovision(app, &bot) {
             tracing::warn!(bot_id = %bot.id, error = %e, "system.md regeneration failed");
         }

@@ -3,10 +3,13 @@
 //! consumers deduplicate by delivery id / idempotency key. A bot that is not
 //! ready (stopped, socket unknown) defers without consuming retry attempts.
 
+use std::sync::Arc;
+
 use bus::envelope::{render_message, render_routine};
-use bus::DeliveryState;
+use bus::{DeliveryState, Message};
 use chrono::Duration as ChronoDuration;
 
+use crate::app::AppState;
 use crate::config::DeliveryConfig;
 use crate::db::Db;
 use crate::events::{Events, Push};
@@ -18,6 +21,8 @@ use crate::supervisor::Supervisor;
 const MAX_NOT_READY_BACKOFF_SECONDS: i64 = 60;
 
 pub struct DeliveryWorker {
+    /// For forwarding to linked bots, which runs through the peer link.
+    pub app: Arc<AppState>,
     pub db: Db,
     pub supervisor: Supervisor,
     pub events: Events,
@@ -31,22 +36,22 @@ impl DeliveryWorker {
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             tick.tick().await;
-            if let Err(e) = self.step() {
+            if let Err(e) = self.step().await {
                 tracing::warn!(error = %e, "delivery worker step failed");
             }
         }
     }
 
-    pub fn step(&self) -> anyhow::Result<()> {
+    pub async fn step(&self) -> anyhow::Result<()> {
         self.db.recover_expired_leases()?;
         let due = self.db.lease_due_deliveries(self.cfg.lease_seconds, 20)?;
         for delivery in due {
-            self.attempt(&delivery.id)?;
+            self.attempt(&delivery.id).await?;
         }
         Ok(())
     }
 
-    fn attempt(&self, delivery_id: &str) -> anyhow::Result<()> {
+    async fn attempt(&self, delivery_id: &str) -> anyhow::Result<()> {
         let Some(delivery) = self.db.get_delivery(delivery_id)? else {
             return Ok(());
         };
@@ -55,27 +60,26 @@ impl DeliveryWorker {
                 .mark_delivery_retry(delivery_id, "message missing", chrono::Utc::now(), 0)?;
             return Ok(());
         };
-        // A decision notice was already rendered by the registry, which owns
-        // its header and its phase. Wrapping it in `[msg #N …]` would bury the
-        // one thing that makes it authority: that it comes from the owner.
-        let text = if msg.decision_id.is_some() {
-            msg.body.clone()
-        } else if msg.sender.kind == bus::SenderKind::Routine {
-            let run_id = self.db.run_id_for_delivery(delivery_id)?;
-            render_routine(&msg.sender.name, msg.num, run_id.as_deref(), &msg.body)
-        } else {
-            let ref_num = match &msg.ref_message_id {
-                Some(rid) => self.db.get_message(rid)?.map(|m| m.num),
-                None => None,
-            };
-            let task_id = self
-                .db
-                .open_task_for_message(&msg.id, &delivery.bot_id)?
-                .map(|t| t.id);
-            render_message(&msg, ref_num, task_id.as_deref())
+        let outcome = match self.db.get_bot(&delivery.bot_id)? {
+            // A bot that runs on a peer: the peer stores and delivers it.
+            Some(target) if target.is_linked() => {
+                match crate::peer::forward(&self.app, &target, &msg).await {
+                    Ok(()) => Ok(()),
+                    Err(crate::peer::ForwardError::Offline) => Err(
+                        crate::supervisor::DeliverError::NotReady("peer offline".to_string()),
+                    ),
+                    Err(crate::peer::ForwardError::Failed(e)) => {
+                        Err(crate::supervisor::DeliverError::Failed(e))
+                    }
+                }
+            }
+            _ => {
+                let text = self.render(delivery_id, &delivery.bot_id, &msg)?;
+                self.supervisor.deliver(&delivery.bot_id, &text)
+            }
         };
 
-        match self.supervisor.deliver(&delivery.bot_id, &text) {
+        match outcome {
             Ok(()) => {
                 self.db.mark_delivered(delivery_id)?;
                 tracing::info!(delivery_id, bot_id = %delivery.bot_id, message_id = %msg.id, "delivered");
@@ -119,5 +123,43 @@ impl DeliveryWorker {
             self.events.push(Push::DeliveryUpdate { delivery: updated });
         }
         Ok(())
+    }
+
+    /// The envelope a local session reads for `msg`.
+    fn render(&self, delivery_id: &str, bot_id: &str, msg: &Message) -> anyhow::Result<String> {
+        // A decision notice was already rendered by the registry, which owns
+        // its header and its phase. Wrapping it in `[msg #N …]` would bury the
+        // one thing that makes it authority: that it comes from the owner.
+        Ok(if msg.decision_id.is_some() {
+            msg.body.clone()
+        } else if msg.sender.kind == bus::SenderKind::Routine {
+            let run_id = self.db.run_id_for_delivery(delivery_id)?;
+            render_routine(&msg.sender.name, msg.num, run_id.as_deref(), &msg.body)
+        } else {
+            let ref_num = match &msg.ref_message_id {
+                Some(rid) => self.db.get_message(rid)?.map(|m| m.num),
+                None => None,
+            };
+            let task_id = self
+                .db
+                .open_task_for_message(&msg.id, bot_id)?
+                .map(|t| t.id);
+            render_message(&self.sender_view(msg)?, ref_num, task_id.as_deref())
+        })
+    }
+
+    /// A linked sender is named with its machine, so a bot can tell a peer
+    /// on the other daemon from a colleague here.
+    fn sender_view(&self, msg: &Message) -> anyhow::Result<Message> {
+        let mut view = msg.clone();
+        let Some(bot_id) = &msg.sender.bot_id else {
+            return Ok(view);
+        };
+        if let Some(peer_id) = self.db.get_bot(bot_id)?.and_then(|b| b.peer_id) {
+            if let Some(peer) = self.db.get_peer(&peer_id)? {
+                view.sender.name = format!("{} @ {}", msg.sender.name, peer.name);
+            }
+        }
+        Ok(view)
     }
 }

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactElement } from "react";
-import { isStopped } from "../app/bots";
 import type { AddToast } from "../app/useToasts";
 import type { DaemonApi } from "../protocol/api";
 import type { Bot, Routine } from "../protocol/entities";
@@ -11,11 +10,14 @@ import {
   saveBotInfoPanel,
 } from "../settings";
 import BotHeader from "./bot/BotHeader";
-import BotTabs from "./bot/BotTabs";
+import BotPanes from "./bot/BotPanes";
+import BotSessionActions from "./bot/BotSessionActions";
+import BotSidePanel from "./bot/BotSidePanel";
+import type { SideTab } from "./bot/BotSidePanel";
+import BotTabs, { botTabs } from "./bot/BotTabs";
 import type { BotTab } from "./bot/BotTabs";
-import InfoPanel from "./InfoPanel";
-import RoutinesPanel from "./RoutinesPanel";
-import TerminalPane from "./TerminalPane";
+import { useBotKeys } from "./bot/useBotKeys";
+import { useBrowserWatch } from "./browser/useBrowserWatch";
 
 interface BotViewProps {
   readonly client: DaemonApi;
@@ -26,6 +28,7 @@ interface BotViewProps {
   readonly onBotUpdated: (bot: Bot) => void;
   readonly onRoutinesChanged: (botId: string, routines: readonly Routine[]) => void;
   readonly onToast: AddToast;
+  readonly onOpenDecision?: (decisionId: string) => void;
 }
 
 interface DragState {
@@ -42,14 +45,32 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export default function BotView(props: BotViewProps): ReactElement {
   const { client, bot, bots, connected, canControl, onToast } = props;
-  const [tab, setTab] = useState<BotTab>("terminal");
+  const tabs = botTabs(
+    {
+      chat: client.capabilities.includes("chat"),
+      browser: client.capabilities.includes("bot_browser"),
+      peerTerminal: client.capabilities.includes("peer_terminal"),
+      peerBrowser: client.capabilities.includes("peer_browser"),
+    },
+    bot.peer != null,
+  );
+  const [tab, setTab] = useState<BotTab>(tabs[0] ?? "terminal");
+  const [side, setSide] = useState<SideTab>("info");
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const [infoPanel, setInfoPanel] = useState(loadBotInfoPanel);
   const [maxInfoPanelWidth, setMaxInfoPanelWidth] = useState(FALLBACK_MAX_INFO_PANEL_WIDTH);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  // The terminal belongs to the user: any `control` connection may type while
-  // the bot runs. Bus deliveries arrive via the bot's inbox socket, never here.
-  const canWrite = canControl && !isStopped(bot);
+  useBotKeys(tabs, setTab);
+  // The bot's browser streams from the moment the bot is selected, whatever
+  // tab is open, so it is live when the Browser tab is.
+  const browser = useBrowserWatch(client, bot.id, tabs.includes("browser"), connected);
+
+  const showFile = (path: string): void => {
+    setSide("files");
+    setOpenFile(path);
+    setInfoPanel((current) => ({ ...current, collapsed: false }));
+  };
 
   useEffect(() => {
     saveBotInfoPanel(infoPanel);
@@ -141,6 +162,15 @@ export default function BotView(props: BotViewProps): ReactElement {
       <BotHeader
         bot={bot}
         canControl={canControl}
+        actions={
+          <BotSessionActions
+            client={client}
+            bot={bot}
+            connected={connected}
+            canControl={canControl}
+            onToast={onToast}
+          />
+        }
         infoPanelCollapsed={infoPanel.collapsed}
         onToggleInfoPanel={() => {
           setInfoPanel((current) => ({ ...current, collapsed: !current.collapsed }));
@@ -148,26 +178,26 @@ export default function BotView(props: BotViewProps): ReactElement {
       />
       <div className="bot-view-layout" ref={layoutRef}>
         <section className="bot-view-main">
-          <BotTabs active={tab} onSelect={setTab} />
-          <div className="bot-view-body">
-            {/* Keep the terminal mounted across tab switches to preserve the buffer. */}
-            <div className={tab === "terminal" ? "tab-pane" : "tab-pane tab-pane-hidden"}>
-              <TerminalPane client={client} botId={bot.id} canWrite={canWrite} onToast={onToast} />
-            </div>
-            {tab === "routines" ? (
-              <div className="tab-pane tab-pane-scroll">
-                <RoutinesPanel
-                  client={client}
-                  bot={bot}
-                  bots={bots}
-                  connected={connected}
-                  canControl={canControl}
-                  onRoutinesChanged={props.onRoutinesChanged}
-                  onToast={onToast}
-                />
-              </div>
-            ) : null}
-          </div>
+          <BotTabs
+            tabs={tabs}
+            active={tab}
+            onSelect={setTab}
+            browserLive={browser.tabs?.open === true}
+          />
+          <BotPanes
+            client={client}
+            bot={bot}
+            bots={bots}
+            tabs={tabs}
+            active={tab}
+            browser={browser}
+            connected={connected}
+            canControl={canControl}
+            onOpenFile={showFile}
+            onOpenDecision={props.onOpenDecision}
+            onRoutinesChanged={props.onRoutinesChanged}
+            onToast={onToast}
+          />
         </section>
         {infoPanel.collapsed ? null : (
           <div
@@ -195,11 +225,15 @@ export default function BotView(props: BotViewProps): ReactElement {
           style={panelStyle}
           aria-label="Bot info"
         >
-          <InfoPanel
+          <BotSidePanel
             client={client}
             bot={bot}
             connected={connected}
             canControl={canControl}
+            side={side}
+            onSide={setSide}
+            openFile={openFile}
+            onOpenFile={setOpenFile}
             onBotUpdated={props.onBotUpdated}
             onToast={onToast}
           />

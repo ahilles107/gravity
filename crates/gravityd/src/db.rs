@@ -15,6 +15,8 @@ pub use routines::RoutineLimits;
 pub use runs::NewRun;
 pub use signals::NewSignal;
 
+pub mod agent_talk;
+mod bot_runtime;
 mod bots;
 mod conversations;
 mod decision_threads;
@@ -25,6 +27,8 @@ mod decisions_list;
 mod decisions_tests;
 mod deliveries;
 mod devices;
+mod peers;
+mod project_links;
 mod projects;
 mod revisions;
 mod routines;
@@ -37,6 +41,7 @@ mod signals;
 mod tags;
 #[cfg(test)]
 mod tags_tests;
+mod task_views;
 mod tasks;
 #[cfg(test)]
 mod tests;

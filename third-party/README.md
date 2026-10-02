@@ -1,10 +1,10 @@
 # Dependency notices
 
 Gravity's `LICENSE` covers Gravity. The separate notice bundles preserve upstream
-license, copyright and NOTICE texts for dependencies of the official macOS ARM64
-app and daemon. `inventory.json` records exact versions, provenance, file hashes
-and scope against the committed lockfiles. Other distribution targets need their
-own review before release.
+license, copyright and NOTICE texts for dependencies of the macOS ARM64 and
+Windows x64 app and daemon builds. `inventory.json` records exact versions,
+provenance, file hashes and scope against the committed lockfiles. Other
+distribution targets need their own review before release.
 
 ## Distribution scope
 

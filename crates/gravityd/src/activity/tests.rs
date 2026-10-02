@@ -37,6 +37,15 @@ fn mangles_the_workspace_path_the_way_claude_code_does() {
 }
 
 #[test]
+fn mangles_underscores_like_claude_code() {
+    let dir = transcript_dir(
+        Path::new("/Users/me"),
+        Path::new("/Users/me/.gravity/projects/my_app/bots/q_a/workspace"),
+    );
+    assert!(dir.ends_with("-Users-me--gravity-projects-my-app-bots-q-a-workspace"));
+}
+
+#[test]
 fn reads_the_newest_assistant_turn() {
     let tmp = tempfile::tempdir().expect("tmp");
     let workspace = Path::new("/w/bot/workspace");

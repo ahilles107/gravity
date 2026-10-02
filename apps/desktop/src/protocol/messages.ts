@@ -1,6 +1,24 @@
 // Server → client frames (protocol v2): replies carry `req_id`, pushes do not.
 
+import type {
+  Artifact,
+  ChatTurn,
+  FileBody,
+  PermissionOutcome,
+  PermissionRequest,
+  StepDetail,
+} from "./chat";
 import type { Decision, DecisionComment, PendingCounts, PublishResult, Tag } from "./decisions";
+import type {
+  AgentBot,
+  AgentConversation,
+  AgentMessage,
+  BotCommand,
+  BrowserAction,
+  BrowserFramePush,
+  BrowserTabsPush,
+} from "./agents";
+import type { BotTask } from "./tasks";
 import type {
   Bot,
   BotActivity,
@@ -139,7 +157,71 @@ export type ServerReply =
       readonly results: readonly PublishResult[];
     })
   | (ReplyBase & { readonly type: "tag"; readonly tag: Tag })
-  | (ReplyBase & { readonly type: "tags"; readonly tags: readonly Tag[] });
+  | (ReplyBase & { readonly type: "tags"; readonly tags: readonly Tag[] })
+  | (ReplyBase & {
+      readonly type: "chat";
+      readonly bot_id: string;
+      /** Oldest first. */
+      readonly turns: readonly ChatTurn[];
+      readonly has_more: boolean;
+    })
+  | (ReplyBase & {
+      readonly type: "chat_step";
+      readonly bot_id: string;
+      readonly item_id: string;
+      readonly detail: StepDetail;
+    })
+  | (ReplyBase & { readonly type: "file"; readonly file: FileBody })
+  | (ReplyBase & {
+      readonly type: "permissions";
+      readonly permissions: readonly PermissionRequest[];
+    })
+  | (ReplyBase & { readonly type: "permission"; readonly permission: PermissionRequest })
+  | (ReplyBase & { readonly type: "task"; readonly task: BotTask })
+  | (ReplyBase & {
+      readonly type: "upload";
+      /** `path` is set once the last chunk is in. */
+      readonly upload: { readonly upload_id: string; readonly path?: string };
+    })
+  | (ReplyBase & {
+      readonly type: "tasks";
+      readonly bot_id: string;
+      /** Newest first. */
+      readonly tasks: readonly BotTask[];
+    })
+  | (ReplyBase & {
+      readonly type: "browser_activity";
+      readonly bot_id: string;
+      /** Newest first. */
+      readonly activity: readonly BrowserAction[];
+    })
+  | (ReplyBase & {
+      readonly type: "bot_commands";
+      readonly bot_id: string;
+      /** Running first, then newest first. */
+      readonly commands: readonly BotCommand[];
+    })
+  | (ReplyBase & {
+      readonly type: "agent_conversations";
+      readonly project_id: string;
+      /** Most recently active first. */
+      readonly conversations: readonly AgentConversation[];
+      readonly bots: readonly AgentBot[];
+    })
+  | (ReplyBase & {
+      readonly type: "agent_conversation";
+      readonly project_id: string;
+      readonly bot_ids: readonly [string, string];
+      /** Oldest first. */
+      readonly messages: readonly AgentMessage[];
+      readonly has_more: boolean;
+      readonly bots: readonly AgentBot[];
+    })
+  | (ReplyBase & {
+      readonly type: "artifacts";
+      readonly project_id: string;
+      readonly artifacts: readonly Artifact[];
+    });
 
 export type ServerReplyType = ServerReply["type"];
 
@@ -178,7 +260,22 @@ export type ServerPush =
     }
   | { readonly type: "decision_update"; readonly decision: Decision }
   | { readonly type: "decision_deleted"; readonly decision_id: string }
-  | { readonly type: "decision_comment_new"; readonly comment: DecisionComment };
+  | { readonly type: "decision_comment_new"; readonly comment: DecisionComment }
+  | { readonly type: "permission_request"; readonly request: PermissionRequest }
+  | {
+      readonly type: "permission_resolved";
+      readonly request_id: string;
+      readonly bot_id: string;
+      readonly outcome: PermissionOutcome;
+    }
+  | BrowserTabsPush
+  | BrowserFramePush
+  | {
+      readonly type: "chat_turns";
+      readonly bot_id: string;
+      /** New or changed turns of a loaded chat, oldest first. */
+      readonly turns: readonly ChatTurn[];
+    };
 
 export type ServerPushType = ServerPush["type"];
 

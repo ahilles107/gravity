@@ -7,6 +7,7 @@ import type { DaemonApi } from "../protocol/api";
 import { connectionStatusLabel } from "../protocol/connection";
 import BotView from "./BotView";
 import ControlCenterView from "./control/ControlCenterView";
+import ConversationsView from "./conversations/ConversationsView";
 import ProjectView from "./ProjectView";
 import NewProjectForm from "./sidebar/NewProjectForm";
 
@@ -100,6 +101,21 @@ export default function MainPane(props: MainPaneProps): ReactElement {
     );
   }
 
+  if (selection.kind === "conversations") {
+    const project = daemon.projects.find((item) => item.id === selection.projectId);
+    return project === undefined ? (
+      <EmptyState daemon={daemon} onCreateProject={props.onCreateProject} />
+    ) : (
+      <ConversationsView
+        key={project.id}
+        client={client}
+        project={project}
+        bots={bots.filter((item) => item.project_id === project.id)}
+        connected={connected}
+      />
+    );
+  }
+
   if (selection.kind === "bot") {
     const bot = bots.find((item) => item.id === selection.botId);
     return bot === undefined ? (
@@ -115,6 +131,9 @@ export default function MainPane(props: MainPaneProps): ReactElement {
         onBotUpdated={daemon.applyBotUpdate}
         onRoutinesChanged={daemon.updateBotRoutines}
         onToast={addToast}
+        onOpenDecision={(decisionId) => {
+          daemon.select({ kind: "control", decisionId });
+        }}
       />
     );
   }

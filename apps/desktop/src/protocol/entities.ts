@@ -29,7 +29,11 @@ export type BotState =
   | "stopping"
   | "stopped";
 
+export type BotRuntime = "claude_code" | "codex_cli";
+
 export interface Bot {
+  /** Absent on older daemons, which use Claude Code. */
+  readonly runtime?: BotRuntime;
   readonly id: string;
   readonly project_id: string;
   readonly name: string;
@@ -48,7 +52,18 @@ export interface Bot {
   readonly created_by_bot_id?: string | null;
   /** Set when archived: the row and its history survive, the bot does not. */
   readonly deleted_at?: string | null;
+  /** Set on a linked bot: one that runs on a paired peer daemon. */
+  readonly peer?: BotPeer | null;
+  /** May drive the owner's own Chrome; absent on older daemons. */
+  readonly user_chrome?: boolean;
   readonly created_at: string;
+}
+
+/** The peer daemon a linked bot runs on. */
+interface BotPeer {
+  readonly id: string;
+  readonly name: string;
+  readonly online: boolean;
 }
 
 /**

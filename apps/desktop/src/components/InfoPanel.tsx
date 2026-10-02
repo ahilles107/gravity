@@ -8,6 +8,8 @@ import { errText } from "../util";
 import BotAvatar from "./BotAvatar";
 import { BOT_ICONS } from "./botIcons";
 import BotHistory from "./bot/BotHistory";
+import BotChromeSwitch from "./bot/BotChromeSwitch";
+import BotRuntimePicker from "./bot/BotRuntimePicker";
 
 interface InfoPanelProps {
   readonly client: DaemonApi;
@@ -132,8 +134,8 @@ export default function InfoPanel({
             <button
               type="button"
               className="workspace-reveal"
-              aria-label="Reveal bot workspace in Finder"
-              title="Reveal in Finder"
+              aria-label="Open bot workspace folder"
+              title="Open folder"
               onClick={() => {
                 void revealBotWorkspace(bot.workspace_path);
               }}
@@ -242,6 +244,25 @@ export default function InfoPanel({
           {saving ? "Saving…" : "Save"}
         </button>
       </div>
+
+      <BotRuntimePicker
+        key={`${bot.id}:${bot.runtime ?? "claude_code"}`}
+        client={client}
+        bot={bot}
+        connected={connected}
+        canControl={canControl}
+        onBotUpdated={onBotUpdated}
+        onToast={onToast}
+      />
+
+      <BotChromeSwitch
+        client={client}
+        bot={bot}
+        connected={connected}
+        canControl={canControl}
+        onBotUpdated={onBotUpdated}
+        onToast={onToast}
+      />
 
       <BotHistory
         client={client}

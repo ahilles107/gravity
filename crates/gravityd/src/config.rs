@@ -37,11 +37,14 @@ pub struct Config {
     /// where only the allowlisted `/mcp` URL reaches bots at all. Ignored for
     /// direct launches, which always fail on a collision.
     pub negotiate_port: bool,
-    /// `pty` (spawn `claude` in a pty) or `double` (deterministic test runtime).
+    /// `pty` (each bot's saved CLI) or `double` (deterministic test runtime).
     pub runtime: RuntimeKind,
     pub claude_bin: String,
     /// Extra arguments passed to the `claude` CLI.
     pub claude_args: Vec<String>,
+    pub codex_bin: String,
+    pub codex_args: Vec<String>,
+    pub default_bot_runtime: bus::BotRuntime,
     /// Context window, in tokens, a bot session may grow to before Claude Code
     /// auto-compacts it (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`). Bots are
     /// always-on chat sessions, and every turn re-sends the whole transcript,
@@ -59,6 +62,12 @@ pub struct Config {
     /// own children, and archived bots free their slot, this bounds the whole
     /// population regardless of how deeply bots nest their teams.
     pub max_bots_per_project: usize,
+    /// How long, in seconds, a permission prompt waits for an answer from the
+    /// app before it is denied. Capped below the hook's own timeout.
+    pub permission_timeout_seconds: u64,
+    /// After a restart, tell each bot that was cut off mid-turn, or still
+    /// holds open tasks, to pick its work back up. See [`crate::resume`].
+    pub resume_after_restart: bool,
     pub delivery: DeliveryConfig,
     pub scheduler: SchedulerConfig,
     /// How often the supervisor reconciles live bots into running sessions.
@@ -70,6 +79,8 @@ pub struct Config {
     /// header (native clients) and tauri/localhost origins are always allowed.
     pub allowed_origins: Vec<String>,
     pub retention: RetentionConfig,
+    /// Each bot's own browser. See [`crate::browser`].
+    pub browser: crate::browser::BrowserConfig,
     /// The *user's* home, where Claude Code keeps its `~/.claude/projects`
     /// transcripts. Distinct from `home`, which is the daemon's own state
     /// directory; separate so tests can point it at a fixture tree.
@@ -170,10 +181,16 @@ impl Default for Config {
             runtime: RuntimeKind::Pty,
             claude_bin: "claude".to_string(),
             claude_args: Vec::new(),
+            codex_bin: "codex".to_string(),
+            codex_args: Vec::new(),
+            default_bot_runtime: bus::BotRuntime::ClaudeCode,
             auto_compact_window: Some(DEFAULT_AUTO_COMPACT_WINDOW),
             classic_renderer: true,
             max_bots_per_project: 12,
+            permission_timeout_seconds: 600,
+            resume_after_restart: true,
             delivery: DeliveryConfig::default(),
+            browser: crate::browser::BrowserConfig::default(),
             scheduler: SchedulerConfig::default(),
             supervision_interval_ms: 5_000,
             scrollback_bytes: 1_048_576,
@@ -196,9 +213,9 @@ fn resolve_home(gravity_home: Option<PathBuf>, user_home: PathBuf) -> PathBuf {
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var_os("HOME")
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 impl Config {

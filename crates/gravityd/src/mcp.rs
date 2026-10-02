@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 use crate::app::AppState;
 
 mod decisions;
+mod remote;
 mod routines;
 mod schema;
 mod schema_decisions;
@@ -122,7 +123,10 @@ pub async fn mcp_handler(
         "tools/list" => Ok(tool_list()),
         // Tool-level failures travel as `isError` content; an Err here means
         // the request itself was malformed, which is invalid params (-32602).
-        "tools/call" => tool_call(&app, &bot_id, &params).map_err(|msg| (-32602, msg)),
+        "tools/call" => match remote_call(&app, &bot_id, &params).await {
+            Some(result) => Ok(result),
+            None => tool_call(&app, &bot_id, &params).map_err(|msg| (-32602, msg)),
+        },
         _ => Err((-32601, format!("method not found: {method}"))),
     };
 
@@ -142,6 +146,16 @@ fn text_result(v: &Value) -> Value {
 
 fn tool_error(msg: &str) -> Value {
     json!({ "content": [{ "type": "text", "text": msg }], "isError": true })
+}
+
+/// A tool call that belongs on a peer, answered once the peer has.
+async fn remote_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Option<Value> {
+    let name = params.get("name").and_then(|n| n.as_str())?;
+    let args = params.get("arguments").cloned().unwrap_or(json!({}));
+    Some(match remote::intercept(app, bot_id, name, &args).await? {
+        Ok(v) => text_result(&v),
+        Err(e) => tool_error(&e.to_string()),
+    })
 }
 
 fn tool_call(app: &Arc<AppState>, bot_id: &str, params: &Value) -> Result<Value, String> {

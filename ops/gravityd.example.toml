@@ -21,11 +21,14 @@ port = 49777
 # a collision.
 negotiate_port = true
 
-# "pty" spawns the `claude` CLI in a pseudo-terminal per bot.
+# "pty" selects each bot's saved CLI (Claude Code PTY or Codex App Server).
 # "double" is a deterministic echo runtime for testing.
 runtime = "pty"
 claude_bin = "claude"
 claude_args = []
+codex_bin = "codex"
+codex_args = []
+default_bot_runtime = "claude_code" # or "codex_cli" for newly created bots
 
 # Tokens a bot conversation may reach before Claude Code auto-compacts it
 # (exported as CLAUDE_CODE_AUTO_COMPACT_WINDOW). Every turn re-sends the whole

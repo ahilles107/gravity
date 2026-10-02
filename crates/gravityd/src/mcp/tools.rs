@@ -204,14 +204,25 @@ pub(super) fn list_bots(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<Val
         .into_iter()
         .map(|b| {
             let (state, _) = app.supervisor.state(&b.id);
-            json!({
+            let mut item = json!({
                 "id": b.id,
                 "name": b.name,
                 "avatar": b.avatar,
                 "description": b.description,
+                "runtime": b.runtime,
                 "status": state.as_str(),
                 "created_by_me": b.created_by_bot_id.as_deref() == Some(bot_id)
-            })
+            });
+            // A linked bot runs on another of the owner's machines: it can be
+            // messaged like anyone here, but its files are not on this disk.
+            if let Some(peer_id) = &b.peer_id {
+                let peer = app.db.get_peer(peer_id).ok().flatten();
+                let online = app.peers.is_online(peer_id);
+                item["machine"] = json!(peer.map(|p| p.name));
+                item["online"] = json!(online);
+                item["status"] = json!(if online { "ready" } else { "offline" });
+            }
+            item
         })
         .collect();
     Ok(json!({ "bots": bots }))

@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -17,6 +16,9 @@ pub struct Secrets {
     bot_tokens: Mutex<HashMap<String, String>>,
     /// token -> device_id for device-scoped client credentials.
     device_tokens: Mutex<HashMap<String, String>>,
+    /// token -> peer_id for the `/peer` link. The same token serves both
+    /// ends: the listening daemon accepts it, the dialing daemon presents it.
+    peer_tokens: Mutex<HashMap<String, String>>,
     client_token: String,
 }
 
@@ -28,14 +30,14 @@ fn random_token() -> String {
 
 fn write_secret(path: &Path, value: &str) -> anyhow::Result<()> {
     fs::write(path, value)?;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    crate::permissions::private(path, false)?;
     Ok(())
 }
 
 impl Secrets {
     pub fn open(dir: &Path) -> anyhow::Result<Self> {
         fs::create_dir_all(dir)?;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+        crate::permissions::private(dir, true)?;
 
         let client_path = dir.join("client.token");
         let client_token = if client_path.exists() {
@@ -48,6 +50,7 @@ impl Secrets {
 
         let mut bot_tokens = HashMap::new();
         let mut device_tokens = HashMap::new();
+        let mut peer_tokens = HashMap::new();
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_string();
@@ -67,6 +70,14 @@ impl Secrets {
                 if !token.is_empty() {
                     device_tokens.insert(token, device_id.to_string());
                 }
+            } else if let Some(peer_id) = name
+                .strip_prefix("peer-")
+                .and_then(|s| s.strip_suffix(".token"))
+            {
+                let token = fs::read_to_string(entry.path())?.trim().to_string();
+                if !token.is_empty() {
+                    peer_tokens.insert(token, peer_id.to_string());
+                }
             }
         }
 
@@ -74,6 +85,7 @@ impl Secrets {
             dir: dir.to_path_buf(),
             bot_tokens: Mutex::new(bot_tokens),
             device_tokens: Mutex::new(device_tokens),
+            peer_tokens: Mutex::new(peer_tokens),
             client_token,
         })
     }
@@ -156,6 +168,49 @@ impl Secrets {
         write_secret(&self.dir.join(format!("bot-{bot_id}.token")), &token)?;
         map.insert(token.clone(), bot_id.to_string());
         Ok(token)
+    }
+}
+
+impl Secrets {
+    /// Issue a fresh link token for a peer that will dial this daemon.
+    pub fn issue_peer_token(&self, peer_id: &str) -> anyhow::Result<String> {
+        let token = random_token();
+        self.store_peer_token(peer_id, &token)?;
+        Ok(token)
+    }
+
+    /// Keep the token from a peer's invite, presented when dialing it.
+    pub fn store_peer_token(&self, peer_id: &str, token: &str) -> anyhow::Result<()> {
+        let mut map = self.peer_tokens.lock().unwrap_or_else(|e| e.into_inner());
+        map.retain(|_, id| id.as_str() != peer_id);
+        write_secret(&self.dir.join(format!("peer-{peer_id}.token")), token)?;
+        map.insert(token.to_string(), peer_id.to_string());
+        Ok(())
+    }
+
+    pub fn peer_for_token(&self, token: &str) -> Option<String> {
+        let map = self.peer_tokens.lock().unwrap_or_else(|e| e.into_inner());
+        map.iter()
+            .find(|(t, _)| constant_time_eq(t.as_bytes(), token.as_bytes()))
+            .map(|(_, id)| id.clone())
+    }
+
+    pub fn peer_token(&self, peer_id: &str) -> Option<String> {
+        let map = self.peer_tokens.lock().unwrap_or_else(|e| e.into_inner());
+        map.iter()
+            .find(|(_, id)| id.as_str() == peer_id)
+            .map(|(t, _)| t.clone())
+    }
+
+    /// Delete a revoked peer's token so neither end can use the link again.
+    pub fn remove_peer_token(&self, peer_id: &str) -> anyhow::Result<()> {
+        let mut map = self.peer_tokens.lock().unwrap_or_else(|e| e.into_inner());
+        map.retain(|_, id| id.as_str() != peer_id);
+        let path = self.dir.join(format!("peer-{peer_id}.token"));
+        if path.exists() {
+            fs::remove_file(path)?;
+        }
+        Ok(())
     }
 }
 

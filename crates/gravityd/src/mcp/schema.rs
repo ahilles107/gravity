@@ -62,7 +62,7 @@ fn core_tools() -> Vec<Value> {
              }),
              vec!["task_id"]),
         tool("list_bots",
-             "List bots in your project with status. The id is what a signal \
+             "List bots in your project with status and runtime (claude_code or codex_cli). The id is what a signal \
               trigger's from_bot_id refers to.",
              json!({}), vec![]),
         tool("check_inbox",
@@ -117,7 +117,7 @@ fn core_tools() -> Vec<Value> {
              json!({ "routine_id": {"type": "string"} }),
              vec!["routine_id"]),
         tool("get_self",
-             "Read your own settings: name, avatar, description, instructions, who created you, and the bots you created.",
+             "Read your own settings: name, avatar, description, instructions, runtime (claude_code or codex_cli), who created you, and the bots you created.",
              json!({}), vec![]),
         tool("update_self",
              "Change your own avatar, description or instructions. Applies immediately; omitted fields are left alone.",
@@ -137,16 +137,19 @@ fn core_tools() -> Vec<Value> {
                  "name": {"type": "string"},
                  "description": {"type": "string", "description": "Optional. Short summary other bots see in list_bots"},
                  "instructions": {"type": "string", "description": "Optional. Standing instructions for the new bot"},
-                 "avatar": {"type": "string", "description": format!("Optional; defaults to a random icon. {}", avatar_hint())}
+                 "avatar": {"type": "string", "description": format!("Optional; defaults to a random icon. {}", avatar_hint())},
+                 "runtime": {"type": "string", "enum": ["claude_code", "codex_cli"], "description": "Optional. Select Claude Code or Codex CLI explicitly; omitted inherits your runtime, or on another machine uses that machine's default. The result reports the saved runtime; list_bots verifies it."},
+                 "machine": {"type": "string", "description": "Optional. Create the bot on another of the owner's machines, named as list_bots reports it. Allowed only when this project is linked with that machine; omitted creates it here."}
              }),
              vec!["name"]),
         tool("update_bot",
-             "Change the avatar, description or instructions of a bot you created.",
+             "Change the avatar, description, instructions or runtime of a bot you created. Omitted fields stay unchanged. Changing runtime interrupts its current turn and restarts its session, preserving the workspace and separate provider histories.",
              json!({
                  "name": {"type": "string", "description": "The bot to change"},
                  "description": {"type": "string"},
                  "instructions": {"type": "string"},
-                 "avatar": {"type": "string", "description": avatar_hint()}
+                 "avatar": {"type": "string", "description": avatar_hint()},
+                 "runtime": {"type": "string", "enum": ["claude_code", "codex_cli"], "description": "Optional. Select Claude Code or Codex CLI. The result reports the saved runtime; list_bots verifies it."}
              }),
              vec!["name"]),
         tool("delete_bot",

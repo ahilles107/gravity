@@ -23,7 +23,8 @@ to public issues. Security reports belong in the private channel described in
 
 Use a current stable Rust toolchain, Node.js 22, and pnpm 11. Building the native
 macOS app requires Xcode Command Line Tools. Official binaries target Apple
-Silicon macOS; other platforms are not currently distributed. Docker is required
+Silicon macOS; Windows x64 builds are available as CI artifacts. See
+[Windows setup](docs/windows.md) for native prerequisites and PowerShell commands. Docker is required
 for the visual regression suite.
 
 ```sh
@@ -35,7 +36,7 @@ cargo build --workspace
 ./scripts/dev.sh
 ```
 
-Real bots require your own Claude Code installation and authentication. Use
+Real bots require your own Claude Code or Codex CLI installation and authentication. Use
 `GRAVITY_RUNTIME=double ./scripts/dev.sh` to run the deterministic test runtime
 without Claude credentials. Development state stays under `.dev/`.
 
@@ -55,7 +56,8 @@ pnpm run verify
 
 This runs Rust and native-shell checks, desktop and marketing typechecking,
 linting, tests and builds, the file-length check, and visual regression tests.
-It stops on the first failure. Full verification requires macOS and running Docker.
+It stops on the first failure. Native-shell checks run on the host platform;
+visual verification requires running Docker with Linux containers.
 
 Visual baselines must be generated in the pinned CI container; use the
 repository's visual regression workflow when accepting

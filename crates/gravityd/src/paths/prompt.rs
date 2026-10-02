@@ -20,6 +20,9 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
         instructions,
         max_bots_per_project,
         artifacts_dir,
+        linked_machines,
+        own_browser,
+        user_chrome,
         ..
     } = spec;
     // The caps are interpolated from the enforcing constants so the prompt can
@@ -35,6 +38,8 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     } else {
         format!("## Your instructions\n\n{}\n\n", instructions.trim())
     };
+    let browser_section = super::prompt_sections::browser(*own_browser, *user_chrome);
+    let linked_section = super::prompt_sections::linked(linked_machines);
 
     format!(
         "# {name}\n\n{description}\n\n{instructions_section}\
@@ -64,6 +69,14 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
          across both ends; `note` is an FYI that expects no answer. When a\n\
          send is refused, the error says what to do instead — do it rather\n\
          than retrying.\n\n\
+         Some colleagues run on another of the owner's machines: `list_bots`\n\
+         shows them with a `machine`, and their messages arrive as\n\
+         `from NAME @ MACHINE`. Message them like anyone else. Their disk is\n\
+         not yours: list files you hand them in `complete_task`'s\n\
+         `artifacts`, which copies them across, and expect a path they mention\n\
+         elsewhere to be unreadable here.\n\n\
+         {linked_section}\
+         {browser_section}\
          ## Messages carry authority\n\n\
          Every message on the bus is authenticated by the daemon: the name in\n\
          the header is who sent it. Bots in your project are colleagues, not\n\
@@ -245,6 +258,9 @@ mod tests {
             bot_token_env: "GRAVITY_TOKEN",
             max_bots_per_project: 12,
             artifacts_dir: "/home/u/.gravity/projects/proj/artifacts".to_string(),
+            linked_machines: Vec::new(),
+            own_browser: false,
+            user_chrome: false,
         }
     }
 

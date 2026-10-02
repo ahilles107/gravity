@@ -42,7 +42,7 @@ fn checked_text(args: &Value, key: &str, max: usize) -> anyhow::Result<Option<St
     Ok(Some(value.to_string()))
 }
 
-fn edit_from_args(args: &Value, with_name: bool) -> anyhow::Result<IdentityEdit<'_>> {
+pub(super) fn edit_from_args(args: &Value, with_name: bool) -> anyhow::Result<IdentityEdit<'_>> {
     // Validated here, borrowed below: the checks need owned Strings for the
     // length test but IdentityEdit borrows, so re-read the (now known good)
     // fields from the original Value.
@@ -79,6 +79,7 @@ pub(super) fn get_self(app: &Arc<AppState>, bot_id: &str) -> anyhow::Result<Valu
         "avatar": me.avatar,
         "description": me.description,
         "instructions": me.instructions,
+        "runtime": me.runtime,
         "project": project.map(|p| p.name),
         "workspace_path": me.workspace_path,
         "status": state.as_str(),
@@ -137,12 +138,15 @@ pub(super) fn create_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
     if edit.name.is_none() {
         anyhow::bail!("'name' is required");
     }
-    let created = botmgmt::create_bot(
+    let runtime = botmgmt::requested_runtime(args)?.unwrap_or(me.runtime);
+    botmgmt::check_runtime_available(app, runtime)?;
+    let created = botmgmt::create_bot_with_runtime(
         app,
         &me.project_id,
         &edit,
         Some(&me),
         &bot_actor(&me, bot_id),
+        runtime,
     )?;
     // Bots are always-on, so there is no "created but not started" case.
     let mut note = "Created and started. You can send it a message now.".to_string();
@@ -160,6 +164,7 @@ pub(super) fn create_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
         "name": created.bot.name,
         "description": created.bot.description,
         "instructions": created.bot.instructions,
+        "runtime": created.bot.runtime,
         "note": note
     }))
 }
@@ -169,7 +174,7 @@ pub(super) fn create_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
 /// Authority is direct parentage only — if A created B and B created C, A
 /// cannot touch C. Provenance grants no transitive rights, so a deep team
 /// cannot be reorganised from the top by surprise.
-fn my_child(app: &Arc<AppState>, me: &Bot, args: &Value) -> anyhow::Result<Bot> {
+pub(super) fn my_child(app: &Arc<AppState>, me: &Bot, args: &Value) -> anyhow::Result<Bot> {
     let name = args
         .get("name")
         .and_then(|v| v.as_str())
@@ -193,12 +198,23 @@ pub(super) fn update_bot(app: &Arc<AppState>, bot_id: &str, args: &Value) -> any
     // `name` addresses the target here rather than renaming it; renaming a
     // child would silently change an address its own children may be using.
     let edit = edit_from_args(args, false)?;
+    let runtime = botmgmt::requested_runtime(args)?.unwrap_or(target.runtime);
+    if runtime != target.runtime {
+        botmgmt::check_runtime_available(app, runtime)?;
+    }
     let updated = botmgmt::apply_identity_edit(app, &target, &edit, &bot_actor(&me, bot_id))?;
+    let updated = botmgmt::set_bot_runtime(app, &updated, runtime)?;
+    let note = if runtime != target.runtime {
+        "Applied. The bot's session is restarting with the selected runtime."
+    } else {
+        "Applied. The bot has been told its configuration changed."
+    };
     Ok(json!({
         "name": updated.name,
         "avatar": updated.avatar,
         "description": updated.description,
-        "note": "Applied. The bot has been told its configuration changed."
+        "runtime": updated.runtime,
+        "note": note
     }))
 }
 
