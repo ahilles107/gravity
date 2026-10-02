@@ -65,7 +65,8 @@ async fn bots_use_their_own_browser_unless_allowed_the_owners_chrome() {
 }
 
 /// Serves `/json/list` with one page, and that page's WebSocket answering
-/// `Page.startScreencast` with a frame. Returns the HTTP port.
+/// `Page.startScreencast` with a frame, keeping connections open as Chrome
+/// does. Returns the HTTP port.
 async fn fake_devtools(title: &'static str) -> u16 {
     let ws = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
     let ws_port = ws.local_addr().expect("addr").port();
@@ -103,6 +104,12 @@ async fn fake_devtools(title: &'static str) -> u16 {
                 body.len()
             );
             let _ = stream.write_all(reply.as_bytes()).await;
+            // Like Chrome: the connection stays open whatever the request
+            // asked, so the daemon has to stop at Content-Length.
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                drop(stream);
+            });
         }
     });
     port

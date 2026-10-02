@@ -44,30 +44,52 @@ pub async fn tabs(port: u16) -> anyhow::Result<Vec<Tab>> {
         .collect())
 }
 
-/// A plain HTTP/1.1 GET on loopback: all DevTools' discovery needs.
+/// A plain HTTP/1.1 GET on loopback: all DevTools' discovery needs. Chrome
+/// keeps the connection open whatever the request asks, so the body is read
+/// to its `Content-Length` rather than to the end of the stream.
 async fn get(port: u16, path: &str) -> anyhow::Result<String> {
-    let mut stream = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        tokio::net::TcpStream::connect(("127.0.0.1", port)),
-    )
-    .await
-    .context("browser did not answer")??;
+    let timeout = std::time::Duration::from_secs(2);
+    let mut stream =
+        tokio::time::timeout(timeout, tokio::net::TcpStream::connect(("127.0.0.1", port)))
+            .await
+            .context("browser did not answer")??;
     let request =
         format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).await?;
+    tokio::time::timeout(timeout, read_response(&mut stream, path))
+        .await
+        .context("browser did not answer")?
+}
+
+async fn read_response(stream: &mut tokio::net::TcpStream, path: &str) -> anyhow::Result<String> {
     let mut raw = Vec::new();
-    tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        stream.read_to_end(&mut raw),
-    )
-    .await
-    .context("browser did not answer")??;
-    let text = String::from_utf8_lossy(&raw);
-    let (head, body) = text
-        .split_once("\r\n\r\n")
-        .context("malformed DevTools reply")?;
-    anyhow::ensure!(head.contains(" 200 "), "DevTools refused {path}");
-    Ok(body.to_string())
+    let mut chunk = [0u8; 8192];
+    loop {
+        let read = stream.read(&mut chunk).await?;
+        raw.extend_from_slice(&chunk[..read]);
+        let Some(split) = raw.windows(4).position(|w| w == b"\r\n\r\n") else {
+            anyhow::ensure!(read > 0, "DevTools closed the connection early");
+            continue;
+        };
+        let head = String::from_utf8_lossy(&raw[..split]).to_string();
+        anyhow::ensure!(head.contains(" 200 "), "DevTools refused {path}");
+        let length = head.lines().find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.trim()
+                .eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<usize>().ok())
+                .flatten()
+        });
+        let body = &raw[split + 4..];
+        match length {
+            Some(length) if body.len() >= length => {
+                return Ok(String::from_utf8_lossy(&body[..length]).to_string());
+            }
+            None if read == 0 => return Ok(String::from_utf8_lossy(body).to_string()),
+            _ if read == 0 => anyhow::bail!("DevTools closed the connection early"),
+            _ => {}
+        }
+    }
 }
 
 /// Streams a tab's screen: calls `frame` with each JPEG (base64) and the
