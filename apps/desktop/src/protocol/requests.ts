@@ -172,6 +172,7 @@ export type ClientRequestBody =
   | { readonly type: "watch_browser"; readonly bot_id: string; readonly tab_id?: string }
   | { readonly type: "unwatch_browser" }
   | { readonly type: "list_browser_activity"; readonly bot_id: string; readonly limit?: number }
+  | { readonly type: "list_bot_commands"; readonly bot_id: string; readonly limit?: number }
   | { readonly type: "list_agent_conversations"; readonly project_id: string }
   | {
       readonly type: "list_agent_conversation";

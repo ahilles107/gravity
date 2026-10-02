@@ -20,6 +20,7 @@ use crate::app::{AppState, DAEMON_VERSION, PROTOCOL_VERSION};
 mod admin;
 mod browser;
 mod chat;
+mod commands;
 mod conversations;
 mod decisions;
 mod decisions_publish;

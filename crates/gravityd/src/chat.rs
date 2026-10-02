@@ -11,6 +11,7 @@ mod browser_steps;
 mod builder;
 #[cfg(test)]
 mod builder_tests;
+pub mod commands;
 mod envelope;
 pub mod files;
 pub mod model;

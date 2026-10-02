@@ -79,6 +79,7 @@ const REPLY_TYPES: ReadonlySet<string> = new Set(
     upload: true,
     task: true,
     browser_activity: true,
+    bot_commands: true,
     agent_conversations: true,
     agent_conversation: true,
   } satisfies Record<ServerReplyType, true>),

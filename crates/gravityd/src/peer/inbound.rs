@@ -19,7 +19,7 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
         "ping" => Ok(json!({})),
         "list_bots" => list_bots(app),
         "link" => link(app, &peer, frame),
-        "chat" | "chat_step" | "chat_image" | "read_file" | "browser_activity" => {
+        "chat" | "chat_step" | "chat_image" | "read_file" | "browser_activity" | "bot_commands" => {
             super::chat::serve(app, &peer, frame)
         }
         "term_attach" => super::term::serve_attach(app, &peer, frame),

@@ -23,6 +23,7 @@
 @import "./styles/tasks.css";
 @import "./styles/agent-browser.css";
 @import "./styles/conversations.css";
+@import "./styles/commands.css";
 @import "./styles/overlays.css";
 @import "./styles/settings.css";
 @import "./styles/devices.css";

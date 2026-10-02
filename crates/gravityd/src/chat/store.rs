@@ -27,6 +27,8 @@ struct BotChat {
     /// Bytes of the transcript already folded in; always at a line boundary.
     offset: u64,
     builder: Builder,
+    /// The commands the bot ran, read from the same lines.
+    commands: super::commands::CommandLog,
 }
 
 #[derive(Default)]
@@ -45,11 +47,17 @@ impl ChatStore {
                 path: path.clone(),
                 offset: 0,
                 builder: Builder::new(&bot.id, names(app, bot)),
+                commands: Default::default(),
             };
         }
         if let Some(path) = &path {
             let offset = chat.offset;
-            chat.offset = read_from(path, offset, &mut chat.builder)?;
+            let chat = &mut *chat;
+            let (builder, commands) = (&mut chat.builder, &mut chat.commands);
+            chat.offset = read_from(path, offset, |at, line| {
+                builder.push_line(at, line);
+                commands.push_line(line);
+            })?;
         }
         let changed = chat.builder.take_changed();
         // The first read is a snapshot, not news.
@@ -91,6 +99,26 @@ impl ChatStore {
             .last()
             .filter(|turn| turn.open)
             .map(|turn| turn.trigger.clone()))
+    }
+
+    /// The commands the bot ran, the running ones first, then the newest. A
+    /// background command still running shows the end of its output file.
+    pub fn commands(
+        &self,
+        app: &AppState,
+        bot: &Bot,
+        limit: usize,
+    ) -> anyhow::Result<Vec<super::commands::Command>> {
+        self.refresh(app, bot)?;
+        let (chat, _) = self.entry(app, bot)?;
+        let mut commands = lock(&chat).commands.list(busy(app, bot), limit);
+        for command in &mut commands {
+            let running = command.status == super::commands::CommandStatus::Running;
+            if let (true, Some(file)) = (running, &command.output_file) {
+                command.output = super::commands::read_tail(Path::new(file));
+            }
+        }
+        Ok(commands)
     }
 
     /// The bot's browser actions, newest first: what it did to which page, in
@@ -224,6 +252,7 @@ impl ChatStore {
             path: None,
             offset: 0,
             builder: Builder::new(&bot.id, names(app, bot)),
+            commands: Default::default(),
         }));
         bots.insert(bot.id.clone(), chat.clone());
         Ok((chat, true))
@@ -282,7 +311,7 @@ fn settle(mut page: Vec<ChatTurn>, all: &[ChatTurn], busy: bool) -> Vec<ChatTurn
 
 /// Folds the complete lines after `offset` into the builder and returns the
 /// offset of the first line not yet complete.
-fn read_from(path: &Path, offset: u64, builder: &mut Builder) -> anyhow::Result<u64> {
+fn read_from(path: &Path, offset: u64, mut push: impl FnMut(u64, &str)) -> anyhow::Result<u64> {
     let mut file = File::open(path)?;
     let len = file.metadata()?.len();
     // A shorter file than we have read is a rewritten one: start over.
@@ -294,7 +323,7 @@ fn read_from(path: &Path, offset: u64, builder: &mut Builder) -> anyhow::Result<
     while let Some(end) = bytes[start..].iter().position(|&b| b == b'\n') {
         let line = &bytes[start..start + end];
         if let Ok(text) = std::str::from_utf8(line) {
-            builder.push_line(offset + start as u64, text);
+            push(offset + start as u64, text);
         }
         start += end + 1;
     }

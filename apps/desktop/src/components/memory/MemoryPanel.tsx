@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ReactElement } from "react";
 import { useLoadOnConnect } from "../../hooks/useLoadOnConnect";
+import { useOnBotTurns } from "../../hooks/useOnBotTurns";
 import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import { errText } from "../../util";
@@ -56,20 +57,7 @@ export default function MemoryPanel({ client, bot, connected }: MemoryPanelProps
 
   useLoadOnConnect(connected, load);
 
-  useEffect(() => {
-    let timer: number | undefined;
-    const off = client.on("chat_turns", (push) => {
-      if (push.bot_id !== bot.id) {
-        return;
-      }
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => void load(), REFRESH_DELAY_MS);
-    });
-    return () => {
-      window.clearTimeout(timer);
-      off();
-    };
-  }, [client, bot.id, load]);
+  useOnBotTurns(client, bot.id, load, REFRESH_DELAY_MS);
 
   return (
     <div className="memory-panel tab-pane-scroll">

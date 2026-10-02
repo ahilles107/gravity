@@ -31,7 +31,8 @@ the conversations between a project's bots (`list_agent_conversations`,
 `list_agent_conversation`), and `peer_terminal` when a linked bot's terminal can be
 attached to, typed into and resized here, relayed from its machine, and
 `peer_browser` when a linked bot's browser can be watched here the same way
-(`watch_browser`, `list_browser_activity` on the stand-in).
+(`watch_browser`, `list_browser_activity` on the stand-in), and `bot_commands` when
+`list_bot_commands` lists what each bot is running.
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -121,6 +122,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `watch_browser` | `bot_id, tab_id?` | `ok`, then `browser_tabs` and `browser_frame` pushes to this connection, starting with the current tabs and screen. `tab_id` shows that tab; without it the view follows the tab the bot used last. One watch per connection: a new one replaces it. Every connection watching a bot shares one stream, and a slow one gets the newest frame rather than every frame. Requires `read` |
 | `unwatch_browser` | – | `ok`; stops the stream |
 | `list_browser_activity` | `bot_id, limit?` (default 100) | `browser_activity`: `activity`, newest first, each `{ turn_id, step_id, at, browser: own\|owners_chrome, title, subtitle?, status, trigger }`; `trigger` is what started the turn, as in the chat |
+| `list_bot_commands` | `bot_id, limit?` (default 100) | `bot_commands`: `commands`, running first then newest, each `{ id, command, description?, background, status: running\|done\|failed\|stopped, started_at, ended_at?, exit_code?, task_id?, output? }`. Read from the bot's transcript: a background command runs until the runtime reports it finished or the bot stops it, and a running one's `output` is the live end of its output file. A command left running when its session ended is `stopped`. For a linked bot, read from its machine. Refetch on `chat_turns` for the bot, and every few seconds while a background command runs. Requires `read` |
 | `list_agent_conversations` | `project_id` | `agent_conversations`: `conversations`, most recent first, each `{ bot_ids: [a, b], message_count, last_at, last }`, and `bots` (`id, name, avatar, machine?, deleted`) naming everyone in them |
 | `list_agent_conversation` | `project_id, bot_ids: [a, b], before?, limit?` (default 50) | `agent_conversation`: `messages` between the two, oldest first, each `{ id, num, from_bot_id, to_bot_id, kind, body, ref_message_id?, task?: { id, state }, created_at }`, `has_more`, and `bots`. `before` is a message `num` |
 | `list_permissions` | `bot_id?` | `permissions` (prompts waiting on the owner) |

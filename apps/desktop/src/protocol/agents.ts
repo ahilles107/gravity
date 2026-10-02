@@ -83,3 +83,21 @@ export interface AgentConversation {
   /** The newest message, its body cut to a preview. */
   readonly last: AgentMessage | null;
 }
+
+/** A command a bot ran, or is running (`list_bot_commands`). */
+export interface BotCommand {
+  /** The tool call's id. */
+  readonly id: string;
+  readonly command: string;
+  readonly description?: string;
+  /** Run in the background: it outlives the turn that started it. */
+  readonly background: boolean;
+  /** `stopped`: by the bot, or by its session ending under it. */
+  readonly status: "running" | "done" | "failed" | "stopped";
+  readonly started_at: string;
+  readonly ended_at?: string;
+  readonly exit_code?: number;
+  readonly task_id?: string;
+  /** The end of its output: a running background command's, live. */
+  readonly output?: string;
+}

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useLoadOnConnect } from "../../hooks/useLoadOnConnect";
+import { useOnBotTurns } from "../../hooks/useOnBotTurns";
 import type { BrowserAction } from "../../protocol/agents";
 import type { DaemonApi } from "../../protocol/api";
 import { errText } from "../../util";
@@ -37,20 +38,7 @@ export function useBrowserActivity(
 
   useLoadOnConnect(connected, load);
 
-  useEffect(() => {
-    let timer: number | undefined;
-    const off = client.on("chat_turns", (push) => {
-      if (push.bot_id !== botId) {
-        return;
-      }
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => void load(), REFRESH_DELAY_MS);
-    });
-    return () => {
-      window.clearTimeout(timer);
-      off();
-    };
-  }, [client, botId, load]);
+  useOnBotTurns(client, botId, load, REFRESH_DELAY_MS);
 
   return { items, error };
 }

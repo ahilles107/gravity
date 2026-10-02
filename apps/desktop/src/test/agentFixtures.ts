@@ -2,6 +2,7 @@ import type {
   AgentBot,
   AgentConversation,
   AgentMessage,
+  BotCommand,
   BrowserAction,
   BrowserTabsPush,
 } from "../protocol/agents";
@@ -155,6 +156,39 @@ export const browserActivity: readonly BrowserAction[] = [
 const facts =
   "# Facts\n\n- The release certificate lives in `certs/release.pfx`.\n- CI runs on the `win-2022` image.";
 
+const botCommands: readonly BotCommand[] = [
+  {
+    id: "b1",
+    command: "./build.sh --player macos",
+    description: "Build the macOS player",
+    background: true,
+    status: "running",
+    started_at: "2025-01-15T10:00:00Z",
+    task_id: "bx1",
+    output: "compiling…\nlinking player",
+  },
+  {
+    id: "t2",
+    command: "cargo test -p updater",
+    description: "Run the updater tests",
+    background: false,
+    status: "failed",
+    started_at: "2025-01-15T09:58:00Z",
+    ended_at: "2025-01-15T09:59:12Z",
+    exit_code: 101,
+    output: "test result: FAILED. 11 passed; 1 failed",
+  },
+  {
+    id: "t1",
+    command: "git status --short",
+    background: false,
+    status: "done",
+    started_at: "2025-01-15T09:57:00Z",
+    ended_at: "2025-01-15T09:57:01Z",
+    output: " M src/update.rs",
+  },
+];
+
 /** A daemon serving bot browsers, memory and conversations from the fixtures above. */
 export function agentsDaemon(): FakeDaemon {
   const client = new FakeDaemon()
@@ -170,6 +204,12 @@ export function agentsDaemon(): FakeDaemon {
       type: "file",
       req_id: "1",
       file: { name: "FACTS.md", mime: "text/markdown", text: facts, truncated: false },
+    }))
+    .onRequest("list_bot_commands", () => ({
+      type: "bot_commands",
+      req_id: "1",
+      bot_id: "b1",
+      commands: botCommands,
     }))
     .onRequest("list_agent_conversations", () => ({
       type: "agent_conversations",
@@ -187,6 +227,12 @@ export function agentsDaemon(): FakeDaemon {
       has_more: false,
       bots: [lead, windev],
     }));
-  client.capabilities = [...client.capabilities, "chat", "bot_browser", "agent_conversations"];
+  client.capabilities = [
+    ...client.capabilities,
+    "chat",
+    "bot_browser",
+    "agent_conversations",
+    "bot_commands",
+  ];
   return client;
 }

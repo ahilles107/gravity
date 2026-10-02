@@ -13,6 +13,7 @@ import type {
   AgentBot,
   AgentConversation,
   AgentMessage,
+  BotCommand,
   BrowserAction,
   BrowserFramePush,
   BrowserTabsPush,
@@ -193,6 +194,12 @@ export type ServerReply =
       readonly bot_id: string;
       /** Newest first. */
       readonly activity: readonly BrowserAction[];
+    })
+  | (ReplyBase & {
+      readonly type: "bot_commands";
+      readonly bot_id: string;
+      /** Running first, then newest first. */
+      readonly commands: readonly BotCommand[];
     })
   | (ReplyBase & {
       readonly type: "agent_conversations";
