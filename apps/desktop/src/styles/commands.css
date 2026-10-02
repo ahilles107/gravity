@@ -97,3 +97,54 @@
   color: var(--amber);
   border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
 }
+
+.command-line-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px 13px;
+}
+
+.command-line-row .command-line {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.command-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 0 13px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.command-block-head + .command-output {
+  margin-top: 4px;
+}
+
+.command-full {
+  max-height: 160px;
+}
+
+.copy-button {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  color: var(--text-strong);
+  background: var(--bg-hover);
+}

@@ -1,5 +1,5 @@
-import { useState } from "react";
 import type { ReactElement } from "react";
+import CopyButton from "../CopyButton";
 import { highlight } from "./highlight";
 
 interface CodeBlockProps {
@@ -12,26 +12,12 @@ interface CodeBlockProps {
 
 /** Code with light highlighting, a language label and a copy button. */
 export default function CodeBlock({ code, language = "", label }: CodeBlockProps): ReactElement {
-  const [copied, setCopied] = useState(false);
-  const copy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => {
-        setCopied(false);
-      }, 1500);
-    } catch {
-      setCopied(false);
-    }
-  };
   const heading = label ?? language;
   return (
     <div className="code-block">
       <div className="code-block-head">
         <span className="code-block-lang">{heading === "" ? "text" : heading}</span>
-        <button type="button" className="code-block-copy" onClick={() => void copy()}>
-          {copied ? "Copied" : "Copy"}
-        </button>
+        <CopyButton text={code} className="code-block-copy" />
       </div>
       <pre className="code-block-body">
         <code>

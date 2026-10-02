@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { agentsDaemon } from "../../test/agentFixtures";
 import * as fx from "../../test/fixtures";
 import CommandsPanel, { elapsed } from "./CommandsPanel";
@@ -23,6 +23,20 @@ describe("CommandsPanel", () => {
     render(<CommandsPanel client={agentsDaemon()} bot={fx.bot()} connected />);
     await userEvent.click(await screen.findByRole("button", { name: /Build the macOS player/ }));
     expect(screen.getByText(/linking player/)).toBeInTheDocument();
+  });
+
+  it("copies a command and its output", async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<CommandsPanel client={agentsDaemon()} bot={fx.bot()} connected />);
+    const running = await screen.findByRole("region", { name: "Running" });
+    await userEvent.click(within(running).getByRole("button", { name: "Copy command" }));
+    expect(writeText).toHaveBeenLastCalledWith("./build.sh --player macos");
+    expect(await within(running).findByText("Copied")).toBeInTheDocument();
+
+    await userEvent.click(within(running).getByRole("button", { name: /Build the macOS player/ }));
+    await userEvent.click(within(running).getByRole("button", { name: "Copy output" }));
+    expect(writeText).toHaveBeenLastCalledWith("compiling…\nlinking player");
   });
 
   it("refetches as the bot works", async () => {

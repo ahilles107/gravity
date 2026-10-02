@@ -6,6 +6,7 @@ import type { BotCommand } from "../../protocol/agents";
 import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import { errText, fmtTimestamp } from "../../util";
+import CopyButton from "../CopyButton";
 
 /** Waits this long after the bot's turns change before refetching. */
 const REFRESH_DELAY_MS = 600;
@@ -70,9 +71,29 @@ function CommandRow({ command }: { readonly command: BotCommand }): ReactElement
           </span>
         )}
       </button>
-      <code className="command-line">{command.command}</code>
+      {open ? null : (
+        <div className="command-line-row">
+          <code className="command-line">{command.command}</code>
+          <CopyButton text={command.command} label="Copy command" />
+        </div>
+      )}
       <div className="task-when">{when(command)}</div>
-      {open ? <pre className="command-output">{command.output ?? "No output yet."}</pre> : null}
+      {open ? (
+        <>
+          <div className="command-block-head">
+            <span>Command</span>
+            <CopyButton text={command.command} label="Copy command" />
+          </div>
+          <pre className="command-output command-full">{command.command}</pre>
+          <div className="command-block-head">
+            <span>Output</span>
+            {command.output == null || command.output === "" ? null : (
+              <CopyButton text={command.output} label="Copy output" />
+            )}
+          </div>
+          <pre className="command-output">{command.output ?? "No output yet."}</pre>
+        </>
+      ) : null}
     </li>
   );
 }
