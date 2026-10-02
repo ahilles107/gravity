@@ -28,6 +28,9 @@ pub const CAPABILITIES: &[&str] = &[
     "config",
     "decisions",
     "bot_runtime",
+    "chat",
+    "permissions",
+    "peer_chat",
 ];
 
 pub struct AppState {
@@ -42,6 +45,10 @@ pub struct AppState {
     /// Live links to peer daemons, shared by the delivery worker (forwarding
     /// to linked bots) and the control plane (pairing and linking).
     pub peers: crate::peer::PeerHub,
+    /// Bots' conversations read from their transcripts, for the chat pane.
+    pub chat: crate::chat::ChatStore,
+    /// Permission prompts waiting on the owner's answer.
+    pub approvals: crate::approval::Approvals,
     pub started_at: Instant,
     /// Wall-clock start, kept alongside the monotonic `started_at` purely so
     /// [`AppState::stale_build`] can compare it against a file mtime.
@@ -79,6 +86,8 @@ impl AppState {
             supervisor,
             auto_compact,
             peers: crate::peer::PeerHub::default(),
+            chat: crate::chat::ChatStore::default(),
+            approvals: crate::approval::Approvals::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),
         }))

@@ -200,6 +200,15 @@ would read a local one.
   it shows its conversation and the composer instead of a terminal. Sending to
   it from the composer is a forwarded `chat`.
 
+A linked bot's chat (turns, step details, images, and files from its own
+directory) is read from the daemon it runs on: the app asks its own daemon,
+which asks the peer over the link (`chat`, `chat_step`, `chat_image` and
+`read_file` frames). While the chat is open, the peer streams `chat_turns`
+event frames back for it. A peer serves these only for bots linked to it.
+Daemons advertise this as the `peer_chat` capability; with an older daemon the
+app falls back to the bot's bus conversation. Permission prompts of a linked
+bot are answered on its own machine.
+
 Watching the Windows bot's terminal from the Mac is left to the UI rework.
 It needs the app to hold connections to two daemons at once.
 

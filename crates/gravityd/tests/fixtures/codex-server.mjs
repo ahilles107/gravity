@@ -24,6 +24,20 @@ function receive(request, respond) {
     reply(id, { turn: { id: "turn-fixture", status: "inProgress" } });
     if (text === "approval") {
       send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { command: "echo hello", threadId: "thread-fixture", turnId: "turn-fixture" } });
+    } else if (text === "tools") {
+      const change = { id: "fc-1", type: "fileChange", status: "completed",
+        changes: [{ path: "/w/src/update.rs", kind: { type: "update", move_path: null },
+          diff: "@@ -1,1 +1,2 @@\n-old\n+new\n+more\n" }] };
+      notify("item/started", { item: change });
+      notify("item/completed", { item: { id: "cmd-1", type: "commandExecution", command: "cargo test",
+        cwd: "/w", aggregatedOutput: "test result: ok", exitCode: 0, status: "completed" } });
+      notify("item/completed", { item: change });
+      notify("item/completed", { item: { id: "mcp-1", type: "mcpToolCall", server: "gravity-bus",
+        tool: "send_message", status: "completed", arguments: { to: "lead", kind: "note", body: "built" },
+        result: { content: [{ type: "text", text: "{}" }] }, error: null } });
+      notify("item/completed", { item: { type: "agentMessage", text: "Built it." } });
+      active = false;
+      notify("turn/completed", { turn: { id: "turn-fixture", status: "completed" } });
     } else if (text === "crash") { process.exit(7); }
     else if (text !== "hold") {
       notify("item/agentMessage/delta", { delta: "Hello 🪟" });
@@ -38,6 +52,8 @@ function receive(request, respond) {
     notify("turn/completed", { turn: { id: "turn-fixture", status: "interrupted" } });
   } else if (id === "approval-1" && request.result) {
     if (!active) { throw new Error("approval after completed turn"); }
+    // Every client hears that the request is settled, as the real server says.
+    notify("serverRequest/resolved", { threadId: "thread-fixture", requestId: "approval-1" });
     active = false;
     notify("turn/completed", { turn: { id: "turn-fixture", status: "completed" } });
   } else { throw new Error(`Unexpected request ${line}`); }

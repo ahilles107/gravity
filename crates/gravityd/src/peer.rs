@@ -6,6 +6,7 @@
 //! the sender were one of its own. See `docs/peer-bots.md`.
 
 mod artifacts;
+pub mod chat;
 pub mod cli;
 mod forward;
 mod frames;

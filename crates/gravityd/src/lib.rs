@@ -4,9 +4,11 @@
 pub mod activity;
 pub mod actor;
 pub mod app;
+pub mod approval;
 pub mod backup;
 pub mod botmgmt;
 pub mod channel;
+pub mod chat;
 pub mod config;
 pub mod db;
 pub mod decisions;

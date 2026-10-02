@@ -129,6 +129,17 @@ impl RuntimeSession for NativeSession {
             .backend
             .deliver(text)
     }
+    fn answer_permission(
+        &mut self,
+        key: u64,
+        answer: crate::runtime::PermissionAnswer,
+    ) -> anyhow::Result<()> {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .backend
+            .answer_permission(key, answer)
+    }
     fn kill(&mut self) -> anyhow::Result<()> {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).kill()
     }

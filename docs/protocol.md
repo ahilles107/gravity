@@ -23,6 +23,11 @@ Server replies:
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
 
+A client may add `"features": ["permission_cards"]` to `hello`: it shows bots'
+permission prompts and can answer them (`answer_permission`). The daemon only holds
+a Claude Code prompt for the app while at least one such client with the `control`
+grant is connected; otherwise the prompt stays in the bot's terminal.
+
 Two credential kinds are accepted as `token`:
 
 - **Owner token** (`~/.gravity/secrets/client.token`) — full grants, same machine.
@@ -89,6 +94,16 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `revoke_peer` | `peer_id` | `peer` |
 | `list_peer_bots` | `peer_id` | `peer_bots` (`bots`: id, name, description, avatar, runtime, project) |
 | `link_peer_bot` | `peer_id, remote_bot_id, project_id` | `bot` (a linked bot; `peer` is set on it) |
+| `list_chat` | `bot_id, before?` (a turn id), `limit?` (default 30, max 200) | `chat` (`turns` oldest first, `has_more`) |
+| `get_chat_step` | `bot_id, item_id` | `chat_step` (`detail`: `input?, command?, output?, diff?, content?`) |
+| `get_chat_image` | `bot_id, image_id` | `file` |
+| `list_artifacts` | `project_id` | `artifacts` (newest first) |
+| `write_artifact` | `project_id, name, base64` (one chunk, up to ~512 KB), `upload_id?` (from the first chunk's reply), `last` | `upload` (`upload_id`, and `path` once the last chunk is in); `control` grant. Files land in the project's `artifacts/uploads/`, up to 16 MB |
+| `list_tasks` | `bot_id, limit?` (default 100) | `tasks`: newest first, each with `state`, `role` (`assigned` \| `delegated`), `other` (`name`, `machine?`), `request` and `result?` as previews (`request_truncated`, `result_truncated` say when they were cut), `deadline_at?`, `closed_at?` |
+| `get_task` | `bot_id, task_id` | `task`: the same shape with the whole request and result |
+| `list_permissions` | `bot_id?` | `permissions` (prompts waiting on the owner) |
+| `answer_permission` | `request_id, decision` (`allow_once` \| `allow_session` \| `deny`), `reason?` | `permission`; `control` grant |
+| `read_file` | `path` and `bot_id` (its directory and its project's artifacts) or `project_id` (artifacts only) | `file` (`text` or `base64`, capped at 16 MiB) |
 | `list_decisions` | `project_id?, state?, tag?, bot_id?, query?, before?, limit?` | `decisions` |
 | `get_decision` | `decision_id` | `decision` (with comments, tags, notifications) |
 | `count_pending_decisions` | – | `pending_decisions` |
@@ -174,6 +189,15 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
   the `ready` state; see Semantics.
 - `delivery_update`: `{ "delivery": {...} }`.
+- `permission_request`: `{ "request": { "id", "bot_id", "tool", "summary", "input", "created_at", "expires_at" } }`
+  — a bot's tool waits on the owner. Unanswered by `expires_at` (config
+  `permission_timeout_seconds`, default 600) it is denied.
+- `permission_resolved`: `{ "request_id", "bot_id", "outcome" }` — outcome ∈
+  `allowed_once|allowed_session|denied|expired|abandoned` (the hook went away first).
+- `chat_turns`: `{ "bot_id", "turns": [...] }` — turns of a loaded chat that are new or
+  changed, usually the open one. Merge by turn `id`. Only bots whose chat a client has
+  listed are followed. The turn model is described in
+  [the chat pane design](superpowers/specs/2026-09-16-chat-pane-design.md).
 - `routine_run_update`: `{ "routine_run": {...} }`.
 - `approval_pending`: `{ "bot_id", "detail" }` — bot is waiting on its native permission prompt.
 - `notify`: `{ "level": "info|warn|error", "title", "body", "decision_id"? }` —

@@ -39,6 +39,7 @@ mod signals;
 mod tags;
 #[cfg(test)]
 mod tags_tests;
+mod task_views;
 mod tasks;
 #[cfg(test)]
 mod tests;

@@ -251,6 +251,9 @@ export class DaemonClient implements DaemonApi {
         protocol_version: PROTOCOL_VERSION,
         token,
         client: CLIENT_ID,
+        // This app shows permission cards, so the daemon may hold a bot's
+        // prompt for it instead of leaving it to the terminal.
+        features: ["permission_cards"],
       });
       if (replyIs(reply, "error")) {
         throw new DaemonError(reply.code, reply.message);

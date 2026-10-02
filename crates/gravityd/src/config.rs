@@ -62,6 +62,9 @@ pub struct Config {
     /// own children, and archived bots free their slot, this bounds the whole
     /// population regardless of how deeply bots nest their teams.
     pub max_bots_per_project: usize,
+    /// How long, in seconds, a permission prompt waits for an answer from the
+    /// app before it is denied. Capped below the hook's own timeout.
+    pub permission_timeout_seconds: u64,
     pub delivery: DeliveryConfig,
     pub scheduler: SchedulerConfig,
     /// How often the supervisor reconciles live bots into running sessions.
@@ -179,6 +182,7 @@ impl Default for Config {
             auto_compact_window: Some(DEFAULT_AUTO_COMPACT_WINDOW),
             classic_renderer: true,
             max_bots_per_project: 12,
+            permission_timeout_seconds: 600,
             delivery: DeliveryConfig::default(),
             scheduler: SchedulerConfig::default(),
             supervision_interval_ms: 5_000,
