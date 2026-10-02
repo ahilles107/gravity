@@ -24,6 +24,7 @@ pub mod paths;
 pub mod peer;
 mod permissions;
 pub mod projectmgmt;
+pub mod resume;
 pub mod routine_validation;
 pub mod runtime;
 pub mod scheduler;

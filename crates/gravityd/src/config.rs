@@ -65,6 +65,9 @@ pub struct Config {
     /// How long, in seconds, a permission prompt waits for an answer from the
     /// app before it is denied. Capped below the hook's own timeout.
     pub permission_timeout_seconds: u64,
+    /// After a restart, tell each bot that was cut off mid-turn, or still
+    /// holds open tasks, to pick its work back up. See [`crate::resume`].
+    pub resume_after_restart: bool,
     pub delivery: DeliveryConfig,
     pub scheduler: SchedulerConfig,
     /// How often the supervisor reconciles live bots into running sessions.
@@ -185,6 +188,7 @@ impl Default for Config {
             classic_renderer: true,
             max_bots_per_project: 12,
             permission_timeout_seconds: 600,
+            resume_after_restart: true,
             delivery: DeliveryConfig::default(),
             browser: crate::browser::BrowserConfig::default(),
             scheduler: SchedulerConfig::default(),

@@ -296,6 +296,12 @@ Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
   restarts crashes with backoff (2s doubling to 5 minutes), so `bot_state` is
   something clients observe, never something they drive. A bot only reaches
   `stopped` when the daemon stops it while archiving.
+- After a daemon restart, every bot resumes its conversation, and each bot that
+  was cut off mid-turn, or still holds open tasks, is sent one `note` from the
+  daemon: what started the interrupted turn, its open tasks with their
+  `task_id`s, and to pick up where it left off (or keep waiting, if it was
+  waiting on someone). It is read from the transcripts before sessions restart;
+  `resume_after_restart = false` in `gravityd.toml` turns it off.
 - Multiple clients may `attach` to the same bot; all receive `term` pushes. Any
   connection with the `control` grant may `input`/`resize` — there is no input
   lease. Bus deliveries are posted to the bot session's inbox socket

@@ -14,7 +14,7 @@ use serde_json::Value;
 use crate::app::AppState;
 
 use super::builder::Builder;
-use super::model::{ChatTurn, StepDetail};
+use super::model::{ChatTurn, StepDetail, Trigger};
 use super::steps::{self, result_text};
 
 const MAX_INPUT_CHARS: usize = 4_000;
@@ -77,6 +77,20 @@ impl ChatStore {
         let start = end.saturating_sub(limit);
         let page = settle(turns[start..end].to_vec(), turns, busy(app, bot));
         Ok((page, start > 0))
+    }
+
+    /// What started the bot's last turn, when that turn never ended: the
+    /// session stopped mid-turn. Read before the session is started again.
+    pub fn interrupted(&self, app: &AppState, bot: &Bot) -> anyhow::Result<Option<Trigger>> {
+        self.refresh(app, bot)?;
+        let (chat, _) = self.entry(app, bot)?;
+        let chat = lock(&chat);
+        Ok(chat
+            .builder
+            .turns
+            .last()
+            .filter(|turn| turn.open)
+            .map(|turn| turn.trigger.clone()))
     }
 
     /// The bot's browser actions, newest first: what it did to which page, in
