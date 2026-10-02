@@ -11,6 +11,14 @@ paths = ['''apps/desktop/src/components/devices/TokenReveal\.stories\.tsx$''']
 regexTarget = "secret"
 regexes = ['''^grav_5f2c9e4ab8d14c6f9a3e7d1b0c8f2a6e$''']
 
+# The WebSocket handshake key is base64 of "gravity-test-key", not a credential.
+[[allowlists]]
+description = "Synthetic Sec-WebSocket-Key in the Codex terminal fixture"
+condition = "AND"
+paths = ['''crates/gravityd/tests/fixtures/codex-websocket\.mjs$''']
+regexTarget = "secret"
+regexes = ['''^Z3Jhdml0eS10ZXN0LWtleQ==$''']
+
 [[rules]]
 id = "linear-api-key"
 description = "Linear personal API key"
