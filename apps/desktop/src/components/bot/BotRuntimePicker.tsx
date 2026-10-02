@@ -47,7 +47,7 @@ export default function BotRuntimePicker({
     }
   };
   return (
-    <div className="field">
+    <div className="field bot-runtime">
       <label className="field-label" htmlFor="bot-runtime">
         Bot runtime
       </label>
