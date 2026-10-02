@@ -35,6 +35,7 @@ pub const CAPABILITIES: &[&str] = &[
     "bot_browser",
     "agent_conversations",
     "peer_terminal",
+    "peer_browser",
 ];
 
 pub struct AppState {

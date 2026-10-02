@@ -77,7 +77,15 @@ Streaming happens only while some client watches that bot.
 Without Node the bot starts without a browser of its own, and the daemon logs
 a warning. `npx` downloads the pinned package on first use.
 
-## Not yet
+## A linked bot's browser
 
-A linked bot's browser runs on its own machine and is watched there; the
-Browser tab is not shown for linked bots.
+A linked bot's browser runs on its own machine, and the daemon a client is
+connected to relays it (`peer_browser`): its Browser tab works as for a local
+bot, from the desktop or a phone. The bot's machine watches the browser for
+the peer through its shared stream (`browser_watch`) and forwards the pushes as
+`browser_feed` events: tab lists at once, frames newest only and at most a
+few a second, so a slow link never queues them. The other daemon keeps one
+feed per stand-in and tab choice, shared by its viewers, and renames the bot
+to the stand-in. When the link drops, viewers are told the machine is
+offline, and the feeds resume when it is back. The activity log is read from
+the bot's machine (`list_browser_activity` on the stand-in).

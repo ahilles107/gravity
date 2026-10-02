@@ -306,6 +306,9 @@ while anyone watches, picks up after the last frame it sent when the link comes
 back, and stops (`term_detach`) when the last viewer leaves. A peer only feeds
 or takes input for bots linked to it.
 
+A linked bot's browser is relayed the same way (`peer_browser`); see
+[bot-browser.md](bot-browser.md#a-linked-bots-browser).
+
 ## Schema
 
 One append-only migration:

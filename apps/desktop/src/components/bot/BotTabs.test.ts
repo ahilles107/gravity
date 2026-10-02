@@ -19,5 +19,10 @@ describe("botTabs", () => {
       "chat",
       "terminal",
     ]);
+    expect(botTabs({ chat: true, peerTerminal: true, peerBrowser: true }, true)).toEqual([
+      "chat",
+      "terminal",
+      "browser",
+    ]);
   });
 });

@@ -6,15 +6,11 @@ mod common;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
+use common::devtools::{fake_devtools, start_browser};
 use common::peers::{project, wait_until};
 use common::*;
-use futures::{SinkExt, StreamExt};
 use serde_json::{json, Value};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
-use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 fn bot_root(d: &TestDaemon, bot_id: &str) -> std::path::PathBuf {
     let bot = d.app.db.get_bot(bot_id).expect("db").expect("bot");
@@ -66,58 +62,6 @@ async fn bots_use_their_own_browser_unless_allowed_the_owners_chrome() {
     assert!(system.contains("claude-in-chrome"));
 }
 
-/// Serves `/json/list` with one page, and that page's WebSocket answering
-/// `Page.startScreencast` with a frame, keeping connections open as Chrome
-/// does. Returns the HTTP port.
-async fn fake_devtools(title: &'static str, screencasts: Arc<AtomicUsize>) -> u16 {
-    let ws = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
-    let ws_port = ws.local_addr().expect("addr").port();
-    tokio::spawn(async move {
-        while let Ok((stream, _)) = ws.accept().await {
-            screencasts.fetch_add(1, Ordering::SeqCst);
-            tokio::spawn(async move {
-                let mut socket = tokio_tungstenite::accept_async(stream).await.expect("ws");
-                while let Some(Ok(WsMsg::Text(text))) = socket.next().await {
-                    let call: Value = serde_json::from_str(&text).expect("json");
-                    if call["method"] == "Page.startScreencast" {
-                        let frame = json!({
-                            "method": "Page.screencastFrame",
-                            "params": { "data": "SlBFRw==", "sessionId": 1,
-                                        "metadata": { "deviceWidth": 800, "deviceHeight": 600 } }
-                        });
-                        let _ = socket.send(WsMsg::Text(frame.to_string())).await;
-                    }
-                }
-            });
-        }
-    });
-    let http = TcpListener::bind("127.0.0.1:0").await.expect("bind http");
-    let port = http.local_addr().expect("addr").port();
-    tokio::spawn(async move {
-        while let Ok((mut stream, _)) = http.accept().await {
-            let mut buf = [0u8; 1024];
-            let _ = stream.read(&mut buf).await;
-            let body = json!([{
-                "id": "tab-1", "type": "page", "title": title, "url": "https://example.com/",
-                "webSocketDebuggerUrl": format!("ws://127.0.0.1:{ws_port}/devtools/page/tab-1")
-            }])
-            .to_string();
-            let reply = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
-                body.len()
-            );
-            let _ = stream.write_all(reply.as_bytes()).await;
-            // Like Chrome: the connection stays open whatever the request
-            // asked, so the daemon has to stop at Content-Length.
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(30)).await;
-                drop(stream);
-            });
-        }
-    });
-    port
-}
-
 #[tokio::test]
 async fn the_app_watches_a_bots_browser_live() {
     let d = spawn_daemon_with(|cfg| cfg.user_home = cfg.home.join("user")).await;
@@ -137,13 +81,7 @@ async fn the_app_watches_a_bots_browser_live() {
     // The bot's browser comes up and writes its DevTools port to its profile.
     let screencasts = Arc::new(AtomicUsize::new(0));
     let port = fake_devtools("Example", screencasts.clone()).await;
-    let profile = bot_root(&d, &id).join("browser/profile");
-    std::fs::create_dir_all(&profile).expect("mkdir");
-    std::fs::write(
-        profile.join("DevToolsActivePort"),
-        format!("{port}\n/devtools/browser/x"),
-    )
-    .expect("port");
+    start_browser(&d, &id, port);
 
     let tabs = c
         .wait_for(|v| v["type"] == "browser_tabs" && v["open"] == true)

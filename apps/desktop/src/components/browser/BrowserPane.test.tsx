@@ -95,6 +95,20 @@ describe("BrowserPane", () => {
     expect(screen.getByText(/your Chrome is off limits/)).toBeInTheDocument();
   });
 
+  it("says a linked bot's browser streams from its machine", async () => {
+    render(
+      <Pane
+        client={agentsDaemon()}
+        bot={fx.bot({ peer: { id: "p", name: "win-pc", online: true } })}
+        active={false}
+        connected
+      />,
+    );
+    expect(
+      await screen.findByText("alice runs on win-pc; its browser streams from there."),
+    ).toBeInTheDocument();
+  });
+
   it("says when the bot may also use the owner's Chrome", async () => {
     render(
       <Pane client={agentsDaemon()} bot={fx.bot({ user_chrome: true })} active={false} connected />,

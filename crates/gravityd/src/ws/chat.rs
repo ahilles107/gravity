@@ -161,7 +161,7 @@ impl Conn {
     }
 
     /// The bot, when it is linked: its chat lives on its peer.
-    fn linked(&self, bot_id: &str) -> Option<bus::Bot> {
+    pub(super) fn linked(&self, bot_id: &str) -> Option<bus::Bot> {
         self.app
             .db
             .get_live_bot(bot_id)
@@ -172,7 +172,7 @@ impl Conn {
 
     /// Asks a linked bot's peer and replies with `reply(result)`, or with an
     /// `unavailable` error when the peer is offline or refuses.
-    fn remote(
+    pub(super) fn remote(
         &self,
         req_id: &Value,
         bot: bus::Bot,

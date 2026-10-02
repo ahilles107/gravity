@@ -49,6 +49,7 @@ export default function BotView(props: BotViewProps): ReactElement {
       chat: client.capabilities.includes("chat"),
       browser: client.capabilities.includes("bot_browser"),
       peerTerminal: client.capabilities.includes("peer_terminal"),
+      peerBrowser: client.capabilities.includes("peer_browser"),
     },
     bot.peer != null,
   );

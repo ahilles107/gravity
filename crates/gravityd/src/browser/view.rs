@@ -34,11 +34,12 @@ pub async fn watch(
     chosen: Option<String>,
     out: UnboundedSender<Value>,
 ) {
+    if bot.is_linked() {
+        // Its browser is on its machine, which streams it here.
+        crate::peer::browser::watch(app, bot, chosen, out).await;
+        return;
+    }
     let Some(profile) = profile(&app, &bot) else {
-        let _ = out.send(json!({
-            "type": "browser_tabs", "bot_id": bot.id, "open": false, "tabs": [],
-            "active": null, "reason": "this bot runs on another machine"
-        }));
         return;
     };
     let stream = app.browsers.bot(&bot.id, profile);

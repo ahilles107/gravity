@@ -35,6 +35,10 @@ pub(super) fn serve(app: &AppState, peer: &Peer, frame: &Value) -> anyhow::Resul
             Ok(json!({ "turns": turns, "has_more": has_more }))
         }
         "chat_step" => Ok(json!({ "detail": app.chat.step(app, &bot, text("item_id"))? })),
+        "browser_activity" => {
+            let limit = frame["limit"].as_u64().unwrap_or(100).clamp(1, 500) as usize;
+            Ok(json!({ "activity": app.chat.browser_activity(app, &bot, limit)? }))
+        }
         "chat_image" => {
             let (mime, base64) = app.chat.image(app, &bot, text("image_id"))?;
             Ok(json!({ "mime": mime, "base64": base64 }))

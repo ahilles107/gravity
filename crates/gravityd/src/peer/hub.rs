@@ -73,6 +73,8 @@ pub struct PeerHub {
     chat_watchers: Arc<Mutex<HashMap<String, HashSet<String>>>>,
     /// Terminal feeds served to peers, and mirrors of peers' bot terminals.
     pub terms: Arc<super::term::Terms>,
+    /// Bot browsers watched for peers, and peers' bot browsers watched here.
+    pub browsers: Arc<super::browser::Browsers>,
 }
 
 impl PeerHub {
@@ -199,6 +201,7 @@ impl PeerHub {
             tokio::task::spawn_blocking(move || super::mirror::sync(&app, &peer_id));
         }
         tokio::spawn(super::term::link_up(app.clone(), peer_id.clone()));
+        tokio::spawn(super::browser::link_up(app.clone(), peer_id.clone()));
 
         // Events are applied in the order they were sent: a roster, then a
         // newer one, must not land the other way round.
@@ -262,6 +265,7 @@ impl PeerHub {
         }
         drop(links);
         self.terms.link_down(&peer_id);
+        self.browsers.link_down(&app, &peer_id);
         let _ = app.db.touch_peer(&peer_id);
         tracing::info!(peer_id, "peer link down");
     }

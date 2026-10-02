@@ -52,6 +52,14 @@ impl Conn {
             .get("limit")
             .and_then(Value::as_u64)
             .map_or(DEFAULT_ACTIVITY, |n| (n as usize).clamp(1, MAX_ACTIVITY));
+        // A linked bot browses on its machine, which keeps its log.
+        if let Some(bot) = self.linked(&bot_id) {
+            let frame = json!({ "type": "browser_activity", "limit": limit });
+            self.remote(req_id, bot, frame, move |result| {
+                json!({ "type": "browser_activity", "bot_id": bot_id, "activity": result["activity"] })
+            });
+            return Ok(());
+        }
         self.blocking(req_id, move |app| {
             let bot = app
                 .db

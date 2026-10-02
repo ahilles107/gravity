@@ -16,16 +16,25 @@ export interface TabSupport {
   readonly browser?: boolean;
   /** A linked bot's terminal, relayed from its machine. */
   readonly peerTerminal?: boolean;
+  /** A linked bot's browser, relayed from its machine. */
+  readonly peerBrowser?: boolean;
 }
 
 /**
- * The tabs a bot offers. A linked bot has its chat, and its terminal when the
- * daemon relays it; its browser stays on its own machine.
+ * The tabs a bot offers. A linked bot has its chat, and its terminal and
+ * browser when the daemon relays them from its machine.
  */
 export function botTabs(support: TabSupport, linked: boolean): readonly BotTab[] {
-  const { chat, browser = false, peerTerminal = false } = support;
+  const { chat, browser = false, peerTerminal = false, peerBrowser = false } = support;
   if (linked) {
-    return peerTerminal ? ["chat", "terminal"] : ["chat"];
+    const tabs: BotTab[] = ["chat"];
+    if (peerTerminal) {
+      tabs.push("terminal");
+    }
+    if (peerBrowser) {
+      tabs.push("browser");
+    }
+    return tabs;
   }
   const tabs: BotTab[] = chat ? ["chat", "terminal"] : ["terminal"];
   if (browser) {

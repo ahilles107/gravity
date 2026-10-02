@@ -29,7 +29,9 @@ has a browser of its own the app can watch (`watch_browser`, `list_browser_activ
 `set_bot_user_chrome`, `user_chrome` on bots), and `agent_conversations` when it serves
 the conversations between a project's bots (`list_agent_conversations`,
 `list_agent_conversation`), and `peer_terminal` when a linked bot's terminal can be
-attached to, typed into and resized here, relayed from its machine.
+attached to, typed into and resized here, relayed from its machine, and
+`peer_browser` when a linked bot's browser can be watched here the same way
+(`watch_browser`, `list_browser_activity` on the stand-in).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.

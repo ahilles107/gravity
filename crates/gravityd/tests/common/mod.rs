@@ -16,6 +16,7 @@ use gravityd::db::Db;
 use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::Message as WsMsg;
 
+pub mod devtools;
 pub mod peers;
 pub mod tasks;
 
