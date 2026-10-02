@@ -169,6 +169,18 @@ impl Supervisor {
             rows: 36,
         };
 
+        // Whatever the last session left unfinished is read now, before the
+        // new one writes to the transcript; the note it queues waits for the
+        // session to be ready.
+        if let Some(hook) = self.inner.before_start.get() {
+            let continues = match bot.runtime {
+                bus::BotRuntime::ClaudeCode => resume,
+                bus::BotRuntime::CodexCli => bot_root
+                    .as_deref()
+                    .is_some_and(|root| root.join(crate::runtime::codex::THREAD_FILE).exists()),
+            };
+            hook(bot_id, continues);
+        }
         let started = self.inner.adapter.start(&spec)?;
         // From here on the workspace has a conversation to come back to.
         if let Err(e) = self.inner.db.mark_bot_session(bot_id) {

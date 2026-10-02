@@ -168,6 +168,10 @@ export type ClientRequestBody =
   | { readonly type: "list_tasks"; readonly bot_id: string; readonly limit?: number }
   | { readonly type: "get_task"; readonly bot_id: string; readonly task_id: string }
   | { readonly type: "set_bot_user_chrome"; readonly bot_id: string; readonly enabled: boolean }
+  /** Restarts the session; it picks its conversation back up and is told what it left unfinished. */
+  | { readonly type: "restart_bot"; readonly bot_id: string }
+  /** Restarts with a fresh conversation; work, memory and tasks are kept. */
+  | { readonly type: "clear_bot_session"; readonly bot_id: string }
   /** Streams `browser_tabs` and `browser_frame`; `tab_id` pins a tab, else it follows the bot. */
   | { readonly type: "watch_browser"; readonly bot_id: string; readonly tab_id?: string }
   | { readonly type: "unwatch_browser" }

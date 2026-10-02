@@ -32,7 +32,8 @@ the conversations between a project's bots (`list_agent_conversations`,
 attached to, typed into and resized here, relayed from its machine, and
 `peer_browser` when a linked bot's browser can be watched here the same way
 (`watch_browser`, `list_browser_activity` on the stand-in), and `bot_commands` when
-`list_bot_commands` lists what each bot is running.
+`list_bot_commands` lists what each bot is running, and `restart_bot` when bots
+can be restarted or cleared (`restart_bot`, `clear_bot_session`).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -75,6 +76,8 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
 | `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?, peer_id?` | `bot` (starts running immediately). With `peer_id`, the peer creates the bot in the project linked with this one (`runtime` defaults to the peer's `default_bot_runtime`), and the reply is its stand-in here, with `peer` set; `not_linked` when the project is not linked through that peer, `unavailable` when it is offline |
 | `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
+| `restart_bot` | `bot_id` | `ok`: the bot's session restarts and picks its conversation back up, and is told what it left unfinished (see Semantics). On a linked bot, restarted on its machine. Requires `control` |
+| `clear_bot_session` | `bot_id` | `ok`: the bot restarts with a fresh conversation, without the old one's history (which leaves the chat); its workspace, memory files and tasks are kept, and it is told what it was working on. On a linked bot, done on its machine. Requires `control` |
 | `set_bot_user_chrome` | `bot_id, enabled` | `bot`: whether the bot may also drive the owner's own Chrome (Claude in Chrome). Off by default; restarts the session. See [bot-browser.md](bot-browser.md) |
 | `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot`; on a stand-in in a linked project, forwarded to its machine |
 | `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics. On a stand-in in a linked project, deletes the bot on its machine |
@@ -301,12 +304,16 @@ Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
   restarts crashes with backoff (2s doubling to 5 minutes), so `bot_state` is
   something clients observe, never something they drive. A bot only reaches
   `stopped` when the daemon stops it while archiving.
-- After a daemon restart, every bot resumes its conversation, and each bot that
+- Whenever a bot's session starts again (the daemon starting, a crash restart,
+  a runtime or Chrome change, `restart_bot`, `clear_bot_session`), a bot that
   was cut off mid-turn, or still holds open tasks, is sent one `note` from the
   daemon: what started the interrupted turn, its open tasks with their
   `task_id`s, and to pick up where it left off (or keep waiting, if it was
-  waiting on someone). It is read from the transcripts before sessions restart;
-  `resume_after_restart = false` in `gravityd.toml` turns it off.
+  waiting on someone). After `clear_bot_session` the note says the
+  conversation was cleared and points at `FACTS.md`. It is read from the
+  transcript just before the session starts; a note still waiting to be
+  delivered is not sent twice. `resume_after_restart = false` in
+  `gravityd.toml` turns it off.
 - Multiple clients may `attach` to the same bot; all receive `term` pushes. Any
   connection with the `control` grant may `input`/`resize` — there is no input
   lease. Bus deliveries are posted to the bot session's inbox socket

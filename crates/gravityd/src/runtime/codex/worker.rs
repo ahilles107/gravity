@@ -170,7 +170,7 @@ impl Worker {
             .workspace
             .parent()
             .unwrap_or(&self.spec.workspace)
-            .join("codex-thread-id");
+            .join(super::THREAD_FILE);
         let saved = std::fs::read_to_string(&path)
             .ok()
             .map(|id| id.trim().to_string())

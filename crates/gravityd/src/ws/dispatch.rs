@@ -101,6 +101,8 @@ impl Conn {
             "update_bot" => self.update_bot(&req_id, req),
             "set_bot_runtime" => self.set_bot_runtime(&req_id, req),
             "set_bot_user_chrome" => self.set_bot_user_chrome(&req_id, req),
+            "restart_bot" => self.restart_bot(&req_id, req),
+            "clear_bot_session" => self.clear_bot_session(&req_id, req),
             "watch_browser" => self.watch_browser(&req_id, req),
             "unwatch_browser" => self.unwatch_browser(&req_id),
             "list_browser_activity" => self.list_browser_activity(&req_id, req),

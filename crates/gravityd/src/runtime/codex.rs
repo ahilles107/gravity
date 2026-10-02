@@ -18,6 +18,10 @@ mod worker;
 
 pub use native::NativeCodexAdapter;
 
+/// Where a Codex bot's thread id is kept, in its bot directory: the next
+/// session resumes that thread.
+pub const THREAD_FILE: &str = "codex-thread-id";
+
 #[derive(Debug, Clone)]
 pub struct CodexSpec {
     pub bin: String,

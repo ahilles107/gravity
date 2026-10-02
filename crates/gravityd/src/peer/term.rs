@@ -173,6 +173,19 @@ pub(super) fn serve_detach(app: &AppState, peer: &Peer, frame: &Value) -> anyhow
     Ok(json!({}))
 }
 
+/// The peer's owner restarts a bot linked to it, or clears its conversation.
+pub(super) fn serve_session(app: &AppState, peer: &Peer, frame: &Value) -> anyhow::Result<Value> {
+    let bot = exposed_bot(app, peer, frame)?;
+    if frame["type"] == "clear_bot_session" {
+        let root = std::path::Path::new(&bot.workspace_path).parent();
+        app.supervisor.clear_session(&bot.id, root)?;
+    } else {
+        app.supervisor.restart_bot(&bot.id)?;
+    }
+    tracing::info!(peer = %peer.name, bot = %bot.name, kind = %frame["type"], "peer restarted a bot");
+    Ok(json!({}))
+}
+
 /// Typing and resizes from the peer's clients, for a bot linked to it.
 pub(super) fn serve_event(app: &AppState, peer: &Peer, frame: &Value) {
     let Ok(bot) = exposed_bot(app, peer, frame) else {

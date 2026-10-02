@@ -24,7 +24,7 @@ impl RuntimeAdapter for NativeCodexAdapter {
             spec.workspace
                 .parent()
                 .unwrap_or(&spec.workspace)
-                .join("codex-thread-id"),
+                .join(super::THREAD_FILE),
         )?;
         let mut terminal = spec.clone();
         terminal.claude_bin = super::super::executable::command(&codex.bin)

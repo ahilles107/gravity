@@ -57,13 +57,9 @@ pub fn spawn_workers(app: &Arc<AppState>) {
         tracing::warn!(error = %e, "artifacts dir backfill failed");
     }
 
-    // Work the last run left unfinished, read before any session starts
-    // again, while the transcripts still end where the old sessions stopped.
-    let interrupted = crate::resume::interrupted_work(app);
     // Bots are always-on: bring every live bot up now, then keep reconciling
     // so crashes come back and nothing waits on a user pressing Start.
     app.supervisor.reconcile();
-    crate::resume::nudge(app, interrupted);
     {
         let app = app.clone();
         tokio::spawn(async move {

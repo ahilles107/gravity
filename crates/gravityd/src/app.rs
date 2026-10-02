@@ -37,6 +37,7 @@ pub const CAPABILITIES: &[&str] = &[
     "peer_terminal",
     "peer_browser",
     "bot_commands",
+    "restart_bot",
 ];
 
 pub struct AppState {
@@ -86,7 +87,7 @@ impl AppState {
             secrets.clone(),
             auto_compact.clone(),
         );
-        Ok(Arc::new(Self {
+        let app = Arc::new(Self {
             cfg,
             db,
             events,
@@ -99,7 +100,15 @@ impl AppState {
             browsers: crate::browser::streams::BrowserStreams::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),
-        }))
+        });
+        // Every session start picks up what the last one left unfinished.
+        let weak = Arc::downgrade(&app);
+        app.supervisor.on_start(Box::new(move |bot_id, continues| {
+            if let Some(app) = weak.upgrade() {
+                crate::resume::pick_up(&app, bot_id, continues);
+            }
+        }));
+        Ok(app)
     }
 
     /// True when the daemon binary on disk is newer than the running process.

@@ -23,6 +23,7 @@ pub(super) fn handle(app: &Arc<AppState>, peer_id: &str, frame: &Value) -> anyho
             super::chat::serve(app, &peer, frame)
         }
         "term_attach" => super::term::serve_attach(app, &peer, frame),
+        "restart_bot" | "clear_bot_session" => super::term::serve_session(app, &peer, frame),
         "browser_watch" => super::browser::serve_watch(app, &peer, frame),
         "term_detach" => super::term::serve_detach(app, &peer, frame),
         "list_projects" => super::links::serve_list(app, &peer),

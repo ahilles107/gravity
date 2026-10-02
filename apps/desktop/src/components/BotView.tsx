@@ -11,6 +11,7 @@ import {
 } from "../settings";
 import BotHeader from "./bot/BotHeader";
 import BotPanes from "./bot/BotPanes";
+import BotSessionActions from "./bot/BotSessionActions";
 import BotSidePanel from "./bot/BotSidePanel";
 import type { SideTab } from "./bot/BotSidePanel";
 import BotTabs, { botTabs } from "./bot/BotTabs";
@@ -161,6 +162,15 @@ export default function BotView(props: BotViewProps): ReactElement {
       <BotHeader
         bot={bot}
         canControl={canControl}
+        actions={
+          <BotSessionActions
+            client={client}
+            bot={bot}
+            connected={connected}
+            canControl={canControl}
+            onToast={onToast}
+          />
+        }
         infoPanelCollapsed={infoPanel.collapsed}
         onToggleInfoPanel={() => {
           setInfoPanel((current) => ({ ...current, collapsed: !current.collapsed }));

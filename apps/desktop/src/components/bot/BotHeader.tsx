@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { Bot, BotState } from "../../protocol/entities";
 import BotAvatar from "../BotAvatar";
 import { InfoPanelIcon } from "./icons";
@@ -31,6 +31,8 @@ interface BotHeaderProps {
   readonly canControl: boolean;
   readonly infoPanelCollapsed: boolean;
   readonly onToggleInfoPanel: () => void;
+  /** Session actions shown before the info toggle. */
+  readonly actions?: ReactNode;
 }
 
 export default function BotHeader(props: BotHeaderProps): ReactElement {
@@ -51,10 +53,12 @@ export default function BotHeader(props: BotHeaderProps): ReactElement {
         )}
       </div>
       <div className="view-header-actions">
-        {/* Bots are always-on, so there is no lifecycle control here. The
+        {/* Bots are always-on, so there is no start or stop here; Restart
+            and Clear chat (in `actions`) bring a running bot back. The
             terminal is the user's whenever they hold `control`; only
             read-only connections need a badge. */}
         {canControl ? null : <span className="readonly-badge">Read-only</span>}
+        {props.actions}
         <button
           type="button"
           className="info-panel-toggle"
