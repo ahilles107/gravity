@@ -115,11 +115,31 @@ pub fn server(cfg: &Config, bot_root: &Path) -> Option<Value> {
         ),
     )
     .ok()?;
+    let args = vec![
+        "-y".to_string(),
+        cfg.browser.package.clone(),
+        "--config".to_string(),
+        browser.config().display().to_string(),
+    ];
+    let (command, args) = launch(&npx.display().to_string(), args, cfg!(windows));
     Some(json!({
-        "command": npx,
-        "args": ["-y", cfg.browser.package, "--config", browser.config()],
+        "command": command,
+        "args": args,
         "env": { "PATH": path.to_string_lossy() }
     }))
+}
+
+/// How a session runs `npx`. On Windows it is a batch script, which neither
+/// Claude Code nor Codex can start directly, so it goes through `cmd /c` (the
+/// form Claude Code documents for `npx` servers on native Windows).
+fn launch(npx: &str, args: Vec<String>, windows: bool) -> (String, Vec<String>) {
+    if windows {
+        let mut wrapped = vec!["/c".to_string(), npx.to_string()];
+        wrapped.extend(args);
+        ("cmd".to_string(), wrapped)
+    } else {
+        (npx.to_string(), args)
+    }
 }
 
 /// The directory holding `npx`: the configured one, else the first found on
@@ -254,6 +274,20 @@ mod tests {
             root.join("browser/profile").to_str().expect("utf8")
         );
         assert_eq!(written["capabilities"], json!(["vision"]));
+    }
+
+    #[test]
+    fn windows_runs_npx_through_cmd() {
+        let args = vec!["-y".to_string(), "@playwright/mcp@0.0.83".to_string()];
+        let (command, wrapped) = launch(r"C:\nodejs\npx.cmd", args.clone(), true);
+        assert_eq!(command, "cmd");
+        assert_eq!(
+            wrapped[..2],
+            [r"/c".to_string(), r"C:\nodejs\npx.cmd".to_string()]
+        );
+        assert_eq!(wrapped[2..], args[..]);
+        let (command, plain) = launch("/opt/node/bin/npx", args.clone(), false);
+        assert_eq!((command.as_str(), plain), ("/opt/node/bin/npx", args));
     }
 
     #[test]

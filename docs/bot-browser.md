@@ -75,7 +75,11 @@ Streaming happens only while some client watches that bot.
 | `package` | `@playwright/mcp@0.0.83` | The npm package serving the tools, pinned. |
 
 Without Node the bot starts without a browser of its own, and the daemon logs
-a warning. `npx` downloads the pinned package on first use.
+a warning. `npx` downloads the pinned package on first use. On Windows the
+session runs it as `cmd /c npx.cmd …`, since neither Claude Code nor Codex can
+start a batch script directly. The Windows daemon runs from a Task Scheduler
+task whose PATH can lag a fresh terminal's, so set `node_dir` if Node was
+installed somewhere the daemon does not look.
 
 ## A linked bot's browser
 
