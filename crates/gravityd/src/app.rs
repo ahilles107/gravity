@@ -52,6 +52,8 @@ pub struct AppState {
     pub chat: crate::chat::ChatStore,
     /// Permission prompts waiting on the owner's answer.
     pub approvals: crate::approval::Approvals,
+    /// Bot browsers being watched, one shared stream each.
+    pub browsers: crate::browser::streams::BrowserStreams,
     pub started_at: Instant,
     /// Wall-clock start, kept alongside the monotonic `started_at` purely so
     /// [`AppState::stale_build`] can compare it against a file mtime.
@@ -91,6 +93,7 @@ impl AppState {
             peers: crate::peer::PeerHub::default(),
             chat: crate::chat::ChatStore::default(),
             approvals: crate::approval::Approvals::default(),
+            browsers: crate::browser::streams::BrowserStreams::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),
         }))

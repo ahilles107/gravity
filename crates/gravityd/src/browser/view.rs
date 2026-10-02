@@ -1,21 +1,20 @@
-//! Showing a bot's browser in the app. A connection watches one bot at a
+//! Showing a bot's browser to a client. A connection watches one bot at a
 //! time: it gets `browser_tabs` whenever the bot's tabs change and
 //! `browser_frame` with each new screen of the tab it shows. That tab is the
-//! one the bot used last, unless the owner picked another to look at.
+//! one the bot used last, unless the owner picked another to look at. Every
+//! connection watching the same browser reads the same shared stream (see
+//! `streams`), so the desktop and a phone cost one screencast, not two.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde_json::{json, Value};
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::watch;
 
 use crate::app::AppState;
 
-use super::cdp::{self, Tab};
+use super::streams::{Frame, TabStream};
 use super::BotBrowser;
-
-/// How often the tab list is checked: tabs opening, closing, navigating.
-const POLL: Duration = Duration::from_secs(1);
 
 /// The profile directory of a bot's browser, when the bot runs here.
 pub fn profile(app: &AppState, bot: &bus::Bot) -> Option<std::path::PathBuf> {
@@ -27,28 +26,8 @@ pub fn profile(app: &AppState, bot: &bus::Bot) -> Option<std::path::PathBuf> {
     Some(BotBrowser::new(&root).profile())
 }
 
-/// The bot's open tabs, or none when its browser is not running.
-async fn open_tabs(profile: &std::path::Path) -> Vec<Tab> {
-    match cdp::port(profile) {
-        Some(port) => cdp::tabs(port).await.unwrap_or_default(),
-        None => Vec::new(),
-    }
-}
-
-/// The screencast of the tab on show. Dropping it stops the stream, so an
-/// aborted watch never leaves a tab streaming to a connection that moved on.
-struct Showing {
-    tab_id: String,
-    task: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for Showing {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-
-/// Watches a bot's browser for one connection until the task is aborted.
+/// Watches a bot's browser for one connection until the task is aborted,
+/// through the stream every viewer of that browser shares.
 pub async fn watch(
     app: Arc<AppState>,
     bot: bus::Bot,
@@ -62,53 +41,69 @@ pub async fn watch(
         }));
         return;
     };
-    let mut sent: Option<Value> = None;
-    let mut showing: Option<Showing> = None;
+    let stream = app.browsers.bot(&bot.id, profile);
+    let mut tabs = stream.tabs();
+    let mut showing: Option<(String, Arc<TabStream>, watch::Receiver<Option<Frame>>)> = None;
     loop {
-        let tabs = open_tabs(&profile).await;
-        let active = chosen
-            .as_ref()
-            .and_then(|id| tabs.iter().find(|t| &t.id == id))
-            .or_else(|| tabs.first())
-            .cloned();
-        let listing = json!({
-            "type": "browser_tabs", "bot_id": bot.id, "open": !tabs.is_empty(),
-            "active": active.as_ref().map(|t| t.id.clone()),
-            "following": chosen.is_none(),
-            "tabs": tabs.iter().map(|t| json!({ "id": t.id, "title": t.title, "url": t.url })).collect::<Vec<_>>()
-        });
-        if sent.as_ref() != Some(&listing) {
-            if out.send(listing.clone()).is_err() {
-                break;
+        let frame_changed = async {
+            match &mut showing {
+                Some((_, _, frames)) => frames.changed().await,
+                None => std::future::pending().await,
             }
-            sent = Some(listing);
-        }
-        let stale = match (&showing, &active) {
-            (Some(on), Some(tab)) => on.tab_id != tab.id || on.task.is_finished(),
-            (Some(_), None) => true,
-            (None, _) => false,
         };
-        if stale {
-            showing = None;
-        }
-        if let (None, Some(tab)) = (&showing, active) {
-            let (out, bot_id) = (out.clone(), bot.id.clone());
-            let id = tab.id.clone();
-            let task = tokio::spawn(async move {
-                let result = cdp::screencast(&tab, |data, width, height| {
-                    out.send(json!({
-                        "type": "browser_frame", "bot_id": bot_id, "tab_id": tab.id,
-                        "data": data, "width": width, "height": height
-                    }))
-                    .is_ok()
-                })
-                .await;
-                if let Err(e) = result {
-                    tracing::debug!(error = %e, "browser screencast ended");
+        tokio::select! {
+            changed = tabs.changed() => {
+                if changed.is_err() {
+                    break;
                 }
-            });
-            showing = Some(Showing { tab_id: id, task });
+                let Some(open) = tabs.borrow_and_update().clone() else {
+                    continue;
+                };
+                let active = chosen
+                    .as_ref()
+                    .and_then(|id| open.iter().find(|t| &t.id == id))
+                    .or_else(|| open.first())
+                    .cloned();
+                let listing = json!({
+                    "type": "browser_tabs", "bot_id": bot.id, "open": !open.is_empty(),
+                    "active": active.as_ref().map(|t| t.id.clone()),
+                    "following": chosen.is_none(),
+                    "tabs": open.iter().map(|t| json!({ "id": t.id, "title": t.title, "url": t.url })).collect::<Vec<_>>()
+                });
+                if out.send(listing).is_err() {
+                    break;
+                }
+                let on_show = showing.as_ref().map(|(id, _, _)| id.clone());
+                if on_show != active.as_ref().map(|t| t.id.clone()) {
+                    showing = active.map(|tab| {
+                        let screen = stream.screen(&tab);
+                        let frames = screen.frames();
+                        (tab.id, screen, frames)
+                    });
+                }
+            }
+            changed = frame_changed => {
+                let Some((tab_id, _, frames)) = &mut showing else {
+                    continue;
+                };
+                if changed.is_err() {
+                    // The tab's screencast ended (the tab closed, or Chrome
+                    // dropped it); the next tab list decides what to show.
+                    showing = None;
+                    tabs.mark_changed();
+                    continue;
+                }
+                let Some(frame) = frames.borrow_and_update().clone() else {
+                    continue;
+                };
+                let sent = out.send(json!({
+                    "type": "browser_frame", "bot_id": bot.id, "tab_id": tab_id,
+                    "data": &*frame.data, "width": frame.width, "height": frame.height
+                }));
+                if sent.is_err() {
+                    break;
+                }
+            }
         }
-        tokio::time::sleep(POLL).await;
     }
 }

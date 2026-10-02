@@ -15,9 +15,9 @@ export interface BrowserWatch {
 
 /**
  * Streams a bot's browser while `active`: the daemon pushes its tabs as they
- * change and each new screen of the tab on show. Watching stops when the tab
- * is hidden, so only the browser in view streams. Mount it keyed by bot: a
- * different bot's browser starts from nothing.
+ * change and each new screen of the tab on show. The bot view holds it for as
+ * long as the bot is selected, so the browser is live whichever tab is open.
+ * Mount it keyed by bot: a different bot's browser starts from nothing.
  */
 export function useBrowserWatch(
   client: DaemonApi,

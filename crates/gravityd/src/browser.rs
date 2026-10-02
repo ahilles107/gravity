@@ -6,6 +6,7 @@
 
 mod cdp;
 pub mod setup;
+pub mod streams;
 pub mod view;
 
 pub use setup::{BotBrowser, BrowserConfig};

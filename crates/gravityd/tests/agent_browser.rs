@@ -4,6 +4,8 @@
 
 mod common;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use common::peers::{project, wait_until};
@@ -67,11 +69,12 @@ async fn bots_use_their_own_browser_unless_allowed_the_owners_chrome() {
 /// Serves `/json/list` with one page, and that page's WebSocket answering
 /// `Page.startScreencast` with a frame, keeping connections open as Chrome
 /// does. Returns the HTTP port.
-async fn fake_devtools(title: &'static str) -> u16 {
+async fn fake_devtools(title: &'static str, screencasts: Arc<AtomicUsize>) -> u16 {
     let ws = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
     let ws_port = ws.local_addr().expect("addr").port();
     tokio::spawn(async move {
         while let Ok((stream, _)) = ws.accept().await {
+            screencasts.fetch_add(1, Ordering::SeqCst);
             tokio::spawn(async move {
                 let mut socket = tokio_tungstenite::accept_async(stream).await.expect("ws");
                 while let Some(Ok(WsMsg::Text(text))) = socket.next().await {
@@ -132,7 +135,8 @@ async fn the_app_watches_a_bots_browser_live() {
     assert_eq!(closed["open"], false);
 
     // The bot's browser comes up and writes its DevTools port to its profile.
-    let port = fake_devtools("Example").await;
+    let screencasts = Arc::new(AtomicUsize::new(0));
+    let port = fake_devtools("Example", screencasts.clone()).await;
     let profile = bot_root(&d, &id).join("browser/profile");
     std::fs::create_dir_all(&profile).expect("mkdir");
     std::fs::write(
@@ -156,9 +160,25 @@ async fn the_app_watches_a_bots_browser_live() {
         (Some(800), Some(600))
     );
 
+    // A second viewer (the phone, say) shares the stream: it gets the
+    // current screen at once, and Chrome still serves one screencast.
+    let mut phone = WsClient::connect(&d).await;
+    let ok = phone
+        .request(json!({"type": "watch_browser", "bot_id": id}))
+        .await;
+    assert_eq!(ok["type"], "ok");
+    let shared = phone.wait_for(|v| v["type"] == "browser_frame").await;
+    assert_eq!(shared["data"], "SlBFRw==");
+    assert_eq!(screencasts.load(Ordering::SeqCst), 1);
+    assert_eq!(d.app.browsers.live(), 1);
+
+    // The stream lives while anyone watches, and stops when nobody does.
     let stopped = c.request(json!({"type": "unwatch_browser"})).await;
     assert_eq!(stopped["type"], "ok");
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(d.app.browsers.live(), 1);
+    phone.request(json!({"type": "unwatch_browser"})).await;
+    let app = d.app.clone();
+    wait_until("the shared stream stops", || app.browsers.live() == 0).await;
 }
 
 #[tokio::test]

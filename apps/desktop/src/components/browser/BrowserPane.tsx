@@ -4,13 +4,13 @@ import type { DaemonApi } from "../../protocol/api";
 import type { Bot } from "../../protocol/entities";
 import BrowserActivityList from "./BrowserActivityList";
 import { useBrowserActivity } from "./useBrowserActivity";
-import { useBrowserWatch } from "./useBrowserWatch";
+import type { BrowserWatch } from "./useBrowserWatch";
 
 interface BrowserPaneProps {
   readonly client: DaemonApi;
   readonly bot: Bot;
-  /** Whether the tab is on screen; only then does the browser stream. */
-  readonly active: boolean;
+  /** The bot's browser as it streams (see `useBrowserWatch`). */
+  readonly watch: BrowserWatch;
   readonly connected: boolean;
 }
 
@@ -109,10 +109,9 @@ export function BrowserScreen({
 export default function BrowserPane({
   client,
   bot,
-  active,
+  watch,
   connected,
 }: BrowserPaneProps): ReactElement {
-  const watch = useBrowserWatch(client, bot.id, active, connected);
   const activity = useBrowserActivity(client, bot.id, connected);
   return (
     <div className="browser-pane">

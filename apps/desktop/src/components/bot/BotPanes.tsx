@@ -8,6 +8,7 @@ import LinkedChat from "../chat/LinkedChat";
 import PermissionCards from "../permissions/PermissionCards";
 import { usePermissions } from "../permissions/usePermissions";
 import BrowserPane from "../browser/BrowserPane";
+import type { BrowserWatch } from "../browser/useBrowserWatch";
 import RoutinesPanel from "../RoutinesPanel";
 import TerminalPane from "../TerminalPane";
 import type { BotTab } from "./BotTabs";
@@ -18,6 +19,8 @@ interface BotPanesProps {
   readonly bots: readonly Bot[];
   readonly tabs: readonly BotTab[];
   readonly active: BotTab;
+  /** The bot's browser, streamed while the bot is selected. */
+  readonly browser: BrowserWatch;
   readonly connected: boolean;
   readonly canControl: boolean;
   readonly onOpenFile: (path: string) => void;
@@ -98,16 +101,10 @@ export default function BotPanes(props: BotPanesProps): ReactElement {
           </div>
         ) : null}
         {tabs.includes("browser") ? (
-          // Mounted while hidden so its activity log stays loaded; it only
-          // streams while shown. Keyed by bot: another bot is another browser.
+          // Mounted while hidden, so the live screen and the activity log
+          // are there the moment the tab is opened.
           <div className={paneClass(active === "browser")}>
-            <BrowserPane
-              key={bot.id}
-              client={client}
-              bot={bot}
-              active={active === "browser"}
-              connected={connected}
-            />
+            <BrowserPane client={client} bot={bot} watch={props.browser} connected={connected} />
           </div>
         ) : null}
         {active === "routines" ? (

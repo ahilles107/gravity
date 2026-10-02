@@ -29,9 +29,16 @@ interface BotTabsProps {
   readonly tabs: readonly BotTab[];
   readonly active: BotTab;
   readonly onSelect: (tab: BotTab) => void;
+  /** The bot's browser is open: its tab shows a live dot. */
+  readonly browserLive?: boolean;
 }
 
-export default function BotTabs({ tabs, active, onSelect }: BotTabsProps): ReactElement {
+export default function BotTabs({
+  tabs,
+  active,
+  onSelect,
+  browserLive = false,
+}: BotTabsProps): ReactElement {
   return (
     <nav className="tabs">
       {tabs.map((tab, index) => (
@@ -45,6 +52,9 @@ export default function BotTabs({ tabs, active, onSelect }: BotTabsProps): React
           }}
         >
           {TAB_LABEL[tab]}
+          {tab === "browser" && browserLive ? (
+            <span className="tab-live" role="img" aria-label="live" />
+          ) : null}
         </button>
       ))}
     </nav>

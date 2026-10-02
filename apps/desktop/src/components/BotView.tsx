@@ -16,6 +16,7 @@ import type { SideTab } from "./bot/BotSidePanel";
 import BotTabs, { botTabs } from "./bot/BotTabs";
 import type { BotTab } from "./bot/BotTabs";
 import { useBotKeys } from "./bot/useBotKeys";
+import { useBrowserWatch } from "./browser/useBrowserWatch";
 
 interface BotViewProps {
   readonly client: DaemonApi;
@@ -56,6 +57,9 @@ export default function BotView(props: BotViewProps): ReactElement {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   useBotKeys(tabs, setTab);
+  // The bot's browser streams from the moment the bot is selected, whatever
+  // tab is open, so it is live when the Browser tab is.
+  const browser = useBrowserWatch(client, bot.id, tabs.includes("browser"), connected);
 
   const showFile = (path: string): void => {
     setSide("files");
@@ -160,13 +164,19 @@ export default function BotView(props: BotViewProps): ReactElement {
       />
       <div className="bot-view-layout" ref={layoutRef}>
         <section className="bot-view-main">
-          <BotTabs tabs={tabs} active={tab} onSelect={setTab} />
+          <BotTabs
+            tabs={tabs}
+            active={tab}
+            onSelect={setTab}
+            browserLive={browser.tabs?.open === true}
+          />
           <BotPanes
             client={client}
             bot={bot}
             bots={bots}
             tabs={tabs}
             active={tab}
+            browser={browser}
             connected={connected}
             canControl={canControl}
             onOpenFile={showFile}

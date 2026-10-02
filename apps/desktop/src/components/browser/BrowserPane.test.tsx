@@ -3,8 +3,28 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { agentsDaemon, browserActivity, browserTabs } from "../../test/agentFixtures";
 import * as fx from "../../test/fixtures";
+import type { ReactElement } from "react";
+import type { DaemonApi } from "../../protocol/api";
+import type { Bot } from "../../protocol/entities";
 import { groupByTurn } from "./BrowserActivityList";
 import BrowserPane from "./BrowserPane";
+import { useBrowserWatch } from "./useBrowserWatch";
+
+/** Holds the watch as the bot view does, for as long as `active`. */
+function Pane({
+  client,
+  bot,
+  active,
+  connected,
+}: {
+  readonly client: DaemonApi;
+  readonly bot: Bot;
+  readonly active: boolean;
+  readonly connected: boolean;
+}): ReactElement {
+  const watch = useBrowserWatch(client, bot.id, active, connected);
+  return <BrowserPane client={client} bot={bot} watch={watch} connected={connected} />;
+}
 
 const FRAME = {
   type: "browser_frame",
@@ -16,20 +36,20 @@ const FRAME = {
 } as const;
 
 describe("BrowserPane", () => {
-  it("watches only while shown, and stops when hidden", async () => {
+  it("watches while held, and stops when let go", async () => {
     const client = agentsDaemon();
-    const view = render(<BrowserPane client={client} bot={fx.bot()} active={false} connected />);
+    const view = render(<Pane client={client} bot={fx.bot()} active={false} connected />);
     await screen.findByText("Opened example.com");
     expect(client.requests.some((r) => r.body.type === "watch_browser")).toBe(false);
-    view.rerender(<BrowserPane client={client} bot={fx.bot()} active connected />);
+    view.rerender(<Pane client={client} bot={fx.bot()} active connected />);
     expect(client.requests.at(-1)?.body).toEqual({ type: "watch_browser", bot_id: "b1" });
-    view.rerender(<BrowserPane client={client} bot={fx.bot()} active={false} connected />);
+    view.rerender(<Pane client={client} bot={fx.bot()} active={false} connected />);
     expect(client.requests.at(-1)?.body).toEqual({ type: "unwatch_browser" });
   });
 
   it("shows the tab on show, live, and lets the owner pick another", async () => {
     const client = agentsDaemon();
-    render(<BrowserPane client={client} bot={fx.bot()} active connected />);
+    render(<Pane client={client} bot={fx.bot()} active connected />);
     expect(await screen.findByText("Looking for the browser…")).toBeInTheDocument();
     act(() => {
       client.emit("browser_tabs", browserTabs);
@@ -58,7 +78,7 @@ describe("BrowserPane", () => {
 
   it("says when the browser is closed, and ignores other bots' frames", async () => {
     const client = agentsDaemon();
-    render(<BrowserPane client={client} bot={fx.bot()} active connected />);
+    render(<Pane client={client} bot={fx.bot()} active connected />);
     act(() => {
       client.emit("browser_tabs", { ...browserTabs, bot_id: "other" });
       client.emit("browser_tabs", { ...browserTabs, open: false, tabs: [], active: null });
@@ -67,7 +87,7 @@ describe("BrowserPane", () => {
   });
 
   it("lists each browser action under the request that led to it", async () => {
-    render(<BrowserPane client={agentsDaemon()} bot={fx.bot()} active={false} connected />);
+    render(<Pane client={agentsDaemon()} bot={fx.bot()} active={false} connected />);
     const log = await screen.findByRole("complementary", { name: "Browser activity" });
     expect(within(log).getByText("Task from lead")).toBeInTheDocument();
     expect(within(log).getByText("Compare the pricing tiers")).toBeInTheDocument();
@@ -77,12 +97,7 @@ describe("BrowserPane", () => {
 
   it("says when the bot may also use the owner's Chrome", async () => {
     render(
-      <BrowserPane
-        client={agentsDaemon()}
-        bot={fx.bot({ user_chrome: true })}
-        active={false}
-        connected
-      />,
+      <Pane client={agentsDaemon()} bot={fx.bot({ user_chrome: true })} active={false} connected />,
     );
     expect(await screen.findByText(/may also use your Chrome/)).toBeInTheDocument();
   });

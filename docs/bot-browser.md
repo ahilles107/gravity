@@ -44,11 +44,23 @@ The bot's **Browser** tab shows:
   the request that started its turn ("Task from lead: compare the pricing
   tiers"). Actions in the owner's Chrome are marked "your Chrome".
 
+The app starts watching as soon as a bot is selected, whatever tab is open, so
+the Browser tab is live when opened; its label shows a red dot while the bot's
+browser is open.
+
+**Several viewers, one stream.** Every client watching the same bot (the
+desktop app and a phone, say) reads one shared stream: one tab list poll per
+browser and one screencast per tab, however many watch. A viewer that joins
+gets the current tabs and screen at once, and a slow one skips to the newest
+frame rather than falling behind. The stream stops when the last viewer
+leaves. A phone uses the same requests as the desktop: `watch_browser` when a
+bot is selected, `unwatch_browser` when it leaves.
+
 How the daemon finds the browser: Chrome is launched with
 `--remote-debugging-port=0` and writes the port it chose to `DevToolsActivePort`
 in the profile. The daemon reads that file, lists the tabs over the DevTools
 HTTP endpoint, and attaches to the tab on show for `Page.startScreencast`.
-Streaming happens only while the app's Browser tab is open on that bot.
+Streaming happens only while some client watches that bot.
 
 ## Configuration
 
