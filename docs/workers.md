@@ -80,42 +80,38 @@ is cancelled and the spawn closes as `cancelled`.
 
 Workers on different machines cannot read each other's disks, so a project
 can name a shared git repository (`set_project_repo`, or Project settings →
-Shared repository). When it has one:
+Shared repository). When it has one, each worker handles git itself, as its
+prompt tells it to, in its own terminal and in parallel with every other
+worker. Placing a worker never waits on git, so a slow clone or an
+unreachable remote never holds up a spawn.
 
-- **Before a worker starts**, its machine fetches the branch into a bare
-  per-project cache (`projects/<project>/repo.git`, cloned on first use). It
-  then adds a worktree at the worker's `workspace/repo` on a branch of its
-  own, `gravity/<name>-<id>`, starting at the tip it just fetched. Every
-  worker therefore begins from the latest pushed work, whichever machine
-  pushed it. If the checkout fails, the worker is retired and the spawn
-  fails with git's error.
-- **When the worker calls `complete_task`**, the daemon commits whatever it
-  left (as the machine's git identity, or `<name> (Gravity worker)` when none
-  is configured). It rebases that commit onto the branch and pushes. A push
-  rejected because another worker pushed first is fetched and retried. If
-  the rebase conflicts, the worker's own branch is pushed instead. Either
-  way, one line is appended to the result the parent reads:
-  `repo: pushed <commit> to <branch>`, or `repo: this work conflicts with
-  <branch>, so it was pushed to branch <own> instead — merge that`.
-- **When a worker stops without its work on the remote** — its task was
-  cancelled or expired, or its push failed — the daemon on its machine commits
-  what it left and pushes the worker's own branch before retiring it. The
+- **Before it starts**, a worker clones the branch into `repo/` in its
+  workspace (`git clone --filter=blob:none --branch <branch> <url> repo`), or
+  pulls if `repo/` is already there. It therefore begins from the latest
+  pushed work, whichever machine pushed it.
+- **Before `complete_task`**, it commits, runs `git pull --rebase`, resolves
+  any conflicts itself, and pushes to the branch. If it still cannot push, it
+  pushes its own branch, `gravity/<name>-<id>`, instead. Its result names the
+  commit or the branch.
+- **When a worker retires with work not on the remote** (it forgot to push,
+  its push failed, or its task was cancelled or expired), the daemon on its
+  machine commits what it left and pushes the worker's own branch. The
   worker then sends whoever spawned it a note:
   `ch-3 stopped: its task was cancelled. Work it had not pushed is saved on
   branch gravity/ch-3-… of the project repository; merge it if you want it.`
-  Nothing unfinished reaches the shared branch, and a worker with nothing
-  unpushed retires without a note. The worker is archived only after that
-  note has left, so it never speaks once archived.
+  This runs in the background. The worker is archived only after the note
+  has left, so it never speaks once archived. A worker with nothing unpushed
+  retires without a note, and nothing unfinished reaches the shared branch.
 - **Permanent bots** are told the repository's URL and branch. They keep
   their own clone and `git pull` before starting and after each worker
   reports.
 
-Git runs non-interactively (`GIT_TERMINAL_PROMPT=0`, the `ext` transport
-disabled) with each machine's own credentials. Clone, fetch and push time out
-after five minutes. Operations on one project's cache run one at a time. A
-retired worker's checkout, and its branch in the cache, are removed once
-everything in it is on the remote; otherwise they are kept. Git hooks are not bypassed: a commit a hook refuses is
-reported as a failed push, and the work stays in the checkout.
+Each machine uses its own git credentials, the same ones the bots use in
+their terminals. The daemon's own git work (the save on retirement) runs
+non-interactively (`GIT_TERMINAL_PROMPT=0`, the `ext` transport disabled),
+with a five-minute limit on the push. Git hooks are not bypassed: a commit a
+hook refuses is reported in the note, and the work stays in the worker's
+workspace.
 
 ## Across machines
 
@@ -123,8 +119,8 @@ In a project linked with another daemon (see [peer bots](peer-bots.md)), a
 spawn that finds this machine full is offered to each online linked machine
 in turn. The offer is the existing `create_bot` peer frame with
 `temporary: true`, plus `repo` when the project has one. The peer creates the
-worker under its own worker cap, checks the repository out with its own
-credentials, and replies. A full peer refuses with `at_capacity`, and the
+worker under its own worker cap and replies at once. Offers to linked machines
+go out in parallel, after every spawn that fits here has started. A full peer refuses with `at_capacity`, and the
 spawn stays queued. The parent's daemon stands the worker in as a linked bot,
 marked temporary, and delegates the brief to it. The task is mirrored and the
 result comes back over the link, as for any linked bot.
@@ -134,9 +130,6 @@ asker's. Each machine reconciles its own workers: the worker is retired on
 its machine once its result has crossed, and the stand-in follows with the
 roster.
 
-Peer requests time out after 60 seconds, so the first clone of a very large
-repository on a peer can time out. The worker then fails, and the next spawn
-reuses whatever the cache fetched.
 
 ## The app
 

@@ -16,6 +16,7 @@ use super::BotProvision;
 pub fn system_md(spec: &BotProvision<'_>) -> String {
     let BotProvision {
         name,
+        bot_id,
         description,
         instructions,
         max_bots_per_project,
@@ -45,7 +46,7 @@ pub fn system_md(spec: &BotProvision<'_>) -> String {
     let linked_section = super::prompt_sections::linked(linked_machines);
     // A worker hears what it is for up front, and nothing about spawning:
     // it may not.
-    let repo_section = super::prompt_sections::repo(repo.as_ref(), *temporary);
+    let repo_section = super::prompt_sections::repo(repo.as_ref(), *temporary, name, bot_id);
     let (worker_section, spawning_section) = if *temporary {
         (super::prompt_sections::temporary(), String::new())
     } else {

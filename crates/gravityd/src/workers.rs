@@ -11,7 +11,8 @@
 //! queue is what lets a parent ask for more than fits: spawns past the cap
 //! wait, oldest first, and start as earlier ones finish.
 
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use bus::{TaskState, Worker, WorkerState};
@@ -45,14 +46,36 @@ pub const HERE: &str = "here";
 #[derive(Default)]
 pub struct Workers {
     wake: Notify,
-    /// One placement pass at a time, or two would hand out the same slot.
+    /// One placement pass here at a time, or two would hand out the same slot.
     placing: Mutex<()>,
+    /// Spawns being offered to linked machines, which another pass leaves
+    /// alone until the offer is answered.
+    offering: StdMutex<HashSet<String>>,
+    /// Retiring workers whose unpushed work is being saved.
+    salvaging: StdMutex<HashSet<String>>,
 }
 
 impl Workers {
     /// Reconcile soon: a task closed, a worker was asked for, a slot freed.
     pub fn nudge(&self) {
         self.wake.notify_one();
+    }
+
+    fn set(set: &StdMutex<HashSet<String>>) -> std::sync::MutexGuard<'_, HashSet<String>> {
+        set.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn is_offering(&self, worker_id: &str) -> bool {
+        Self::set(&self.offering).contains(worker_id)
+    }
+
+    fn start_offering(&self, worker_id: &str) {
+        Self::set(&self.offering).insert(worker_id.to_string());
+    }
+
+    fn stop_offering(&self, worker_id: &str) {
+        Self::set(&self.offering).remove(worker_id);
     }
 }
 
@@ -140,9 +163,10 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
         settle(app, &worker)?;
     }
     for bot in app.db.finished_temporary_bots(chrono::Utc::now())? {
-        // A note about saved work went out: retire once it has left, which a
-        // later pass sees, so the worker never speaks after it is archived.
-        if salvage(app, &bot).await {
+        // Unpushed work is saved first, in the background, and the worker
+        // retires on a later pass once its note has left — so it never
+        // speaks after it is archived, and a slow push holds up nothing.
+        if !salvaged(app, &bot) {
             continue;
         }
         let actor = match &bot.created_by_bot_id {
@@ -154,12 +178,7 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
         };
         if let Err(error) = botmgmt::archive_bot(app, &bot, &actor, Some("worker finished")) {
             tracing::warn!(bot_id = %bot.id, %error, "retiring a worker failed");
-            continue;
         }
-        let workspace = std::path::PathBuf::from(&bot.workspace_path);
-        tokio::task::spawn_blocking(move || repo::retire(&workspace))
-            .await
-            .ok();
     }
     for project_id in app.db.projects_with_queued_workers()? {
         place_queued(app, &project_id).await;
@@ -167,34 +186,51 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Push work a worker never got onto the shared branch — its task was
-/// cancelled or expired, or its push failed — to its own branch, and tell
-/// whoever spawned it where that is. True when a note was sent.
-async fn salvage(app: &Arc<AppState>, bot: &bus::Bot) -> bool {
+/// Whether a retiring worker's work is safe: it has no checkout, or saving
+/// what it left unpushed has finished. Otherwise saving is started, or is
+/// still running, and the worker waits.
+fn salvaged(app: &Arc<AppState>, bot: &bus::Bot) -> bool {
     let workspace = std::path::PathBuf::from(&bot.workspace_path);
     let marker = workspace.join(SALVAGED_MARKER);
-    let Some(checkout) = repo::checkout_of(&workspace).filter(|_| !marker.exists()) else {
-        return false;
+    let Some(checkout) = repo::checkout_of(&workspace) else {
+        return true;
     };
-    let (dir, name) = (checkout.clone(), bot.name.clone());
-    let saved = tokio::task::spawn_blocking(move || repo::salvage(&dir, &name))
-        .await
-        .unwrap_or_else(|error| repo::Salvaged::Failed(error.to_string()));
-    if let Err(error) = std::fs::write(&marker, "") {
-        tracing::warn!(bot_id = %bot.id, %error, "could not mark a worker salvaged");
+    if marker.exists() {
+        return true;
     }
-    let Some(line) = saved.report(&checkout) else {
+    if !Workers::set(&app.workers.salvaging).insert(bot.id.clone()) {
         return false;
-    };
+    }
+    let (app, bot) = (app.clone(), bot.clone());
+    tokio::spawn(async move {
+        let (dir, name, id) = (checkout.clone(), bot.name.clone(), bot.id.clone());
+        let saved = tokio::task::spawn_blocking(move || repo::salvage(&dir, &name, &id))
+            .await
+            .unwrap_or_else(|error| repo::Salvaged::Failed(error.to_string()));
+        if let Some(line) = saved.report(&checkout) {
+            tell_parent(&app, &bot, &line);
+        }
+        if let Err(error) = std::fs::write(&marker, "") {
+            tracing::warn!(bot_id = %bot.id, %error, "could not mark a worker salvaged");
+        }
+        Workers::set(&app.workers.salvaging).remove(&bot.id);
+        app.workers.nudge();
+    });
+    false
+}
+
+/// Tell whoever gave a retiring worker its task where its work went, in the
+/// worker's own name.
+fn tell_parent(app: &Arc<AppState>, bot: &bus::Bot, line: &str) {
     let Ok(Some(task)) = app.db.latest_task_to(&bot.id) else {
-        return false;
+        return;
     };
     let Some(parent) = task
         .from_bot_id
         .as_deref()
         .and_then(|id| app.db.get_live_bot(id).ok().flatten())
     else {
-        return false;
+        return;
     };
     let ended = match task.state {
         TaskState::Done => "finished".to_string(),
@@ -202,36 +238,14 @@ async fn salvage(app: &Arc<AppState>, bot: &bus::Bot) -> bool {
     };
     let body = format!("{} {ended}. {line}", bot.name);
     let sender = crate::mcp::bot_sender(bot);
-    let sent = crate::messaging::send_dm(
+    if let Err(error) = crate::messaging::send_dm(
         &app.db,
         &app.events,
         crate::messaging::Dm::new(&parent.id, &sender, bus::MessageKind::Note, &body)
             .re(&task.origin_message_id),
-    );
-    if let Err(error) = &sent {
+    ) {
         tracing::warn!(bot_id = %bot.id, %error, "could not tell the parent about saved work");
     }
-    sent.is_ok()
-}
-
-/// Give a just-created worker its checkout of the project's repository, or
-/// retire it again when that fails: a worker without its checkout would work
-/// from nothing.
-pub fn check_out_or_retire(
-    app: &Arc<AppState>,
-    bot: &bus::Bot,
-    repo: &bus::ProjectRepo,
-) -> anyhow::Result<std::path::PathBuf> {
-    let project = app
-        .db
-        .get_project(&bot.project_id)?
-        .ok_or_else(|| anyhow::anyhow!("project not found"))?;
-    let root = crate::paths::project_dir(&app.cfg, &project.dir_name);
-    let workspace = std::path::Path::new(&bot.workspace_path);
-    repo::check_out(&root, repo, workspace, &bot.id, &bot.name).or_else(|error| {
-        botmgmt::archive_bot(app, bot, &Actor::User, Some("its checkout failed"))?;
-        Err(error.context(format!("checking out {} for {}", repo.url, bot.name)))
-    })
 }
 
 /// A spawn whose parent was deleted: nobody waits on it any more.

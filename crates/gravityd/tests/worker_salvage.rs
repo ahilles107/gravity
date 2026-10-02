@@ -23,6 +23,7 @@ fn saved_branch(seen: &[Value]) -> String {
 async fn a_cancelled_workers_work_is_saved_to_its_own_branch() {
     let mut b = book().await;
     let (_spawned, checkout, _) = b.spawn("ch-1").await;
+    b.clone_as_worker(&checkout);
     std::fs::create_dir_all(checkout.join("chapters")).expect("dir");
     std::fs::write(checkout.join("chapters/1.md"), "Half a chapter.\n").expect("write");
 
@@ -58,14 +59,13 @@ async fn a_cancelled_workers_work_is_saved_to_its_own_branch() {
     assert!(!main.contains("chapters/1.md"), "{main}");
 
     wait_until("ch-1 retires", || bot_named(&b.d, &b.pid, "ch-1").is_none()).await;
-    // Saved on the remote, so its checkout goes too.
-    wait_until("its checkout is removed", || !checkout.exists()).await;
 }
 
 #[tokio::test]
 async fn an_expired_workers_work_is_saved_too() {
     let mut b = book().await;
     let (spawned, checkout, _) = b.spawn("ch-1").await;
+    b.clone_as_worker(&checkout);
     std::fs::write(checkout.join("notes.md"), "Outline.\n").expect("write");
     let task_id = spawned["task_id"].as_str().expect("task id");
     assert!(b.d.app.db.expire_task(task_id).expect("expire"));
@@ -90,6 +90,7 @@ async fn an_expired_workers_work_is_saved_too() {
 async fn a_worker_with_nothing_unpushed_retires_quietly() {
     let mut b = book().await;
     let (_spawned, checkout, _) = b.spawn("ch-1").await;
+    b.clone_as_worker(&checkout);
     b.bus.call("cancel_worker", json!({ "name": "ch-1" })).await;
     wait_until("ch-1 retires", || bot_named(&b.d, &b.pid, "ch-1").is_none()).await;
     let seen = drain_all(&mut b.bus).await;
@@ -99,5 +100,4 @@ async fn a_worker_with_nothing_unpushed_retires_quietly() {
             .is_some_and(|s| s.contains("saved on branch"))),
         "{seen:?}"
     );
-    wait_until("its checkout is removed", || !checkout.exists()).await;
 }

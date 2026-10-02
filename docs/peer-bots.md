@@ -186,13 +186,12 @@ Peer frames (ids are the sender's own, except `bot_id` on `update_bot` and
 
 A peer acts only on projects linked through it, except `list_projects` and
 `link_project`. A refusal carries a `code` (`conflict`, `not_linked`,
-`not_found`, `runtime_unavailable`, and for workers `at_capacity` and
-`repo_failed`) that the asking daemon passes to its client.
+`not_found`, `runtime_unavailable`, and for workers `at_capacity`) that the asking daemon passes to its client.
 
 `create_bot` with `temporary: true` creates a worker under the receiver's own
-worker cap, refusing with `at_capacity` when it is full; with `repo:
-{ url, branch }` it also checks that repository out for the worker before
-answering. See [workers](workers.md#across-machines).
+worker cap, refusing with `at_capacity` when it is full. `repo: { url, branch }`
+becomes the linked project's repository when it has none, so the worker's
+prompt names it. See [workers](workers.md#across-machines).
 
 ## Message flow
 

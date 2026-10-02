@@ -53,31 +53,41 @@ pub(super) fn temporary() -> String {
         .to_string()
 }
 
-/// The project's shared repository: a worker's checkout of it, or how a
-/// permanent bot reads what workers push there.
-pub(super) fn repo(repo: Option<&bus::ProjectRepo>, temporary: bool) -> String {
+/// The project's shared repository: how a worker gets and returns its
+/// work, or how a permanent bot reads what workers push.
+/// `name` and `bot_id` name the worker's own branch, the one its unpushed
+/// work is saved to as well.
+pub(super) fn repo(
+    repo: Option<&bus::ProjectRepo>,
+    temporary: bool,
+    name: &str,
+    bot_id: &str,
+) -> String {
     let Some(bus::ProjectRepo { url, branch }) = repo else {
         return String::new();
     };
     if temporary {
+        let own = crate::workers::repo::salvage_branch(name, bot_id);
         format!(
-            "## Your checkout\n\n\
-             `repo/` in your workspace is a fresh checkout of {url} at the tip of \
-             `{branch}`, on a branch of your own. Do the work there. When you call \
-             `complete_task`, the daemon commits whatever you left, rebases it onto \
-             `{branch}` and pushes it — or, if that conflicts, pushes your branch \
-             for whoever spawned you to merge — and adds where it went to your \
-             result. Do not push yourself.\n\n"
+            "## The project repository\n\n\
+             Your work lives in {url}, branch `{branch}`. Before you start, get the \
+             latest into `repo/` in your workspace: \
+             `git clone --filter=blob:none --branch {branch} {url} repo`, or \
+             `git -C repo pull --rebase` if it is already there. Work in `repo/`. \
+             Before `complete_task`: commit, `git pull --rebase` (resolve any \
+             conflicts yourself), then `git push origin HEAD:{branch}`. If it still \
+             will not push, push `HEAD:{own}` instead and say so. Name the commit or \
+             branch in your result. Anything you leave unpushed when you stop is \
+             saved to a branch of your own and whoever spawned you is told.\n\n"
         )
     } else {
         format!(
             "## The project repository\n\n\
-             This project shares {url} (branch `{branch}`). Every worker starts \
-             from a fresh checkout of the branch tip and its work is pushed there \
-             when it completes; its result says which commit, or which branch to \
-             merge when it conflicted. Keep a clone in your workspace to read or \
-             build on that work, and `git pull` before you start and after each \
-             worker reports.\n\n"
+             This project shares {url} (branch `{branch}`). Every worker clones the \
+             branch tip when it starts and pushes its work there before it reports; \
+             its result names the commit, or a branch to merge. Keep a clone in your \
+             workspace to read or build on that work, and `git pull` before you start \
+             and after each worker reports.\n\n"
         )
     }
 }
@@ -125,10 +135,13 @@ mod tests {
 
     #[test]
     fn tells_workers_and_their_parents_about_the_repository() {
-        assert_eq!(repo(None, true), "");
+        assert_eq!(repo(None, true, "ch-1", "b1"), "");
         let shared = bus::ProjectRepo::parse("git@host:me/book.git", None).expect("repo");
-        assert!(repo(Some(&shared), true).contains("`repo/` in your workspace"));
-        let parent = repo(Some(&shared), false);
+        let worker = repo(Some(&shared), true, "ch-1", "0123456789");
+        assert!(worker.contains("--branch main git@host:me/book.git repo"));
+        assert!(worker.contains("`git push origin HEAD:main`"));
+        assert!(worker.contains("`HEAD:gravity/ch-1-01234567`"));
+        let parent = repo(Some(&shared), false, "lead", "b2");
         assert!(parent.contains("git@host:me/book.git (branch `main`)"));
         assert!(parent.contains("`git pull`"));
     }

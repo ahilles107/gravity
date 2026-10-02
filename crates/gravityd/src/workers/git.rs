@@ -1,11 +1,9 @@
-//! Running git for workers: non-interactively, with a timeout, and one
-//! operation per project cache at a time.
+//! Running git for the daemon's own git work on a worker's checkout:
+//! non-interactively, and with a timeout.
 
-use std::collections::HashMap;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context};
@@ -14,28 +12,6 @@ use anyhow::{bail, Context};
 pub(super) const NETWORK_TIMEOUT: Duration = Duration::from_secs(300);
 /// Everything else is local and quick.
 pub(super) const LOCAL_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// One lock per cache: fetches, worktree changes and pushes all touch its
-/// shared refs.
-pub(super) fn lock(cache: &Path) -> MutexGuard<'static, ()> {
-    static LOCKS: OnceLock<Mutex<HashMap<PathBuf, &'static Mutex<()>>>> = OnceLock::new();
-    // One small lock per project for the life of the daemon, so its guard can
-    // outlive the map's.
-    let mut locks = LOCKS
-        .get_or_init(Mutex::default)
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    let entry: &'static Mutex<()> = match locks.get(cache).copied() {
-        Some(entry) => entry,
-        None => {
-            let entry: &'static Mutex<()> = Box::leak(Box::default());
-            locks.insert(cache.to_path_buf(), entry);
-            entry
-        }
-    };
-    drop(locks);
-    entry.lock().unwrap_or_else(PoisonError::into_inner)
-}
 
 /// Run git non-interactively in `dir`, killing it past `timeout`.
 pub(super) fn git(dir: &Path, args: &[&str], timeout: Duration) -> anyhow::Result<String> {

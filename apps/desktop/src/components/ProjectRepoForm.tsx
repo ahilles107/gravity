@@ -75,9 +75,9 @@ export default function ProjectRepoForm({
           }}
         />
         <span className="field-hint">
-          Each worker a bot spawns starts from the tip of this branch and pushes its work back when
-          it finishes — or to a branch of its own if that conflicts. Each machine uses its own git
-          credentials.
+          Each worker a bot spawns clones this branch when it starts and pushes its work back before
+          it reports. Whatever a worker leaves unpushed is saved to a branch of its own. Each
+          machine uses its own git credentials.
         </span>
       </div>
       <div className="panel-actions">

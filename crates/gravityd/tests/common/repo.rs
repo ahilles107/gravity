@@ -91,6 +91,17 @@ impl Book {
         (spawned, checkout, McpClient::new(&self.d, &token))
     }
 
+    /// Clone the repository into a worker's `repo/`, as its prompt tells it
+    /// to before it starts.
+    pub fn clone_as_worker(&self, checkout: &Path) {
+        let parent = checkout.parent().expect("workspace");
+        let origin = self.origin.display().to_string();
+        git(
+            parent,
+            &["clone", "-q", "--branch", "main", &origin, "repo"],
+        );
+    }
+
     pub fn on_main(&self, path: &str) -> String {
         git(&self.origin, &["show", &format!("main:{path}")])
     }
