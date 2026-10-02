@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: windows-2022
     env:
       CARGO_BUILD_JOBS: 2
@@ -30,16 +30,6 @@ jobs:
           workspaces: |
             . -> target
             apps/desktop/src-tauri -> target
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: apps/desktop/pnpm-lock.yaml
-      - name: Install frontend dependencies
-        run: pnpm --dir apps/desktop install --frozen-lockfile
       - name: Check daemon
         run: |
           cargo fmt --all --check
@@ -47,8 +37,11 @@ jobs:
           cargo clippy --locked --workspace --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked --workspace --all-targets
-      - name: Stage daemon sidecar
-        run: ./scripts/prepare-sidecar.ps1
+      # tauri-build only needs the sidecar to exist; the shell's tests never run it.
+      - name: Stage debug daemon sidecar
+        run: |
+          New-Item -ItemType Directory -Force -Path apps/desktop/src-tauri/binaries | Out-Null
+          Copy-Item -LiteralPath target/debug/gravityd.exe -Destination apps/desktop/src-tauri/binaries/gravityd-x86_64-pc-windows-msvc.exe
       - name: Check native shell
         run: |
           cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
@@ -56,12 +49,3 @@ jobs:
           cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
-      - name: Build installer
-        run: pnpm --dir apps/desktop tauri build --bundles nsis
-      - name: Check installer lifecycle
-        run: ./scripts/test-windows-installer.ps1 -Installer (Get-ChildItem apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe).FullName
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gravity-windows-x64
-          path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-          if-no-files-found: error

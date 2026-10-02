@@ -23,7 +23,7 @@ to public issues. Security reports belong in the private channel described in
 
 Use a current stable Rust toolchain, Node.js 22, and pnpm 11. Building the native
 macOS app requires Xcode Command Line Tools. Official binaries target Apple
-Silicon macOS; Windows x64 builds are available as CI artifacts. See
+Silicon macOS and Windows x64. See
 [Windows setup](docs/windows.md) for native prerequisites and PowerShell commands. Docker is required
 for the visual regression suite.
 

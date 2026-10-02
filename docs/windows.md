@@ -17,12 +17,12 @@ pnpm --dir apps/desktop tauri build --bundles nsis
 The installer is written under
 `apps/desktop/src-tauri/target/release/bundle/nsis/`. Tauri automatically merges
 `tauri.windows.conf.json`, which selects a per-user NSIS installer and native
-window decorations. The Windows CI workflow checks the daemon, frontend, native
-shell, and installer and uploads the installer as a build artifact. The actual
-installer lifecycle test checks fresh install, same-version refresh, uninstall,
+window decorations. The Windows CI workflow lints and tests the daemon and native
+shell on every pull request; it does not build the installer. The release
+workflow builds the installer and runs the installer lifecycle test before
+publishing. That test checks fresh install, same-version refresh, uninstall,
 and uninstall after manual daemon removal, using an isolated test home with no
-real bots. It does not
-publish a release or subscribe source builds to an update feed.
+real bots.
 
 The Windows installer installs and starts the bundled daemon under
 `%USERPROFILE%\.gravity\bin\gravityd.exe` and registers a Task Scheduler task
