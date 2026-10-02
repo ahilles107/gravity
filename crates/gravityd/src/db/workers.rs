@@ -220,11 +220,13 @@ impl Db {
         Ok(Some(ahead + 1))
     }
 
-    /// Move a queued spawn to running. False when it already left the queue,
-    /// which is what keeps two dispatches from starting it twice.
+    /// Move a queued spawn to running, dropping why it waited. False when it
+    /// already left the queue, which is what keeps two dispatches from
+    /// starting it twice.
     pub fn start_worker(&self, id: &str, bot_id: &str, task_id: &str) -> anyhow::Result<bool> {
         let changed = self.lock().execute(
-            "UPDATE worker SET state = 'running', bot_id = ?2, task_id = ?3, started_at = ?4
+            "UPDATE worker SET state = 'running', bot_id = ?2, task_id = ?3, started_at = ?4,
+                               error = NULL
              WHERE id = ?1 AND state = 'queued'",
             params![id, bot_id, task_id, ts(now())],
         )?;
