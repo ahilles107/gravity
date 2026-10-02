@@ -54,7 +54,8 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `delete_project` | `project_id` | `ok` — archives the project and every bot in it; see Semantics |
 | `list_bots` | `project_id?` | `bots` |
 | `list_bot_activity` | `project_id?` | `bot_activity` — one preview line per bot; see Semantics |
-| `create_bot` | `project_id, name?, description?, instructions?, avatar?` | `bot` (starts running immediately) |
+| `create_bot` | `project_id, name?, description?, instructions?, avatar?, runtime?` | `bot` (starts running immediately) |
+| `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
 | `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot` |
 | `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics |
 | `list_bot_revisions` | `bot_id, limit?` | `bot_revisions` |
@@ -107,6 +108,13 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 When `create_bot` omits `name` — or sends it as `null` — the daemon allocates the first
 available placeholder in the project: `New Bot`, `New Bot 2`, and so on, retrying if another
 client claims the same one first. Explicitly named bot creation is unchanged.
+
+Daemons advertising `bot_runtime` include `runtime: "claude_code" | "codex_cli"`
+in bot objects. Older daemons omit it and use Claude Code. `create_bot` defaults
+to the configured `default_bot_runtime`; bot-authored children inherit their
+creator's runtime. `set_bot_runtime` preserves the workspace and provider histories,
+interrupts the current turn, and restarts through the supervisor. Setting the
+current value is a no-op. Existing bots migrate to `claude_code`.
 
 `trigger` is `{ "kind": "cron", "expr": "0 0 9 * * MON", "tz": "Europe/Warsaw" }`,
 `{ "kind": "interval", "seconds": 3600 }`, or

@@ -8,7 +8,7 @@ use crate::db::Db;
 use crate::events::Events;
 use crate::overrides::{AutoCompactOverride, AUTO_COMPACT_META_KEY};
 use crate::runtime::double::DoubleAdapter;
-use crate::runtime::pty::PtyAdapter;
+use crate::runtime::mixed::MixedAdapter;
 use crate::runtime::RuntimeAdapter;
 use crate::secrets::Secrets;
 use crate::supervisor::Supervisor;
@@ -27,6 +27,7 @@ pub const CAPABILITIES: &[&str] = &[
     "bot_self_management",
     "config",
     "decisions",
+    "bot_runtime",
 ];
 
 pub struct AppState {
@@ -52,7 +53,7 @@ impl AppState {
         let secrets = Arc::new(Secrets::open(&cfg.secrets_dir())?);
         let events = Events::new();
         let adapter: Arc<dyn RuntimeAdapter> = match cfg.runtime {
-            RuntimeKind::Pty => Arc::new(PtyAdapter),
+            RuntimeKind::Pty => Arc::new(MixedAdapter::new(&cfg)),
             RuntimeKind::Double => Arc::new(DoubleAdapter),
         };
         let auto_compact = AutoCompactOverride::default();

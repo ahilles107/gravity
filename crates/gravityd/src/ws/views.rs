@@ -35,6 +35,7 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         "description": bot.description,
         "avatar": bot.avatar,
         "instructions": bot.instructions,
+        "runtime": bot.runtime,
         "state": state.as_str(),
         "state_reason": reason,
         "unread_count": unread,

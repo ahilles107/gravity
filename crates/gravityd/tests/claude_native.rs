@@ -20,6 +20,7 @@ async fn native_claude_reaches_its_prompt_without_asking_for_workspace_trust() {
     })).unwrap()).unwrap();
     gravityd::paths::trust_workspace(&config, &workspace).unwrap();
     let spec = BotSpec {
+        codex: None,
         bot_id: "native-trust".into(),
         bot_name: "Trust check".into(),
         workspace,
@@ -54,6 +55,7 @@ async fn native_claude_reaches_its_prompt_without_asking_for_workspace_trust() {
                     }
                 }
                 SessionEvent::Exited { .. } => return false,
+                SessionEvent::Lifecycle { .. } => {}
             }
         }
         false

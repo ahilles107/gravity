@@ -29,8 +29,10 @@ use crate::runtime::{BotSpec, RuntimeAdapter, RuntimeSession, SessionEvent};
 use crate::secrets::Secrets;
 use crate::terminal::TermBuffer;
 
+mod claim;
 mod hooks;
 mod lifecycle;
+mod restart;
 mod termio;
 
 pub const BOT_TOKEN_ENV: &str = "GRAVITY_TOKEN";
@@ -100,6 +102,7 @@ struct BotHandle {
     reason: String,
     session: Option<Arc<Mutex<Box<dyn RuntimeSession>>>>,
     term: Arc<TermBuffer>,
+    terminal_runtime: Option<bus::BotRuntime>,
     /// Inbox socket for channel delivery; from the adapter (double) or the
     /// SessionStart hook (pty).
     msg_socket: Option<MsgSocket>,
@@ -113,6 +116,10 @@ struct BotHandle {
     /// Set when the daemon asked for the stop (archival), so exit is not a
     /// crash and the reconciler leaves the bot alone.
     stopping: bool,
+    restart_pending: bool,
+    /// Set while one `start_bot` call is bringing the runtime up, so a second
+    /// caller does not launch another runtime against the same conversation.
+    starting: bool,
     consecutive_crashes: u32,
     last_start: Instant,
     /// Earliest time the reconciler may start this bot again; set while a
@@ -136,11 +143,14 @@ impl BotHandle {
             reason: String::new(),
             session: None,
             term: Arc::new(TermBuffer::new(scrollback)),
+            terminal_runtime: None,
             msg_socket: None,
             size: (0, 0),
             repaint_restore: None,
             repaint_generation: 0,
             stopping: false,
+            restart_pending: false,
+            starting: false,
             consecutive_crashes: 0,
             last_start: Instant::now(),
             next_start_at: None,
@@ -273,7 +283,7 @@ impl Supervisor {
     /// message is read between tool calls or starts a new turn when the
     /// session is idle; it never touches the terminal.
     pub fn deliver(&self, bot_id: &str, text: &str) -> Result<(), DeliverError> {
-        let socket = {
+        let (session, socket) = {
             let bots = self.lock_bots();
             let Some(h) = bots.get(bot_id) else {
                 return Err(DeliverError::NotReady("bot has no runtime".to_string()));
@@ -284,15 +294,19 @@ impl Supervisor {
                     h.state.as_str()
                 )));
             }
-            match &h.msg_socket {
-                Some(s) => s.clone(),
-                None => {
-                    return Err(DeliverError::NotReady(
-                        "inbox socket not reported yet".to_string(),
-                    ));
-                }
-            }
+            (h.session.clone(), h.msg_socket.clone())
         };
+        if let Some(session) = session {
+            if let Some(result) = session
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .deliver(text)
+            {
+                return result.map_err(DeliverError::Failed);
+            }
+        }
+        let socket = socket
+            .ok_or_else(|| DeliverError::NotReady("inbox socket not reported yet".to_string()))?;
         crate::channel::send(&socket, text).map_err(DeliverError::Failed)
     }
 }

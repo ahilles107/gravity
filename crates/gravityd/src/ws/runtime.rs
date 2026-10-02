@@ -1,0 +1,39 @@
+use super::Conn;
+use crate::botmgmt::{self, requested_runtime};
+use serde_json::{json, Value};
+
+impl Conn {
+    pub(super) fn set_bot_runtime(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let bot_id = Self::str_field(req, "bot_id")?;
+        let runtime = match requested_runtime(req) {
+            Ok(Some(runtime)) => runtime,
+            result => {
+                let message = result
+                    .err()
+                    .map(|error| error.to_string())
+                    .unwrap_or_else(|| "runtime is required".to_string());
+                self.reply_err(req_id, "invalid_request", &message);
+                return Ok(());
+            }
+        };
+        let bot = self
+            .app
+            .db
+            .get_live_bot(bot_id)?
+            .ok_or_else(|| anyhow::anyhow!("bot not found"))?;
+        let bot = match botmgmt::set_bot_runtime(&self.app, &bot, runtime) {
+            Ok(bot) => bot,
+            Err(error)
+                if error
+                    .downcast_ref::<botmgmt::RuntimeUnavailable>()
+                    .is_some() =>
+            {
+                self.reply_err(req_id, "runtime_unavailable", &format!("{error:#}"));
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        self.send(json!({ "type": "bot", "req_id": req_id, "bot": self.bot_json(&bot) }));
+        Ok(())
+    }
+}

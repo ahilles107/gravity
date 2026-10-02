@@ -20,10 +20,14 @@ mod archive;
 mod charter;
 mod create;
 mod revert;
+mod runtime;
 
 pub use archive::{archive_bot, prune_archived_workspaces};
-pub use create::{create_bot, Created};
+pub use create::{create_bot, create_bot_with_runtime, Created};
 pub use revert::revert_revision;
+pub use runtime::{
+    check_runtime_available, requested_runtime, set_bot_runtime, RuntimeUnavailable,
+};
 
 /// Fields that may change on a bot. `None` leaves the stored value alone,
 /// which is what lets `update_self(avatar: "…")` avoid touching instructions.

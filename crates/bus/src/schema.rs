@@ -28,4 +28,5 @@ pub const MIGRATIONS: &[&str] = &[
     MIGRATION_10,
     MIGRATION_11,
     MIGRATION_12,
+    "ALTER TABLE bot ADD COLUMN runtime TEXT NOT NULL DEFAULT 'claude_code' CHECK(runtime IN ('claude_code', 'codex_cli'));",
 ];

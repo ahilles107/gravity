@@ -37,11 +37,14 @@ pub struct Config {
     /// where only the allowlisted `/mcp` URL reaches bots at all. Ignored for
     /// direct launches, which always fail on a collision.
     pub negotiate_port: bool,
-    /// `pty` (spawn `claude` in a pty) or `double` (deterministic test runtime).
+    /// `pty` (each bot's saved CLI) or `double` (deterministic test runtime).
     pub runtime: RuntimeKind,
     pub claude_bin: String,
     /// Extra arguments passed to the `claude` CLI.
     pub claude_args: Vec<String>,
+    pub codex_bin: String,
+    pub codex_args: Vec<String>,
+    pub default_bot_runtime: bus::BotRuntime,
     /// Context window, in tokens, a bot session may grow to before Claude Code
     /// auto-compacts it (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`). Bots are
     /// always-on chat sessions, and every turn re-sends the whole transcript,
@@ -170,6 +173,9 @@ impl Default for Config {
             runtime: RuntimeKind::Pty,
             claude_bin: "claude".to_string(),
             claude_args: Vec::new(),
+            codex_bin: "codex".to_string(),
+            codex_args: Vec::new(),
+            default_bot_runtime: bus::BotRuntime::ClaudeCode,
             auto_compact_window: Some(DEFAULT_AUTO_COMPACT_WINDOW),
             classic_renderer: true,
             max_bots_per_project: 12,

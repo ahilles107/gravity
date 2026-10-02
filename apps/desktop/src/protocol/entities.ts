@@ -29,7 +29,11 @@ export type BotState =
   | "stopping"
   | "stopped";
 
+export type BotRuntime = "claude_code" | "codex_cli";
+
 export interface Bot {
+  /** Absent on older daemons, which use Claude Code. */
+  readonly runtime?: BotRuntime;
   readonly id: string;
   readonly project_id: string;
   readonly name: string;
