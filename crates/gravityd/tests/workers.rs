@@ -275,3 +275,53 @@ async fn a_full_machine_hands_spawns_to_a_linked_one() {
     .await;
     assert_eq!(worker_state(&mac, parent, "ch-2"), Some(WorkerState::Done));
 }
+
+/// The app lists a project's queue, hears when it changes, and can cancel a
+/// spawn on the owner's behalf.
+#[tokio::test]
+async fn the_owner_sees_the_queue_and_can_cancel_from_the_app() {
+    let d = spawn_daemon_with(|cfg| cfg.max_workers_per_project = 1).await;
+    let mut c = WsClient::connect(&d).await;
+    let pid = project(&mut c, "novel").await;
+    let bot = create_bot(&mut c, &pid, "book").await;
+    let token = d
+        .app
+        .secrets
+        .bot_token(bot["id"].as_str().expect("id"))
+        .expect("token");
+    let mut bus = McpClient::new(&d, &token);
+
+    spawn(&mut bus, "ch-1").await;
+    c.wait_for(|v| v["type"] == "workers_updated" && v["project_id"] == pid.as_str())
+        .await;
+    spawn(&mut bus, "ch-2").await;
+
+    let listed = c
+        .request(json!({ "type": "list_workers", "project_id": pid }))
+        .await;
+    assert_eq!(listed["type"], "workers", "{listed}");
+    assert_eq!(listed["running_here"], 1);
+    assert_eq!(listed["max_workers_here"], 1);
+    let workers = listed["workers"].as_array().expect("workers");
+    assert_eq!(workers[0]["name"], "ch-1");
+    assert_eq!(workers[0]["state"], "running");
+    assert_eq!(workers[0]["parent_name"], "book");
+    assert_eq!(workers[0]["brief"], "Write ch-1.");
+    assert_eq!(workers[1]["name"], "ch-2");
+    assert_eq!(workers[1]["queue_position"], 1);
+
+    let cancelled = c
+        .request(json!({ "type": "cancel_worker", "worker_id": workers[1]["id"] }))
+        .await;
+    assert_eq!(cancelled["type"], "worker", "{cancelled}");
+    assert_eq!(cancelled["worker"]["state"], "cancelled");
+    let again = c
+        .request(json!({ "type": "cancel_worker", "worker_id": workers[1]["id"] }))
+        .await;
+    assert_eq!(again["type"], "error", "{again}");
+
+    // Cancelling the running one tells it to stop, as the owner.
+    c.request(json!({ "type": "cancel_worker", "worker_id": workers[0]["id"] }))
+        .await;
+    wait_until("ch-1 retires", || bot_named(&d, &pid, "ch-1").is_none()).await;
+}

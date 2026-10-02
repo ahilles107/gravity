@@ -11,25 +11,17 @@
 //! Git runs with this machine's own credentials, non-interactively, and every
 //! operation on a project's cache is serialised: worktrees share its refs.
 
-use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
-use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use bus::ProjectRepo;
 
+use super::git::{git, lock, LOCAL_TIMEOUT, NETWORK_TIMEOUT};
 use crate::worktree::{self, WorktreeSpec, METADATA_FILE};
 
 /// Where a worker's checkout lives, relative to its workspace.
 pub const CHECKOUT_DIR: &str = "repo";
 
-/// Network operations (clone, fetch, push) give up after this long.
-const NETWORK_TIMEOUT: Duration = Duration::from_secs(300);
-/// Everything else is local and quick.
-const LOCAL_TIMEOUT: Duration = Duration::from_secs(60);
 /// Pushes rejected because another worker pushed first are retried.
 const PUSH_ATTEMPTS: usize = 3;
 
@@ -193,25 +185,111 @@ fn divert(checkout: &Path, own: &str, target: &str) -> anyhow::Result<Published>
     })
 }
 
-/// Remove a retired worker's checkout once nothing in it is left unpushed.
-/// Anything else is kept, never discarded.
+/// What came of saving work a worker left unpushed.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Salvaged {
+    /// Everything it had is already on the remote.
+    Nothing,
+    Saved {
+        branch: String,
+    },
+    Failed(String),
+}
+
+impl Salvaged {
+    /// One line for the note its parent gets, or `None` when there is
+    /// nothing to say.
+    pub fn report(&self, checkout: &Path) -> Option<String> {
+        match self {
+            Self::Nothing => None,
+            Self::Saved { branch } => Some(format!(
+                "Work it had not pushed is saved on branch {branch} of the project \
+                 repository; merge it if you want it."
+            )),
+            Self::Failed(error) => Some(format!(
+                "Work it had not pushed could not be saved ({error}); it remains in {} on \
+                 its machine.",
+                checkout.display()
+            )),
+        }
+    }
+}
+
+/// Commit whatever a retiring worker left and push it to the worker's own
+/// branch, unless all of it is already on the remote — pushed to the shared
+/// branch, or diverted to its own.
+pub fn salvage(checkout: &Path, worker_name: &str) -> Salvaged {
+    match try_salvage(checkout, worker_name) {
+        Ok(salvaged) => salvaged,
+        Err(error) => Salvaged::Failed(format!("{error:#}")),
+    }
+}
+
+fn try_salvage(checkout: &Path, worker_name: &str) -> anyhow::Result<Salvaged> {
+    let meta = worktree::read_meta(checkout)?;
+    let _held = lock(&meta.repo);
+    if !is_clean(checkout)? {
+        git(checkout, &["add", "-A"], LOCAL_TIMEOUT)?;
+        let message = format!("{worker_name}: unfinished work");
+        as_worker(checkout, worker_name, &["commit", "-q", "-m", &message])?;
+    }
+    if is_on_remote(checkout)? {
+        return Ok(Salvaged::Nothing);
+    }
+    let own = git(checkout, &["branch", "--show-current"], LOCAL_TIMEOUT)?
+        .trim()
+        .to_string();
+    let refspec = format!("HEAD:refs/heads/{own}");
+    git(
+        checkout,
+        &["push", "--force", "origin", &refspec],
+        NETWORK_TIMEOUT,
+    )?;
+    Ok(Salvaged::Saved { branch: own })
+}
+
+fn is_clean(checkout: &Path) -> anyhow::Result<bool> {
+    Ok(git(checkout, &["status", "--porcelain"], LOCAL_TIMEOUT)?
+        .trim()
+        .is_empty())
+}
+
+/// Whether HEAD is on some branch of the remote, as last fetched or pushed.
+/// A push updates the matching remote-tracking branch, so this holds right
+/// after a worker's own push.
+fn is_on_remote(checkout: &Path) -> anyhow::Result<bool> {
+    let containing = git(
+        checkout,
+        &["branch", "-r", "--contains", "HEAD"],
+        LOCAL_TIMEOUT,
+    )?;
+    Ok(!containing.trim().is_empty())
+}
+
+/// Remove a retired worker's checkout, and its branch in the cache, once
+/// everything in it is on the remote. Anything else is kept, never discarded.
 pub fn retire(workspace: &Path) {
     let Some(checkout) = checkout_of(workspace) else {
         return;
     };
-    let Ok(meta) = worktree::read_meta(&checkout) else {
-        return;
-    };
-    let _held = lock(&meta.repo);
-    match worktree::cleanup(&checkout) {
-        Ok(worktree::CleanupOutcome::Removed) => {}
-        Ok(worktree::CleanupOutcome::KeptDirty { detail }) => {
-            tracing::info!(path = %checkout.display(), %detail, "kept a retired worker's checkout");
-        }
-        Err(error) => {
-            tracing::warn!(path = %checkout.display(), %error, "removing a worker's checkout failed");
-        }
+    if let Err(error) = try_retire(&checkout) {
+        tracing::warn!(path = %checkout.display(), %error, "removing a worker's checkout failed");
     }
+}
+
+fn try_retire(checkout: &Path) -> anyhow::Result<()> {
+    let meta = worktree::read_meta(checkout)?;
+    let _held = lock(&meta.repo);
+    if !is_clean(checkout)? || !is_on_remote(checkout)? {
+        tracing::info!(path = %checkout.display(), "kept a retired worker's checkout: unpushed work");
+        return Ok(());
+    }
+    let own = git(checkout, &["branch", "--show-current"], LOCAL_TIMEOUT)?;
+    std::fs::remove_file(checkout.join(METADATA_FILE))?;
+    let path = checkout.display().to_string();
+    git(&meta.repo, &["worktree", "remove", &path], LOCAL_TIMEOUT)?;
+    git(&meta.repo, &["branch", "-D", own.trim()], LOCAL_TIMEOUT)?;
+    Ok(())
 }
 
 fn clone(cache: &Path, url: &str) -> anyhow::Result<()> {
@@ -274,86 +352,4 @@ fn first_line(text: &str) -> String {
         .find(|l| !l.trim().is_empty())
         .unwrap_or("work");
     line.trim().chars().take(72).collect()
-}
-
-/// One lock per cache: fetches, worktree changes and pushes all touch its
-/// shared refs.
-fn lock(cache: &Path) -> MutexGuard<'static, ()> {
-    static LOCKS: OnceLock<Mutex<HashMap<PathBuf, &'static Mutex<()>>>> = OnceLock::new();
-    // One small lock per project for the life of the daemon, so its guard can
-    // outlive the map's.
-    let mut locks = LOCKS
-        .get_or_init(Mutex::default)
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    let entry: &'static Mutex<()> = match locks.get(cache).copied() {
-        Some(entry) => entry,
-        None => {
-            let entry: &'static Mutex<()> = Box::leak(Box::default());
-            locks.insert(cache.to_path_buf(), entry);
-            entry
-        }
-    };
-    drop(locks);
-    entry.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-/// Run git non-interactively in `dir`, killing it past `timeout`.
-fn git(dir: &Path, args: &[&str], timeout: Duration) -> anyhow::Result<String> {
-    let mut child = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "protocol.ext.allow=never"])
-        .args(args)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("running git")?;
-    // Drained while git runs, or a long listing would fill the pipe and
-    // stall it until the timeout.
-    let drain = |pipe: Option<Box<dyn Read + Send>>| {
-        std::thread::spawn(move || {
-            let mut out = Vec::new();
-            if let Some(mut pipe) = pipe {
-                pipe.read_to_end(&mut out).ok();
-            }
-            out
-        })
-    };
-    let stdout = drain(
-        child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let stderr = drain(
-        child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let started = Instant::now();
-    let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
-        }
-        if started.elapsed() > timeout {
-            child.kill().ok();
-            child.wait().ok();
-            bail!("git {} timed out", args.first().unwrap_or(&""));
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    };
-    let stdout = stdout.join().unwrap_or_default();
-    let stderr = stderr.join().unwrap_or_default();
-    if !status.success() {
-        bail!(
-            "git {} failed: {}",
-            args.first().unwrap_or(&""),
-            String::from_utf8_lossy(&stderr).trim()
-        );
-    }
-    Ok(String::from_utf8_lossy(&stdout).to_string())
 }

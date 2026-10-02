@@ -28,6 +28,11 @@ pub enum Push {
     ProjectUpdated {
         project: Project,
     },
+    /// A project's worker queue changed: a spawn was queued, placed, waits
+    /// for another reason, or finished. Clients refetch `list_workers`.
+    WorkersUpdated {
+        project_id: String,
+    },
     /// A bot's sidebar preview line changed. Emitted once the finished turn is
     /// actually readable in the transcript, which lags the `ready` state.
     ActivityUpdate {

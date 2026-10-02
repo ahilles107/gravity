@@ -18,6 +18,7 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 pub mod devtools;
 pub mod peers;
+pub mod repo;
 pub mod tasks;
 
 pub struct TestDaemon {

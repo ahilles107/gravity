@@ -47,6 +47,7 @@ const READ_ONLY: &[&str] = &[
     "list_permissions",
     "list_tasks",
     "get_task",
+    "list_workers",
 ];
 
 /// Requests that exercise the owner's ruling authority.
@@ -157,6 +158,8 @@ impl Conn {
             "delete_tag" => self.delete_tag(&req_id, req),
             "set_project_lead" => self.set_project_lead(&req_id, req),
             "set_project_repo" => self.set_project_repo(&req_id, req),
+            "list_workers" => self.list_workers(&req_id, req),
+            "cancel_worker" => self.cancel_worker(&req_id, req),
             "list_peers" => self.list_peers(&req_id),
             "create_peer_invite" => self.create_peer_invite(&req_id, req),
             "add_peer" => self.add_peer(&req_id, req),

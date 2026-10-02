@@ -24,12 +24,13 @@ use crate::db::Actor;
 use crate::mcp::tasks::close_cancelled;
 use crate::messaging::daemon_sender;
 
+mod git;
 mod place;
 pub mod repo;
 mod spawn;
 
 pub use place::place_queued;
-pub use spawn::{cancel, spawn, SpawnRequest, MAX_QUEUED_PER_PROJECT};
+pub use spawn::{cancel, cancel_spawn, spawn, SpawnRequest, MAX_QUEUED_PER_PROJECT};
 
 /// How often workers are reconciled when nothing nudges sooner. Bounds how
 /// long a slot freed on a peer, or by an expired task, sits unused.
@@ -53,6 +54,34 @@ impl Workers {
     pub fn nudge(&self) {
         self.wake.notify_one();
     }
+}
+
+/// Written to a retiring worker's workspace once its unpushed work has been
+/// saved, or found to need none, so a later pass does not try again.
+const SALVAGED_MARKER: &str = ".gravity-salvaged";
+
+/// Tell clients a project's queue changed.
+pub(crate) fn changed(app: &AppState, project_id: &str) {
+    app.events.push(crate::events::Push::WorkersUpdated {
+        project_id: project_id.to_string(),
+    });
+}
+
+/// A spawn as the app lists it: what a parent reads, plus who asked, the
+/// brief's opening, and when it moved.
+pub fn view(app: &AppState, worker: &Worker) -> anyhow::Result<Value> {
+    let mut out = describe(app, worker)?;
+    let parent = app.db.get_bot(&worker.parent_bot_id)?;
+    out["id"] = json!(worker.id);
+    out["project_id"] = json!(worker.project_id);
+    out["parent_bot_id"] = json!(worker.parent_bot_id);
+    out["parent_name"] = json!(parent.as_ref().map(crate::db::Db::display_name));
+    out["brief"] = json!(worker.brief.chars().take(500).collect::<String>());
+    out["bot_id"] = json!(worker.bot_id);
+    out["created_at"] = json!(worker.created_at.to_rfc3339());
+    out["started_at"] = json!(worker.started_at.map(|t| t.to_rfc3339()));
+    out["finished_at"] = json!(worker.finished_at.map(|t| t.to_rfc3339()));
+    Ok(out)
 }
 
 /// A spawn as a parent reads it in tool results.
@@ -111,6 +140,11 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
         settle(app, &worker)?;
     }
     for bot in app.db.finished_temporary_bots(chrono::Utc::now())? {
+        // A note about saved work went out: retire once it has left, which a
+        // later pass sees, so the worker never speaks after it is archived.
+        if salvage(app, &bot).await {
+            continue;
+        }
         let actor = match &bot.created_by_bot_id {
             Some(creator) => Actor::Bot {
                 id: creator,
@@ -131,6 +165,53 @@ pub async fn reconcile(app: &Arc<AppState>) -> anyhow::Result<()> {
         place_queued(app, &project_id).await;
     }
     Ok(())
+}
+
+/// Push work a worker never got onto the shared branch — its task was
+/// cancelled or expired, or its push failed — to its own branch, and tell
+/// whoever spawned it where that is. True when a note was sent.
+async fn salvage(app: &Arc<AppState>, bot: &bus::Bot) -> bool {
+    let workspace = std::path::PathBuf::from(&bot.workspace_path);
+    let marker = workspace.join(SALVAGED_MARKER);
+    let Some(checkout) = repo::checkout_of(&workspace).filter(|_| !marker.exists()) else {
+        return false;
+    };
+    let (dir, name) = (checkout.clone(), bot.name.clone());
+    let saved = tokio::task::spawn_blocking(move || repo::salvage(&dir, &name))
+        .await
+        .unwrap_or_else(|error| repo::Salvaged::Failed(error.to_string()));
+    if let Err(error) = std::fs::write(&marker, "") {
+        tracing::warn!(bot_id = %bot.id, %error, "could not mark a worker salvaged");
+    }
+    let Some(line) = saved.report(&checkout) else {
+        return false;
+    };
+    let Ok(Some(task)) = app.db.latest_task_to(&bot.id) else {
+        return false;
+    };
+    let Some(parent) = task
+        .from_bot_id
+        .as_deref()
+        .and_then(|id| app.db.get_live_bot(id).ok().flatten())
+    else {
+        return false;
+    };
+    let ended = match task.state {
+        TaskState::Done => "finished".to_string(),
+        state => format!("stopped: its task was {}", state.as_str()),
+    };
+    let body = format!("{} {ended}. {line}", bot.name);
+    let sender = crate::mcp::bot_sender(bot);
+    let sent = crate::messaging::send_dm(
+        &app.db,
+        &app.events,
+        crate::messaging::Dm::new(&parent.id, &sender, bus::MessageKind::Note, &body)
+            .re(&task.origin_message_id),
+    );
+    if let Err(error) = &sent {
+        tracing::warn!(bot_id = %bot.id, %error, "could not tell the parent about saved work");
+    }
+    sent.is_ok()
 }
 
 /// Give a just-created worker its checkout of the project's repository, or
@@ -169,8 +250,12 @@ pub(super) fn release_orphan(app: &Arc<AppState>, worker: &Worker) -> anyhow::Re
         );
         close_cancelled(app, &daemon_sender(), &task, &body)?;
     }
-    app.db
-        .finish_worker(&worker.id, WorkerState::Cancelled, Some(reason))?;
+    if app
+        .db
+        .finish_worker(&worker.id, WorkerState::Cancelled, Some(reason))?
+    {
+        changed(app, &worker.project_id);
+    }
     Ok(())
 }
 
@@ -187,6 +272,8 @@ fn settle(app: &Arc<AppState>, worker: &Worker) -> anyhow::Result<()> {
         Some(TaskState::Expired) => WorkerState::Expired,
         None => WorkerState::Failed,
     };
-    app.db.finish_worker(&worker.id, state, None)?;
+    if app.db.finish_worker(&worker.id, state, None)? {
+        changed(app, &worker.project_id);
+    }
     Ok(())
 }

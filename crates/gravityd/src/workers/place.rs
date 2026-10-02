@@ -95,7 +95,9 @@ async fn place_locked(app: &Arc<AppState>, project_id: &str) -> anyhow::Result<(
             }
         }
         if let Some(reason) = waiting {
-            app.db.note_worker_waiting(&worker.id, Some(&reason))?;
+            if app.db.note_worker_waiting(&worker.id, Some(&reason))? {
+                super::changed(app, project_id);
+            }
         }
     }
     Ok(())
@@ -263,7 +265,9 @@ fn hand_over(
         hop,
         &chain,
     )?;
-    if !app.db.start_worker(&worker.id, &bot.id, &task.id)? {
+    let started = app.db.start_worker(&worker.id, &bot.id, &task.id)?;
+    super::changed(app, &worker.project_id);
+    if !started {
         // Cancelled while it was being placed; the worker retires with it.
         let body = format!("Task {} was cancelled before you began. Stop.", task.id);
         close_cancelled(app, &daemon_sender(), &task, &body)?;
@@ -287,6 +291,7 @@ fn fail(
         return Ok(());
     }
     tracing::warn!(worker = %worker.name, %reason, "worker could not start");
+    super::changed(app, &worker.project_id);
     let body = format!(
         "Worker {} could not start, and has been dropped from the queue: {reason}",
         worker.name

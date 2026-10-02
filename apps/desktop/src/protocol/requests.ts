@@ -36,6 +36,8 @@ export type ClientRequestBody =
       readonly branch?: string;
     }
   | { readonly type: "delete_project"; readonly project_id: string }
+  | { readonly type: "list_workers"; readonly project_id: string }
+  | { readonly type: "cancel_worker"; readonly worker_id: string; readonly reason?: string }
   | { readonly type: "list_bots"; readonly project_id?: string }
   | {
       readonly type: "create_bot";

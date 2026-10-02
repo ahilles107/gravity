@@ -94,11 +94,13 @@ pub async fn spawn(
         machine: machine.as_deref(),
         deadline_hours,
     })?;
+    super::changed(app, &parent.project_id);
     place_queued(app, &parent.project_id).await;
     Ok(app.db.get_worker(&worker.id)?.unwrap_or(worker))
 }
 
-/// Drop a queued spawn, or cancel a running worker's task, which retires it.
+/// Drop a queued spawn of `parent`'s, or cancel a running worker's task,
+/// which retires it.
 pub fn cancel(
     app: &Arc<AppState>,
     parent: &Bot,
@@ -109,36 +111,47 @@ pub fn cancel(
         .db
         .active_worker_by_name(&parent.id, name)?
         .ok_or_else(|| anyhow::anyhow!("you have no queued or running worker named '{name}'"))?;
-    match worker.state {
-        WorkerState::Queued => {
-            app.db
-                .finish_worker(&worker.id, WorkerState::Cancelled, Some(reason))?;
-        }
-        _ => {
-            if let Some(task) = worker
-                .task_id
-                .as_deref()
-                .map(|id| app.db.get_task(id))
-                .transpose()?
-                .flatten()
-            {
-                let body = format!(
-                    "Task {} was cancelled. Stop work on it; no one waits on the result.{}",
-                    task.id,
-                    if reason.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" Reason: {reason}")
-                    }
-                );
-                close_cancelled(app, &bot_sender(parent), &task, &body)?;
-            }
-            app.db
-                .finish_worker(&worker.id, WorkerState::Cancelled, Some(reason))?;
-        }
+    cancel_spawn(app, &worker, &bot_sender(parent), reason)
+}
+
+/// Cancel a spawn on behalf of `sender`: the parent, or the owner from the
+/// app. A running worker is told to stop, in `sender`'s name.
+pub fn cancel_spawn(
+    app: &Arc<AppState>,
+    worker: &Worker,
+    sender: &bus::Sender,
+    reason: &str,
+) -> anyhow::Result<Worker> {
+    if worker.state.is_final() {
+        bail!("{} has already {}", worker.name, worker.state.as_str());
+    }
+    let task = match worker.task_id.as_deref() {
+        Some(id) => app.db.get_task(id)?,
+        None => None,
+    };
+    if let Some(task) = task {
+        let because = if reason.is_empty() {
+            String::new()
+        } else {
+            format!(" Reason: {reason}")
+        };
+        let body = format!(
+            "Task {} was cancelled. Stop work on it; no one waits on the result.{because}",
+            task.id
+        );
+        close_cancelled(app, sender, &task, &body)?;
+    }
+    if app
+        .db
+        .finish_worker(&worker.id, WorkerState::Cancelled, Some(reason))?
+    {
+        super::changed(app, &worker.project_id);
     }
     app.workers.nudge();
-    Ok(app.db.get_worker(&worker.id)?.unwrap_or(worker))
+    Ok(app
+        .db
+        .get_worker(&worker.id)?
+        .unwrap_or_else(|| worker.clone()))
 }
 
 /// Normalise a requested machine: `None` for any, [`HERE`], or a linked

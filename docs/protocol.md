@@ -35,7 +35,8 @@ attached to, typed into and resized here, relayed from its machine, and
 `list_bot_commands` lists what each bot is running, and `restart_bot` when bots
 can be restarted or cleared (`restart_bot`, `clear_bot_session`), and `workers`
 when bots can spawn temporary workers (`temporary` on bots, `repo` on projects,
-`set_project_repo`; see [workers](workers.md)).
+`set_project_repo`, `list_workers`, `cancel_worker`, the `workers_updated` push;
+see [workers](workers.md)).
 
 or `{ "type": "error", "req_id": "1", "code": "auth_failed" | "unsupported_version", "message": "..." }`
 followed by close.
@@ -73,6 +74,8 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `list_projects` | – | `projects` |
 | `create_project` | `name` | `project` |
 | `update_project` | `project_id, name` | `project` |
+| `list_workers` | `project_id` | `workers`: `{ project_id, workers: [Worker], running_here, max_workers_here }`, queued and running oldest first, then recently finished. Requires `read` |
+| `cancel_worker` | `worker_id, reason?` | `worker`: a queued spawn is dropped; a running worker is told to stop, in the owner's name, and retires. `conflict` once it has finished |
 | `set_project_repo` | `project_id, url \| null, branch?` (default `main`) | `project`: the shared git repository workers check out and push to; `url: null` clears it. Bots' prompts are rewritten for their next start |
 | `delete_project` | `project_id` | `ok` — archives the project and every bot in it; see Semantics |
 | `list_bots` | `project_id?` | `bots` |
@@ -215,6 +218,7 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 - `message_new`: `{ "message": {...} }` — any new bus message visible to the user.
 - `bot_updated`: `{ "bot": {...} }` — a bot was created, edited, or archived. Bots edit themselves unprompted, so clients must not cache identity across this push.
 - `project_updated`: `{ "project": {...} }` — a project was created, renamed, archived, or linked or unlinked through a peer. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
+- `workers_updated`: `{ "project_id" }` — a project's worker queue changed: a spawn was queued, placed, waits for a new reason, or finished. Clients refetch `list_workers`.
 - `activity_update`: `{ "activity": { "bot_id", "from", "text", "at" } }` — a bot's preview
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
   the `ready` state; see Semantics.
@@ -273,6 +277,9 @@ Diagnostics { "daemon_version", "protocol_version", "db_healthy", "runtime": {"k
               "delivery_backlog", "active_bots", "uptime_seconds" }
 Config   { "bind": ["127.0.0.1"], "port": 49777, "configured_port": 49777,
            "runtime": "pty"|"double", "auto_compact_window": 250000|null }
+Worker   { "id", "project_id", "name", "state": "queued"|"running"|"done"|"cancelled"|"expired"|"failed",
+           "queue_position"?, "machine"?, "parent_bot_id", "parent_name"?, "brief", "task_id"?,
+           "note"?, "bot_id"?, "created_at", "started_at"?, "finished_at"? }
 Device   { "id", "name", "capabilities": ["read"|"control"|"approve"], "created_at",
            "revoked_at?", "last_seen_at?" }
 Decision { "id", "project_id", "kind": "question"|"decision", "title", "body",

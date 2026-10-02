@@ -92,6 +92,7 @@ export default function MainPane(props: MainPaneProps): ReactElement {
     ) : (
       <ProjectView
         key={project.id}
+        client={props.client}
         project={project}
         bots={bots.filter((item) => item.project_id === project.id)}
         connected={connected}

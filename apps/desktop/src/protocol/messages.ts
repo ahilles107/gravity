@@ -19,6 +19,7 @@ import type {
   BrowserTabsPush,
 } from "./agents";
 import type { BotTask } from "./tasks";
+import type { WorkerView } from "./workers";
 import type {
   Bot,
   BotActivity,
@@ -184,6 +185,15 @@ export type ServerReply =
       readonly upload: { readonly upload_id: string; readonly path?: string };
     })
   | (ReplyBase & {
+      readonly type: "workers";
+      readonly project_id: string;
+      /** Queued and running oldest first, then recently finished. */
+      readonly workers: readonly WorkerView[];
+      readonly running_here: number;
+      readonly max_workers_here: number;
+    })
+  | (ReplyBase & { readonly type: "worker"; readonly worker: WorkerView })
+  | (ReplyBase & {
       readonly type: "tasks";
       readonly bot_id: string;
       /** Newest first. */
@@ -242,6 +252,7 @@ export type ServerPush =
   | { readonly type: "message_new"; readonly message: BusMessage }
   | { readonly type: "bot_updated"; readonly bot: Bot }
   | { readonly type: "project_updated"; readonly project: Project }
+  | { readonly type: "workers_updated"; readonly project_id: string }
   | { readonly type: "activity_update"; readonly activity: BotActivity }
   | { readonly type: "delivery_update"; readonly delivery: Delivery }
   | { readonly type: "routine_run_update"; readonly routine_run: RoutineRun }

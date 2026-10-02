@@ -246,13 +246,46 @@ impl Db {
         Ok(changed == 1)
     }
 
-    /// Record why a queued spawn is still waiting, without moving it.
-    pub fn note_worker_waiting(&self, id: &str, reason: Option<&str>) -> anyhow::Result<()> {
-        self.lock().execute(
-            "UPDATE worker SET error = ?2 WHERE id = ?1 AND state = 'queued'",
+    /// Record why a queued spawn is still waiting, without moving it. True
+    /// when the reason changed.
+    pub fn note_worker_waiting(&self, id: &str, reason: Option<&str>) -> anyhow::Result<bool> {
+        let changed = self.lock().execute(
+            "UPDATE worker SET error = ?2 WHERE id = ?1 AND state = 'queued' AND error IS NOT ?2",
             params![id, reason],
         )?;
-        Ok(())
+        Ok(changed == 1)
+    }
+
+    /// A project's spawns, as the app lists them: everything queued or
+    /// running, oldest first, then the most recent that finished.
+    pub fn project_workers(&self, project_id: &str, finished: i64) -> anyhow::Result<Vec<Worker>> {
+        let mut active = self.workers_where(
+            "project_id = ?1 AND state IN ('queued', 'running') ORDER BY created_at, rowid",
+            &[&project_id],
+        )?;
+        let done = self.workers_where(
+            "project_id = ?1 AND state NOT IN ('queued', 'running')
+             ORDER BY finished_at DESC, rowid DESC LIMIT ?2",
+            &[&project_id, &finished],
+        )?;
+        active.extend(done);
+        Ok(active)
+    }
+
+    /// The task most recently given to a bot, open or not.
+    pub fn latest_task_to(&self, bot_id: &str) -> anyhow::Result<Option<Task>> {
+        let id: Option<String> = self
+            .lock()
+            .query_row(
+                "SELECT id FROM task WHERE to_bot_id = ?1 ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                params![bot_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        match id {
+            Some(id) => self.get_task(&id),
+            None => Ok(None),
+        }
     }
 
     /// Temporary bots running here whose work is over: every task given to

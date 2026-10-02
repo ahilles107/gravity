@@ -36,6 +36,7 @@ mod runtime;
 mod tasks;
 mod terminal;
 mod views;
+mod workers;
 
 pub(crate) use views::{bot_view, project_view};
 

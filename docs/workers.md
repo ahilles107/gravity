@@ -2,8 +2,9 @@
 
 Status: implemented in the daemon and covered by
 `crates/gravityd/tests/workers.rs` and `crates/gravityd/tests/worker_repo.rs`.
-The desktop app marks workers in the bot list and sets a project's shared
-repository; it does not show the queue yet.
+The desktop app marks workers in the bot list, and its project settings show
+the project's workers (running, queued, recently finished, each cancellable)
+and set the shared repository.
 
 A bot can split a job into independent pieces and hand each to a
 temporary worker: a book bot spawns a worker per chapter, a migration bot
@@ -66,7 +67,8 @@ instead.
 3. **Finished.** The worker calls `complete_task`, or the parent cancels it
    (`cancel_worker`, or `cancel_task` on its task), or the task expires.
 4. **Retired.** Once its task is closed, and everything it sent across a peer
-   link has left, the worker is archived like any deleted bot. Its history
+   link has left, the worker is archived like any deleted bot. A worker with
+   a checkout first has its unpushed work saved (see below). Its history
    and workspace are kept until retention reclaims them. A temporary bot that
    is never given a task is retired after ten minutes.
 
@@ -95,6 +97,15 @@ Shared repository). When it has one:
   way, one line is appended to the result the parent reads:
   `repo: pushed <commit> to <branch>`, or `repo: this work conflicts with
   <branch>, so it was pushed to branch <own> instead — merge that`.
+- **When a worker stops without its work on the remote** — its task was
+  cancelled or expired, or its push failed — the daemon on its machine commits
+  what it left and pushes the worker's own branch before retiring it. The
+  worker then sends whoever spawned it a note:
+  `ch-3 stopped: its task was cancelled. Work it had not pushed is saved on
+  branch gravity/ch-3-… of the project repository; merge it if you want it.`
+  Nothing unfinished reaches the shared branch, and a worker with nothing
+  unpushed retires without a note. The worker is archived only after that
+  note has left, so it never speaks once archived.
 - **Permanent bots** are told the repository's URL and branch. They keep
   their own clone and `git pull` before starting and after each worker
   reports.
@@ -102,8 +113,8 @@ Shared repository). When it has one:
 Git runs non-interactively (`GIT_TERMINAL_PROMPT=0`, the `ext` transport
 disabled) with each machine's own credentials. Clone, fetch and push time out
 after five minutes. Operations on one project's cache run one at a time. A
-retired worker's checkout is removed only once nothing in it is unpushed;
-otherwise it is kept. Git hooks are not bypassed: a commit a hook refuses is
+retired worker's checkout, and its branch in the cache, are removed once
+everything in it is on the remote; otherwise they are kept. Git hooks are not bypassed: a commit a hook refuses is
 reported as a failed push, and the work stays in the checkout.
 
 ## Across machines
@@ -127,9 +138,17 @@ Peer requests time out after 60 seconds, so the first clone of a very large
 repository on a peer can time out. The worker then fails, and the next spawn
 reuses whatever the cache fetched.
 
+## The app
+
+Project settings list the project's workers under **Workers**: those running
+(and on which machine), the queue with each spawn's position, and the most
+recent that finished, with the spawning bot and the opening of each brief.
+The owner can cancel any spawn that has not finished; a running worker is told
+to stop in the owner's name. The list follows `workers_updated` pushes.
+
 ## Not yet
 
-- The desktop app does not show the queue (`list_workers` is MCP-only).
 - Setting a repository does not propagate to linked projects until a worker
   is placed there.
-- Work from a worker whose task was cancelled or expired is not pushed.
+- The Workers panel lists this daemon's spawns; a worker a linked machine's
+  bot spawned here shows in the bot list, and in that machine's panel.

@@ -12,6 +12,7 @@ export function emptyHandlers(): PushHandlerSets {
     message_new: new Set(),
     bot_updated: new Set(),
     project_updated: new Set(),
+    workers_updated: new Set(),
     activity_update: new Set(),
     delivery_update: new Set(),
     routine_run_update: new Set(),
@@ -73,6 +74,9 @@ export function dispatchPush(handlers: PushHandlerSets, push: ServerPush): void 
       break;
     case "project_updated":
       emitPush(handlers, "project_updated", push);
+      break;
+    case "workers_updated":
+      emitPush(handlers, "workers_updated", push);
       break;
     case "notify":
       emitPush(handlers, "notify", push);

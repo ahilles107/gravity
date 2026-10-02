@@ -124,3 +124,34 @@
 .task-result .markdown p {
   margin: 0 0 6px;
 }
+
+/* The Workers panel in project settings reuses the task rows above. */
+
+.workers-panel .tasks-section-title {
+  padding-left: 0;
+}
+
+.workers-panel .task-row {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.worker-parent {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.worker-brief {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worker-note {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
