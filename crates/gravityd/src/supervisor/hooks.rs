@@ -72,6 +72,26 @@ impl Supervisor {
             tracing::debug!(bot_id, message = text, "idle notification, state unchanged");
             return;
         }
+        // The notification names no tool, so a rule is matched against the
+        // dialog itself, which needs a moment to finish drawing.
+        if !self.inner.auto_approve.is_empty() {
+            if let Ok(runtime) = Handle::try_current() {
+                let sup = self.clone();
+                let bot_id = bot_id.to_string();
+                let text = text.to_string();
+                runtime.spawn(async move {
+                    tokio::time::sleep(AUTO_APPROVE_DELAY).await;
+                    if !sup.auto_approve(&bot_id, &text) {
+                        sup.mark_waiting_for_approval(&bot_id, &text);
+                    }
+                });
+                return;
+            }
+        }
+        self.mark_waiting_for_approval(bot_id, text);
+    }
+
+    fn mark_waiting_for_approval(&self, bot_id: &str, text: &str) {
         self.set_state(bot_id, BotState::WaitingForApproval, "notification");
         let detail = if text.is_empty() {
             "Claude is waiting for input or permission".to_string()
@@ -83,7 +103,57 @@ impl Supervisor {
             detail,
         });
     }
+
+    /// Answers the prompt with Enter, the dialog's default "Yes", when a rule
+    /// matches the dialog on screen. Returns whether the prompt was answered;
+    /// an answered prompt is never shown as pending approval.
+    fn auto_approve(&self, bot_id: &str, message: &str) -> bool {
+        let Some(term) = self.term(bot_id) else {
+            return false;
+        };
+        let tail: Vec<u8> = term
+            .replay_after(0)
+            .frames
+            .iter()
+            .rev()
+            .scan(0usize, |len, f| {
+                *len += f.data.len();
+                (*len <= SCREEN_TAIL_BYTES).then(|| f.data.clone())
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .flatten()
+            .collect();
+        let dialog = crate::auto_approve::dialog_text(&tail);
+        if !self.inner.auto_approve.matches(&dialog) && !self.inner.auto_approve.matches(message) {
+            let shown: String = dialog
+                .chars()
+                .rev()
+                .take(300)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            tracing::info!(bot_id, message, dialog = %shown, "permission prompt not auto-approved");
+            return false;
+        }
+        tracing::info!(bot_id, message, "auto-approving permission prompt");
+        match self.input(bot_id, b"\r") {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::warn!(bot_id, error = %e, "auto-approve could not answer the prompt");
+                false
+            }
+        }
+    }
 }
+
+/// How much recent terminal output is searched for the dialog.
+const SCREEN_TAIL_BYTES: usize = 32 * 1024;
+
+/// How long to wait after the notification for the dialog to finish drawing.
+const AUTO_APPROVE_DELAY: Duration = Duration::from_millis(300);
 
 /// The "waiting for your input" notification means nobody is typing, not that
 /// something needs approving. Everything else (permission prompts above all)

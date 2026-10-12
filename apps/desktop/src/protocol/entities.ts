@@ -206,7 +206,7 @@ export interface Diagnostics {
 
 /**
  * Daemon configuration exposed over the control plane. Only
- * `auto_compact_window` is writable via `set_config`; the rest describe how
+ * `auto_compact_window` and `auto_approve_rules` are writable via `set_config`; the rest describe how
  * the daemon was launched and require a config-file edit plus restart.
  */
 export interface DaemonConfig {
@@ -218,6 +218,8 @@ export interface DaemonConfig {
   readonly runtime: string;
   /** Null when unset: Claude Code uses the model default. */
   readonly auto_compact_window: number | null;
+  /** Patterns for permission prompts the daemon answers with Enter. */
+  readonly auto_approve_rules: readonly string[];
 }
 
 /** Permission grants attached to a connection (from `hello_ok`) or a device. */

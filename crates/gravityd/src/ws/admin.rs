@@ -102,6 +102,7 @@ impl Conn {
             "configured_port": self.app.cfg.configured_port,
             "runtime": self.app.cfg.runtime,
             "auto_compact_window": self.app.auto_compact.effective(&self.app.cfg),
+            "auto_approve_rules": self.app.auto_approve.list(),
         })
     }
 
@@ -110,46 +111,51 @@ impl Conn {
         Ok(())
     }
 
-    /// Updates `auto_compact_window` (`null` = model default) and persists it
-    /// in the `meta` table; bots pick the new value up on their next start.
+    /// Updates the writable settings and persists them in the `meta` table:
+    /// `auto_compact_window` (`null` = model default; bots pick it up on their
+    /// next start) and `auto_approve_rules` (an array of strings, applied to
+    /// the next prompt). Each is optional but at least one is required.
     /// Everything else in the config describes how the daemon was launched
     /// and stays read-only here.
     pub(super) fn set_config(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
-        let Some(field) = req.get("auto_compact_window") else {
+        let compact = req.get("auto_compact_window");
+        let approve = req.get("auto_approve_rules");
+        if compact.is_none() && approve.is_none() {
             self.reply_err(
                 req_id,
                 "invalid_request",
-                "'auto_compact_window' is required",
+                "'auto_compact_window' or 'auto_approve_rules' is required",
             );
             return Ok(());
-        };
-        let window = match field {
-            Value::Null => None,
-            Value::Number(n) => match n.as_u64().and_then(|w| u32::try_from(w).ok()) {
-                Some(w) if (AUTO_COMPACT_WINDOW_MIN..=AUTO_COMPACT_WINDOW_MAX).contains(&w) => {
-                    Some(w)
-                }
-                _ => {
-                    self.reply_err(
-                        req_id,
-                        "invalid_request",
-                        &format!(
-                            "auto_compact_window must be {AUTO_COMPACT_WINDOW_MIN}-{AUTO_COMPACT_WINDOW_MAX} or null"
-                        ),
-                    );
+        }
+        // Validate everything before writing anything, so a bad field cannot
+        // leave the other one half-applied.
+        let window = match compact {
+            None => None,
+            Some(field) => match parse_window(field) {
+                Ok(w) => Some(w),
+                Err(msg) => {
+                    self.reply_err(req_id, "invalid_request", &msg);
                     return Ok(());
                 }
             },
-            _ => {
-                self.reply_err(
-                    req_id,
-                    "invalid_request",
-                    "auto_compact_window must be a number or null",
-                );
-                return Ok(());
-            }
         };
-        self.app.auto_compact.persist(&self.app.db, window)?;
+        let rules = match approve {
+            None => None,
+            Some(field) => match parse_rules(field) {
+                Ok(r) => Some(r),
+                Err(msg) => {
+                    self.reply_err(req_id, "invalid_request", &msg);
+                    return Ok(());
+                }
+            },
+        };
+        if let Some(window) = window {
+            self.app.auto_compact.persist(&self.app.db, window)?;
+        }
+        if let Some(rules) = rules {
+            self.app.auto_approve.persist(&self.app.db, &rules)?;
+        }
         self.get_config(req_id)
     }
 
@@ -178,4 +184,33 @@ impl Conn {
         }));
         Ok(())
     }
+}
+
+/// `auto_compact_window`: a number in range, or `null` for the model default.
+fn parse_window(field: &Value) -> Result<Option<u32>, String> {
+    match field {
+        Value::Null => Ok(None),
+        Value::Number(n) => match n.as_u64().and_then(|w| u32::try_from(w).ok()) {
+            Some(w) if (AUTO_COMPACT_WINDOW_MIN..=AUTO_COMPACT_WINDOW_MAX).contains(&w) => {
+                Ok(Some(w))
+            }
+            _ => Err(format!(
+                "auto_compact_window must be {AUTO_COMPACT_WINDOW_MIN}-{AUTO_COMPACT_WINDOW_MAX} or null"
+            )),
+        },
+        _ => Err("auto_compact_window must be a number or null".to_string()),
+    }
+}
+
+/// `auto_approve_rules`: an array of pattern strings, validated and cleaned.
+fn parse_rules(field: &Value) -> Result<Vec<String>, String> {
+    let items = field
+        .as_array()
+        .ok_or("auto_approve_rules must be an array of strings")?;
+    let rules = items
+        .iter()
+        .map(|v| v.as_str().map(str::to_string))
+        .collect::<Option<Vec<_>>>()
+        .ok_or("auto_approve_rules must be an array of strings")?;
+    crate::auto_approve::normalize(&rules).map_err(|e| e.to_string())
 }

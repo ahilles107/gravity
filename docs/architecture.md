@@ -95,7 +95,10 @@ Process events and authenticated lifecycle hooks update observable states such
 as `starting`, `ready`, `working`, `waiting_for_approval`, and `crashed`. A
 completed turn can return a bot to `ready` while the process stays alive.
 Permission decisions are handled through Claude Code's native terminal prompts;
-the PTY adapter does not advertise an out-of-band permission relay.
+the PTY adapter does not advertise an out-of-band permission relay. The one
+exception is the owner's auto-approve list (`auto_approve_rules`, set through
+`set_config`): a permission dialog on the terminal that matches a rule is
+answered by sending Enter. The list is empty by default and applies to all bots.
 
 The `double` adapter supplies deterministic sessions for tests and local
 development without Claude authentication or model calls. These two adapters

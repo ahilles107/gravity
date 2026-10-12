@@ -232,3 +232,58 @@ async fn clearing_a_session_leaves_the_bot_running() {
     c.send(json!({"type": "input", "bot_id": bot_id, "data": "hi"}))
         .await;
 }
+
+/// A prompt matching an auto-approve rule is answered with Enter by the daemon
+/// and never shows up as waiting for approval; one that matches nothing still
+/// does.
+#[tokio::test]
+async fn a_matching_permission_prompt_is_answered_with_enter() {
+    let d = spawn_daemon().await;
+    let mut c = WsClient::connect(&d).await;
+    let project = c
+        .request(json!({"type": "create_project", "name": "p"}))
+        .await;
+    let project_id = project["project"]["id"].as_str().expect("pid").to_string();
+    let bot = create_bot(&mut c, &project_id, "alice").await;
+    let bot_id = bot["id"].as_str().expect("bid").to_string();
+    c.wait_for(|v| v["type"] == "bot_state" && v["state"] == "ready")
+        .await;
+    let reply = c
+        .request(json!({"type": "set_config", "auto_approve_rules": ["Slack - Read channel"]}))
+        .await;
+    assert_eq!(
+        reply["config"]["auto_approve_rules"],
+        json!(["Slack - Read channel"])
+    );
+
+    let token = d.app.secrets.bot_token(&bot_id).expect("bot token");
+    let http = reqwest::Client::new();
+    let hook = format!("http://{}/hook?event=Notification", d.addr);
+    let notify = |message: &str| {
+        http.post(&hook)
+            .bearer_auth(token.clone())
+            .json(&json!({"hook_event_name": "Notification", "message": message}))
+            .send()
+    };
+
+    // The double runtime echoes input, so Enter shows up as new terminal output.
+    let term = d.app.supervisor.term(&bot_id).expect("terminal");
+    let before = term.latest_seq();
+    notify("Claude needs your permission to use Slack - Read channel messages (MCP)")
+        .await
+        .expect("hook post");
+    for _ in 0..40 {
+        if term.latest_seq() > before {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(term.latest_seq() > before, "Enter was not sent");
+    assert_eq!(d.app.supervisor.state(&bot_id).0.as_str(), "ready");
+
+    notify("Claude needs your permission to use Bash")
+        .await
+        .expect("hook post");
+    c.wait_for(|v| v["type"] == "bot_state" && v["state"] == "waiting_for_approval")
+        .await;
+}

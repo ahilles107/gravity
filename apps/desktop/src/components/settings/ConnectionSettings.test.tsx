@@ -20,6 +20,7 @@ const CONFIG: DaemonConfig = {
   configured_port: 49777,
   runtime: "pty",
   auto_compact_window: null,
+  auto_approve_rules: [],
 };
 
 beforeEach(() => {

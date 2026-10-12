@@ -20,6 +20,7 @@ function config(over: Partial<DaemonConfig> = {}): DaemonConfig {
     configured_port: 49777,
     runtime: "pty",
     auto_compact_window: 250_000,
+    auto_approve_rules: [],
     ...over,
   };
 }
@@ -102,6 +103,34 @@ describe("DaemonSettings", () => {
     });
     const sent = daemon.requests.find((r) => r.body.type === "set_config");
     expect(sent?.body).toEqual({ type: "set_config", auto_compact_window: 300_000 });
+  });
+
+  it("saves auto-approve rules one per line", async () => {
+    const user = userEvent.setup();
+    const daemon = baseDaemon().onRequest("set_config", (body) => {
+      if (body.type !== "set_config") {
+        throw new Error("unexpected request");
+      }
+      return {
+        type: "config",
+        req_id: "1",
+        config: config({ auto_approve_rules: body.auto_approve_rules ?? [] }),
+      };
+    });
+    const { onToast } = renderPane(daemon);
+
+    const box = await screen.findByLabelText("Auto-approve permission prompts");
+    await user.type(box, "Slack - Read channel messages{enter}{enter}  mcp__github*  ");
+    await user.click(screen.getByRole("button", { name: "Save auto-approve rules" }));
+
+    await waitFor(() => {
+      expect(onToast).toHaveBeenCalledWith("info", "Daemon updated", expect.any(String));
+    });
+    const sent = daemon.requests.find((r) => r.body.type === "set_config");
+    expect(sent?.body).toEqual({
+      type: "set_config",
+      auto_approve_rules: ["Slack - Read channel messages", "mcp__github*"],
+    });
   });
 
   it("clears the window to the model default with an empty field", async () => {

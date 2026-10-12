@@ -7,6 +7,7 @@ import type { DaemonConfig, NotifyLevel } from "../../protocol/entities";
 import { restartLocalDaemon } from "../../setup";
 import { errText } from "../../util";
 import ConfirmDialog from "../overlay/ConfirmDialog";
+import AutoApproveForm from "./AutoApproveForm";
 
 const AUTO_COMPACT_WINDOW_MIN = 100_000;
 const AUTO_COMPACT_WINDOW_MAX = 1_000_000;
@@ -274,6 +275,9 @@ export default function DaemonSettings(props: DaemonSettingsProps): ReactElement
         error,
         parsed,
         saving,
+        client,
+        onToast,
+        onConfig: setConfig,
         setDraft,
         save,
       })}
@@ -291,13 +295,29 @@ interface ConfigRowsProps {
   readonly error: string | null;
   readonly parsed: WindowParse;
   readonly saving: boolean;
+  readonly client: DaemonApi;
+  readonly onToast: (level: NotifyLevel, title: string, body: string) => void;
+  readonly onConfig: (config: DaemonConfig) => void;
   readonly setDraft: (draft: string) => void;
   readonly save: () => Promise<void>;
 }
 
 function configRows(props: ConfigRowsProps): ReactElement {
-  const { canControl, config, connected, dirty, draft, error, parsed, saving, setDraft, save } =
-    props;
+  const {
+    canControl,
+    client,
+    config,
+    connected,
+    dirty,
+    draft,
+    error,
+    onConfig,
+    onToast,
+    parsed,
+    saving,
+    setDraft,
+    save,
+  } = props;
   if (error !== null) {
     return <div className="muted">Failed to load daemon config: {error}</div>;
   }
@@ -317,6 +337,14 @@ function configRows(props: ConfigRowsProps): ReactElement {
         onSave={() => {
           void save();
         }}
+      />
+      <AutoApproveForm
+        client={client}
+        connected={connected}
+        canControl={canControl}
+        rules={config.auto_approve_rules}
+        onSaved={onConfig}
+        onToast={onToast}
       />
       <DaemonLaunchConfig config={config} />
     </>

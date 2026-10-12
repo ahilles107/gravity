@@ -265,10 +265,22 @@ Timestamps are RFC 3339 UTC strings. IDs are UUIDv4 strings.
   so no push.
 
 - `set_config` (advertised as the `config` capability, requires the `control`
-  grant) writes only `auto_compact_window`: a number in 100000–1000000, or
-  `null` for the model default. The value is persisted in the daemon's database
-  — layered over `gravityd.toml`, which stays untouched — and takes effect the
-  next time each bot's session starts. `bind`, `port` and `runtime` in the
+  grant) writes `auto_compact_window` and/or `auto_approve_rules` (at least one
+  is required; both are validated before either is written).
+  `auto_compact_window` is a number in 100000–1000000, or `null` for the model
+  default; it takes effect the next time each bot's session starts.
+  `auto_approve_rules` is an array of strings that replaces the whole list
+  (default `[]`): when a Claude Code permission `Notification` hook fires, the
+  daemon waits 300 ms for the dialog to draw, reads it from the bot's terminal
+  output and, if it contains a rule (case-insensitive; `*` matches any run of
+  characters; dashes and whitespace runs are interchangeable), presses Enter,
+  accepting the dialog's default "Yes". Such a prompt never reports
+  `waiting_for_approval`; with a non-empty list, other prompts report it
+  300 ms late. Rules apply to every bot, take effect
+  on the next prompt, are trimmed and de-duplicated, are limited to 100 rules
+  of 200 characters, and a rule of only `*` is refused. Both values are
+  persisted in the daemon's database — layered over `gravityd.toml`, which
+  stays untouched. `bind`, `port` and `runtime` in the
   `config` reply are read-only: they describe how the daemon was launched and
   change only via `gravityd.toml` plus a restart.
 
