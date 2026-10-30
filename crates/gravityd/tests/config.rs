@@ -4,6 +4,7 @@ mod common;
 
 use common::*;
 use futures::StreamExt;
+use gravityd::auto_approve::AUTO_APPROVE_META_KEY;
 use gravityd::overrides::AUTO_COMPACT_META_KEY;
 use serde_json::json;
 
@@ -97,4 +98,46 @@ async fn set_config_requires_the_control_capability() {
         .await;
     assert_eq!(denied["type"], "error", "{denied}");
     assert_eq!(denied["code"], "forbidden");
+}
+
+#[tokio::test]
+async fn set_config_stores_validates_and_restores_auto_approve_rules() {
+    let d = spawn_daemon().await;
+    let mut c = WsClient::connect(&d).await;
+
+    let initial = c.request(json!({"type": "get_config"})).await;
+    assert_eq!(initial["config"]["auto_approve_rules"], json!([]));
+
+    // Rules are trimmed and de-duplicated; the compact window is untouched.
+    let reply = c
+        .request(json!({"type": "set_config", "auto_approve_rules": [" Slack ", "slack", ""]}))
+        .await;
+    assert_eq!(
+        reply["config"]["auto_approve_rules"],
+        json!(["Slack"]),
+        "{reply}"
+    );
+    assert_eq!(reply["config"]["auto_compact_window"], json!(250_000));
+    assert_eq!(
+        d.app.db.get_meta(AUTO_APPROVE_META_KEY).expect("meta"),
+        Some(r#"["Slack"]"#.to_string())
+    );
+
+    // Match-everything, wrong types and a bad window beside good rules are
+    // all rejected without changing anything.
+    for bad in [
+        json!({"auto_approve_rules": ["*"]}),
+        json!({"auto_approve_rules": "Slack"}),
+        json!({"auto_approve_rules": [1]}),
+        json!({"auto_approve_rules": ["Bash"], "auto_compact_window": 1}),
+    ] {
+        let mut req = json!({"type": "set_config"});
+        req.as_object_mut()
+            .unwrap()
+            .extend(bad.as_object().unwrap().clone());
+        let denied = c.request(req).await;
+        assert_eq!(denied["code"], "invalid_request", "{denied}");
+    }
+    let after = c.request(json!({"type": "get_config"})).await;
+    assert_eq!(after["config"]["auto_approve_rules"], json!(["Slack"]));
 }

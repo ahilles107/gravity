@@ -133,7 +133,9 @@ export type ClientRequestBody =
   | {
       readonly type: "set_config";
       /** Null clears the override so Claude Code uses the model default. */
-      readonly auto_compact_window: number | null;
+      readonly auto_compact_window?: number | null;
+      /** Replaces the whole list of auto-approved permission prompts. */
+      readonly auto_approve_rules?: readonly string[];
     }
   | { readonly type: "list_devices" }
   | {

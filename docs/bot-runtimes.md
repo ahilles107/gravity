@@ -45,7 +45,7 @@ Gravity supervision restarts a bot after its terminal exits.
 Bus messages arrive through structured turn requests and never consume a partially
 typed terminal prompt. Gravity observes both native and bus turns for activity and
 routine completion. The native CLI handles approval decisions; Gravity does not
-automatically answer them. Each bot has a separate App Server with a fresh random
+automatically answer them (auto-approve rules apply to Claude Code only). Each bot has a separate App Server with a fresh random
 capability token. The raw token is passed through the terminal environment and RPC
 authorization header; only its SHA-256 verifier appears in server arguments.
 

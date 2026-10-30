@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
+use crate::auto_approve::{AutoApproveRules, AUTO_APPROVE_META_KEY};
 use crate::config::{Config, RuntimeKind};
 use crate::db::Db;
 use crate::events::Events;
@@ -39,6 +40,9 @@ pub struct AppState {
     /// Runtime override for `cfg.auto_compact_window`, shared with the
     /// supervisor and persisted in the `meta` table.
     pub auto_compact: AutoCompactOverride,
+    /// Permission prompts the daemon answers itself, shared with the
+    /// supervisor and persisted in the `meta` table.
+    pub auto_approve: AutoApproveRules,
     /// Live links to peer daemons, shared by the delivery worker (forwarding
     /// to linked bots) and the control plane (pairing and linking).
     pub peers: crate::peer::PeerHub,
@@ -63,6 +67,10 @@ impl AppState {
         if let Some(stored) = db.get_meta(AUTO_COMPACT_META_KEY)? {
             auto_compact.restore(&stored);
         }
+        let auto_approve = AutoApproveRules::default();
+        if let Some(stored) = db.get_meta(AUTO_APPROVE_META_KEY)? {
+            auto_approve.restore(&stored);
+        }
         let supervisor = Supervisor::new(
             adapter,
             cfg.clone(),
@@ -70,6 +78,7 @@ impl AppState {
             events.clone(),
             secrets.clone(),
             auto_compact.clone(),
+            auto_approve.clone(),
         );
         Ok(Arc::new(Self {
             cfg,
@@ -78,6 +87,7 @@ impl AppState {
             secrets,
             supervisor,
             auto_compact,
+            auto_approve,
             peers: crate::peer::PeerHub::default(),
             started_at: Instant::now(),
             started_wall: SystemTime::now(),

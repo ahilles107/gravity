@@ -98,6 +98,7 @@ mod tests {
             Events::new(),
             secrets,
             AutoCompactOverride::default(),
+            crate::auto_approve::AutoApproveRules::default(),
         );
         (sup, bot.id)
     }

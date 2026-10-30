@@ -43,6 +43,7 @@ function renderOverlay(category: SettingsCategory = "connection") {
       configured_port: 49777,
       runtime: "pty",
       auto_compact_window: 250_000,
+      auto_approve_rules: [],
     },
   }));
   const onSelectCategory = vi.fn<(category: SettingsCategory) => void>();

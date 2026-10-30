@@ -20,6 +20,7 @@ use bus::BotState;
 use tokio::runtime::Handle;
 use tokio::task::AbortHandle;
 
+use crate::auto_approve::AutoApproveRules;
 use crate::channel::MsgSocket;
 use crate::config::Config;
 use crate::db::Db;
@@ -173,6 +174,7 @@ struct SupervisorInner {
     events: Events,
     secrets: Arc<Secrets>,
     auto_compact: AutoCompactOverride,
+    auto_approve: AutoApproveRules,
     bots: Mutex<HashMap<String, BotHandle>>,
 }
 
@@ -184,6 +186,7 @@ impl Supervisor {
         events: Events,
         secrets: Arc<Secrets>,
         auto_compact: AutoCompactOverride,
+        auto_approve: AutoApproveRules,
     ) -> Self {
         Self {
             inner: Arc::new(SupervisorInner {
@@ -193,6 +196,7 @@ impl Supervisor {
                 events,
                 secrets,
                 auto_compact,
+                auto_approve,
                 bots: Mutex::new(HashMap::new()),
             }),
         }
