@@ -16,6 +16,8 @@ export interface DaemonActions {
   /** Creates a project and its first bot, so a fresh install lands on a bot. */
   readonly createProjectWithBot: (name: string) => Promise<void>;
   readonly deleteBot: (botId: string) => Promise<void>;
+  /** Puts a project's bots in this order: shown at once, then confirmed. */
+  readonly reorderBots: (projectId: string, botIds: readonly string[]) => Promise<void>;
 }
 
 interface ActionDeps {
@@ -23,12 +25,13 @@ interface ActionDeps {
   readonly addToast: AddToast;
   readonly refreshAll: () => Promise<void>;
   readonly applyBotUpdate: (bot: Bot) => void;
+  readonly applyBotOrder: (projectId: string, botIds: readonly string[]) => void;
   readonly select: (next: Selection) => void;
 }
 
 /** Mutating control-plane calls, each surfacing failures as a toast. */
 export function useDaemonActions(deps: ActionDeps): DaemonActions {
-  const { client, addToast, refreshAll, applyBotUpdate, select } = deps;
+  const { client, addToast, refreshAll, applyBotUpdate, applyBotOrder, select } = deps;
 
   const createProject = useCallback(
     async (name: string): Promise<string | undefined> => {
@@ -141,6 +144,33 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
     [addToast, client, refreshAll],
   );
 
+  /**
+   * A drag has to land the moment it is dropped, so the new order is applied
+   * before the daemon answers. A refusal reloads the real order rather than
+   * leaving the sidebar showing one nobody else sees.
+   */
+  const reorderBots = useCallback(
+    async (projectId: string, botIds: readonly string[]): Promise<void> => {
+      applyBotOrder(projectId, botIds);
+      try {
+        const reply = await client.request(
+          { type: "reorder_bots", project_id: projectId, bot_ids: botIds },
+          "bots",
+        );
+        capture("bots_reordered", {});
+        applyBotOrder(
+          projectId,
+          reply.bots.map((bot) => bot.id),
+        );
+      } catch (error) {
+        captureException(error, "bot_reorder");
+        addToast("error", "Reorder bots failed", errText(error));
+        await refreshAll();
+      }
+    },
+    [addToast, applyBotOrder, client, refreshAll],
+  );
+
   return useMemo(
     () => ({
       createProject,
@@ -150,6 +180,7 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
       createBot,
       createProjectWithBot,
       deleteBot,
+      reorderBots,
     }),
     [
       createBot,
@@ -158,6 +189,7 @@ export function useDaemonActions(deps: ActionDeps): DaemonActions {
       deleteBot,
       deleteProject,
       renameProject,
+      reorderBots,
       setProjectLead,
     ],
   );

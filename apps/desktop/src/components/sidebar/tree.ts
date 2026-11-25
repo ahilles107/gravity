@@ -17,4 +17,6 @@ export interface SidebarTreeProps {
   readonly onDeleteBot: (botId: string) => Promise<void>;
   readonly onDeleteProject: (projectId: string) => Promise<void>;
   readonly onTogglePin: (botId: string) => void;
+  /** Puts a project's bots in this order. Only offered with the control grant. */
+  readonly onReorderBots: (projectId: string, botIds: readonly string[]) => void;
 }

@@ -6,6 +6,7 @@ import { MoreIcon } from "./icons";
 import PinnedBots from "./PinnedBots";
 import type { SidebarTreeProps } from "./tree";
 import { useProjectMenu } from "./useProjectMenu";
+import { useRowReorder } from "./useRowReorder";
 
 export interface ProjectSectionProps extends SidebarTreeProps {
   readonly project: Project;
@@ -37,9 +38,19 @@ export default function ProjectSection(props: ProjectSectionProps): ReactElement
     .filter((bot): bot is Bot => bot !== undefined);
   const unpinnedBots = bots.filter((bot) => !pinnedBotIds.includes(bot.id));
   const selectedBotId = selection.kind === "bot" ? selection.botId : null;
+  const { drag, mover, sectionRef } = useRowReorder({
+    projectId: project.id,
+    bots,
+    rows: unpinnedBots,
+    canControl,
+    onReorderBots: props.onReorderBots,
+  });
 
   return (
-    <section className="project-section">
+    <section
+      ref={sectionRef}
+      className={`project-section ${drag.draggingId === null ? "" : "project-section-dragging"}`}
+    >
       <div
         className={`project-header ${
           selection.kind === "project" && selection.projectId === project.id
@@ -106,6 +117,11 @@ export default function ProjectSection(props: ProjectSectionProps): ReactElement
               onTogglePin={() => {
                 props.onTogglePin(bot.id);
               }}
+              onMoveUp={mover(bot.id, -1)}
+              onMoveDown={mover(bot.id, 1)}
+              drag={drag.rowHandlers(bot.id)}
+              dragging={drag.draggingId === bot.id}
+              dropPlace={drag.target?.botId === bot.id ? drag.target.place : null}
             />
           ))}
           {bots.length === 0 ? <div className="muted project-empty">No bots yet.</div> : null}

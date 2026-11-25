@@ -41,6 +41,7 @@ export interface DaemonState {
   readonly refreshAll: () => Promise<void>;
   readonly updateBotRoutines: (botId: string, routines: readonly Routine[]) => void;
   readonly applyBotUpdate: (bot: Bot) => void;
+  readonly applyBotOrder: (projectId: string, botIds: readonly string[]) => void;
   readonly applyProjectUpdate: (project: Project) => void;
   readonly findConversation: (conversationId: string) => Conversation | undefined;
 }
@@ -135,6 +136,7 @@ export function useDaemonState(client: DaemonApi, addToast: AddToast): DaemonSta
     nextRun: entities.nextRun,
     activityByBot: entities.activityByBot,
     applyBotUpdate: entities.applyBotUpdate,
+    applyBotOrder: entities.applyBotOrder,
     applyProjectUpdate: entities.applyProjectUpdate,
     updateBotRoutines: entities.setBotRoutines,
     unreadBots: unread.bots,

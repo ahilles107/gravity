@@ -7,6 +7,7 @@ use std::path::Path;
 use crate::activity;
 use crate::botmgmt::{self, IdentityEdit};
 use crate::db::Actor;
+use crate::events::Push;
 use crate::projectmgmt;
 
 use super::Conn;
@@ -256,6 +257,33 @@ impl Conn {
         };
         botmgmt::archive_bot(&self.app, &bot, &Actor::User, reason)?;
         self.send(json!({ "type": "ok", "req_id": req_id }));
+        Ok(())
+    }
+
+    /// Rearrange a project's roster. Order is shared by every client, so it
+    /// takes `control` like any other fleet change, and the result is pushed
+    /// to everyone rather than only echoed to the caller.
+    pub(super) fn reorder_bots(&self, req_id: &Value, req: &Value) -> anyhow::Result<()> {
+        let project_id = Self::str_field(req, "project_id")?;
+        let Some(ids) = req.get("bot_ids").and_then(Value::as_array) else {
+            self.reply_err(req_id, "invalid_request", "'bot_ids' must be an array");
+            return Ok(());
+        };
+        let mut bot_ids = Vec::with_capacity(ids.len());
+        for id in ids {
+            let Some(id) = id.as_str() else {
+                self.reply_err(req_id, "invalid_request", "'bot_ids' must hold strings");
+                return Ok(());
+            };
+            bot_ids.push(id.to_string());
+        }
+        let bots = self.app.db.reorder_bots(project_id, &bot_ids)?;
+        self.app.events.push(Push::BotsReordered {
+            project_id: project_id.to_string(),
+            bot_ids: bots.iter().map(|bot| bot.id.clone()).collect(),
+        });
+        let bots: Vec<Value> = bots.iter().map(|bot| self.bot_json(bot)).collect();
+        self.send(json!({ "type": "bots", "req_id": req_id, "bots": bots }));
         Ok(())
     }
 

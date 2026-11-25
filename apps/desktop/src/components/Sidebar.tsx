@@ -111,6 +111,7 @@ export default function Sidebar(props: SidebarProps): ReactElement {
             onDeleteBot={props.onDeleteBot}
             onDeleteProject={props.onDeleteProject}
             onTogglePin={onTogglePin}
+            onReorderBots={props.onReorderBots}
           />
         ))}
         {projects.length === 0 ? (

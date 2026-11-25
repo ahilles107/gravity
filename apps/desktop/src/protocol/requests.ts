@@ -55,6 +55,12 @@ export type ClientRequestBody =
       readonly reason?: string;
     }
   | {
+      readonly type: "reorder_bots";
+      readonly project_id: string;
+      /** Listed bots go first, in this order; the rest keep theirs after them. */
+      readonly bot_ids: readonly string[];
+    }
+  | {
       readonly type: "list_bot_revisions";
       readonly bot_id: string;
       readonly limit?: number;

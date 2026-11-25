@@ -58,6 +58,10 @@ pub struct Bot {
     /// The linked bot's id on its peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remote_bot_id: Option<Id>,
+    /// Position in its project's roster, chosen by the owner. Lower sorts
+    /// first; ties (and daemons that predate ordering) fall back to the name.
+    #[serde(default)]
+    pub sort_order: i64,
     pub created_at: DateTime<Utc>,
 }
 

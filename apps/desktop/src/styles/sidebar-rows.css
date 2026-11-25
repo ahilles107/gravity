@@ -119,9 +119,12 @@
 /* bot rows: avatar beside a name/time line and a message preview line */
 
 .bot-row {
+  position: relative;
   align-items: flex-start;
   gap: 10px;
   padding: 7px 8px;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .bot-row-avatar {
@@ -281,4 +284,36 @@
     transform: scale(2.11);
     opacity: 0;
   }
+}
+
+/* ---------- rearranging bot rows ---------- */
+
+.project-section-dragging,
+.project-section-dragging .row {
+  cursor: grabbing;
+}
+
+.bot-row-dragging {
+  opacity: 0.5;
+}
+
+/* The insertion line sits in the gap the dragged row will land in. */
+.bot-row-drop-before::before,
+.bot-row-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.bot-row-drop-before::before {
+  top: -1px;
+}
+
+.bot-row-drop-after::after {
+  bottom: -1px;
 }

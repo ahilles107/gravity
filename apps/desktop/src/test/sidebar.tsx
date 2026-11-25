@@ -15,6 +15,7 @@ function mocks() {
     onCreateBot: vi.fn<(projectId: string) => Promise<void>>(() => Promise.resolve()),
     onDeleteBot: vi.fn<(botId: string) => Promise<void>>(() => Promise.resolve()),
     onDeleteProject: vi.fn<(projectId: string) => Promise<void>>(() => Promise.resolve()),
+    onReorderBots: vi.fn<(projectId: string, botIds: readonly string[]) => void>(),
     onOpenSettings: vi.fn<(category?: SettingsCategory) => void>(),
   };
 }

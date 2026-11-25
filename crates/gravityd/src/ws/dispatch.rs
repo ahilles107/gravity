@@ -86,6 +86,7 @@ impl Conn {
             "update_bot" => self.update_bot(&req_id, req),
             "set_bot_runtime" => self.set_bot_runtime(&req_id, req),
             "delete_bot" => self.delete_bot(&req_id, req),
+            "reorder_bots" => self.reorder_bots(&req_id, req),
             "list_bot_revisions" => self.list_bot_revisions(&req_id, req),
             "revert_bot_revision" => self.revert_bot_revision(&req_id, req),
             "attach" => self.attach(&req_id, req),

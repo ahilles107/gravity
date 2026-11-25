@@ -28,6 +28,7 @@ function daemonState(client: FakeDaemon): DaemonState {
     refreshAll: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     updateBotRoutines: vi.fn<DaemonState["updateBotRoutines"]>(),
     applyBotUpdate: vi.fn<DaemonState["applyBotUpdate"]>(),
+    applyBotOrder: vi.fn<DaemonState["applyBotOrder"]>(),
     applyProjectUpdate: vi.fn<DaemonState["applyProjectUpdate"]>(),
     findConversation: () => undefined,
   };

@@ -8,6 +8,7 @@ import type {
   Project,
   Routine,
 } from "../protocol/entities";
+import { sortBots, withBotOrder } from "./botOrder";
 import { withoutKey } from "./records";
 import { earliestRun } from "./snapshot";
 import type { DaemonSnapshot } from "./snapshot";
@@ -27,6 +28,8 @@ export interface EntitiesApi {
   readonly applyProjectUpdate: (project: Project) => void;
   readonly applyBotState: (botId: string, state: BotState, reason: string) => void;
   readonly applyBotUpdate: (bot: Bot) => void;
+  /** Rearranges one project's bots, from a reply, a push or an optimistic move. */
+  readonly applyBotOrder: (projectId: string, botIds: readonly string[]) => void;
   readonly applyDelivery: (delivery: Delivery) => void;
   readonly setBotRoutines: (botId: string, routines: readonly Routine[]) => void;
   readonly applyActivity: (activity: readonly BotActivity[]) => void;
@@ -101,21 +104,18 @@ export function useEntities(): EntitiesApi {
    * Creation, rename and deletion all arrive as this one push, so an update
    * for a bot the list has never seen is the normal case for a bot built by
    * another bot — replacing in place alone would drop it silently. The daemon
-   * lists live bots ordered by name, so the order is rebuilt to match and a
-   * rename lands in the right place.
+   * lists live bots by `sort_order` and then name, so the list is re-sorted
+   * the same way: a new bot lands at the end, a renamed one stays put.
    */
   const applyBotUpdate = useCallback((bot: Bot): void => {
     setBots((prev) => {
       const others = prev.filter((item) => item.id !== bot.id);
-      if (typeof bot.deleted_at === "string") {
-        return others;
-      }
-      // The remaining bots are still in the daemon's `ORDER BY name`, so
-      // splicing this one in before the first name that sorts after it keeps
-      // the list matching a fresh `list_bots` — including after a rename.
-      const at = others.findIndex((item) => item.name.localeCompare(bot.name) > 0);
-      return at === -1 ? [...others, bot] : [...others.slice(0, at), bot, ...others.slice(at)];
+      return typeof bot.deleted_at === "string" ? others : sortBots([...others, bot]);
     });
+  }, []);
+
+  const applyBotOrder = useCallback((projectId: string, botIds: readonly string[]): void => {
+    setBots((prev) => withBotOrder(prev, projectId, botIds));
   }, []);
 
   const applyActivity = useCallback((activity: readonly BotActivity[]): void => {
@@ -144,6 +144,7 @@ export function useEntities(): EntitiesApi {
     applyProjectUpdate,
     applyBotState,
     applyBotUpdate,
+    applyBotOrder,
     applyDelivery,
     setBotRoutines,
     applyActivity,

@@ -23,6 +23,7 @@ interface AnalyticsEvents {
     readonly notified: number;
   };
   readonly bot_deleted: Record<string, never>;
+  readonly bots_reordered: Record<string, never>;
   readonly daemon_connected: {
     readonly can_control: boolean;
     readonly connection_type: "local" | "remote";
@@ -60,6 +61,7 @@ export type ErrorOperation =
   | "app_update"
   | "bot_create"
   | "bot_delete"
+  | "bot_reorder"
   | "daemon_restart"
   | "decision_answer"
   | "decision_comment"

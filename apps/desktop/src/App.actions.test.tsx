@@ -37,6 +37,11 @@ function seedDaemon(): FakeDaemon {
     .onRequest("list_messages", () => ({ type: "messages", req_id: "1", messages: [] }));
 }
 
+/** Sidebar rows by name, top to bottom. */
+function rowNames(): string[] {
+  return Array.from(document.querySelectorAll(".bot-row-name"), (node) => node.textContent ?? "");
+}
+
 /** Renders the app and waits for the initial snapshot to land. */
 async function renderApp(): Promise<void> {
   render(<App />);
@@ -279,5 +284,73 @@ describe("App actions", () => {
       expect(screen.getByText("alice", { selector: ".view-title" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+  });
+
+  describe("bot order", () => {
+    const ann = fx.bot({ id: "b1", name: "ann", sort_order: 0 });
+    const bob = fx.bot({ id: "b2", name: "bob", sort_order: 1 });
+
+    beforeEach(() => {
+      daemon.onRequest("list_bots", () => ({ type: "bots", req_id: "1", bots: [ann, bob] }));
+    });
+
+    it("moves a bot at once and asks the daemon to keep it", async () => {
+      const user = userEvent.setup();
+      daemon.onRequest("reorder_bots", () => ({
+        type: "bots",
+        req_id: "1",
+        bots: [
+          { ...bob, sort_order: 0 },
+          { ...ann, sort_order: 1 },
+        ],
+      }));
+      await renderApp();
+      expect(rowNames()).toEqual(["ann", "bob"]);
+
+      await user.pointer({
+        keys: "[MouseRight]",
+        target: screen.getByText("ann", { selector: ".bot-row-name" }),
+      });
+      await user.click(screen.getByRole("menuitem", { name: "Move down" }));
+
+      expect(rowNames()).toEqual(["bob", "ann"]);
+      const request = daemon.requests.find((r) => r.body.type === "reorder_bots");
+      expect(request?.body).toEqual({
+        type: "reorder_bots",
+        project_id: "p1",
+        bot_ids: ["b2", "b1"],
+      });
+    });
+
+    it("follows a reorder made by another client", async () => {
+      await renderApp();
+      act(() => {
+        daemon.emit("bots_reordered", {
+          type: "bots_reordered",
+          project_id: "p1",
+          bot_ids: ["b2", "b1"],
+        });
+      });
+      expect(rowNames()).toEqual(["bob", "ann"]);
+    });
+
+    it("puts the daemon's order back when a reorder is refused", async () => {
+      const user = userEvent.setup();
+      daemon.onRequest("reorder_bots", () => {
+        throw new Error("bot not found");
+      });
+      await renderApp();
+
+      await user.pointer({
+        keys: "[MouseRight]",
+        target: screen.getByText("ann", { selector: ".bot-row-name" }),
+      });
+      await user.click(screen.getByRole("menuitem", { name: "Move down" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Reorder bots failed")).toBeInTheDocument();
+      });
+      expect(rowNames()).toEqual(["ann", "bob"]);
+    });
   });
 });

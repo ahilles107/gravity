@@ -57,6 +57,9 @@ function subscribe(ref: MutableRefObject<PushDeps>): Array<() => void> {
     client.on("bot_updated", (push) => {
       ref.current.entities.applyBotUpdate(push.bot);
     }),
+    client.on("bots_reordered", (push) => {
+      ref.current.entities.applyBotOrder(push.project_id, push.bot_ids);
+    }),
     client.on("project_updated", (push) => {
       ref.current.entities.applyProjectUpdate(push.project);
     }),
