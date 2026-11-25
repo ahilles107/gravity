@@ -64,6 +64,7 @@ pub(crate) fn bot_view(app: &AppState, bot: &bus::Bot) -> Value {
         "workspace_path": bot.workspace_path,
         "dir_name": bot.dir_name,
         "created_by_bot_id": bot.created_by_bot_id,
+        "sort_order": bot.sort_order,
         "deleted_at": bot.deleted_at.map(|t| t.to_rfc3339()),
         "created_at": bot.created_at.to_rfc3339()
     })

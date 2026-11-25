@@ -37,6 +37,7 @@ impl Db {
             },
             peer_id: r.get(12)?,
             remote_bot_id: r.get(13)?,
+            sort_order: r.get(14)?,
             // Runtime fields are overlaid by the supervisor.
             state: BotState::Stopped,
             state_reason: String::new(),
@@ -47,7 +48,7 @@ impl Db {
     pub(super) const BOT_COLS: &'static str =
         "id, project_id, name, description, avatar, instructions, \
          workspace_path, created_at, dir_name, created_by_bot_id, deleted_at, runtime, peer_id, \
-         remote_bot_id";
+         remote_bot_id, sort_order";
 
     /// Restricts a query to bots that still exist for addressing purposes.
     const LIVE: &'static str = "deleted_at IS NULL";
@@ -221,7 +222,7 @@ impl Db {
             format!("WHERE {}", clauses.join(" AND "))
         };
         let sql = format!(
-            "SELECT {} FROM bot {where_sql} ORDER BY name",
+            "SELECT {} FROM bot {where_sql} ORDER BY sort_order, name",
             Self::BOT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;

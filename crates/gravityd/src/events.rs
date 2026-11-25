@@ -23,6 +23,13 @@ pub enum Push {
     BotUpdated {
         bot: Bot,
     },
+    /// The owner rearranged a project's roster. `bot_ids` is every live bot in
+    /// the project, in its new order, so a client can apply it without
+    /// refetching.
+    BotsReordered {
+        project_id: String,
+        bot_ids: Vec<String>,
+    },
     /// A project was created, renamed, or archived. Archival is signalled by
     /// `deleted_at` being set, exactly as it is for `BotUpdated`.
     ProjectUpdated {

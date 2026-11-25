@@ -339,3 +339,33 @@ fn upgrading_gives_open_tasks_a_reply_budget_and_keeps_them_open() {
     assert_eq!(task.hop_count, 6, "legacy chains stay valid");
     assert!(db.integrity_check().expect("integrity"));
 }
+
+/// Migration 15 numbers each project's bots in the name order the sidebar used
+/// to show, so an upgrade looks exactly like the roster the owner already had.
+#[test]
+fn upgrading_orders_existing_bots_by_name() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path().join("bus.sqlite");
+    // `b1` is "Reviewer"; the others sort before and after it.
+    v2_database(&path, "/tmp/acme/bots/reviewer/workspace");
+    let conn = Connection::open(&path).expect("reopen");
+    for (id, name) in [("b2", "Zed"), ("b3", "Alpha")] {
+        conn.execute(
+            "INSERT INTO bot(id, project_id, name, description, avatar, instructions,
+                             workspace_path, created_at)
+             VALUES (?1, 'p1', ?2, '', '', '', '/tmp/x', '2024-01-01T00:00:00Z')",
+            rusqlite::params![id, name],
+        )
+        .expect("insert");
+    }
+    drop(conn);
+
+    let db = Db::open(&path).expect("migrate");
+
+    let bots = db.list_bots(Some("p1")).expect("list");
+    let order: Vec<(&str, i64)> = bots
+        .iter()
+        .map(|b| (b.name.as_str(), b.sort_order))
+        .collect();
+    assert_eq!(order, [("Alpha", 0), ("Reviewer", 1), ("Zed", 2)]);
+}

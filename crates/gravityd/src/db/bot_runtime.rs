@@ -42,7 +42,7 @@ impl Db {
         created_by_bot_id: Option<&str>,
         runtime: BotRuntime,
     ) -> anyhow::Result<Bot> {
-        let bot = Bot {
+        let mut bot = Bot {
             id: new_id(),
             project_id: project_id.to_string(),
             name: name.to_string(),
@@ -59,13 +59,23 @@ impl Db {
             deleted_at: None,
             peer_id: None,
             remote_bot_id: None,
+            sort_order: 0,
             created_at: now(),
         };
         let conn = self.lock();
+        // A new bot joins the end of its project's roster, wherever its name
+        // would sort, so creating one never reshuffles what the owner arranged.
+        bot.sort_order = conn.query_row(
+            "SELECT coalesce(max(sort_order) + 1, 0) FROM bot
+              WHERE project_id = ?1 AND deleted_at IS NULL",
+            params![bot.project_id],
+            |r| r.get(0),
+        )?;
         conn.execute(
             "INSERT INTO bot(id, project_id, name, description, avatar, instructions,
-                             workspace_path, created_at, dir_name, created_by_bot_id, runtime)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                             workspace_path, created_at, dir_name, created_by_bot_id, runtime,
+                             sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 bot.id,
                 bot.project_id,
@@ -77,7 +87,8 @@ impl Db {
                 ts(bot.created_at),
                 bot.dir_name,
                 bot.created_by_bot_id,
-                bot.runtime.as_str()
+                bot.runtime.as_str(),
+                bot.sort_order
             ],
         )?;
         // A DM conversation exists for every bot from creation.

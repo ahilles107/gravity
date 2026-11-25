@@ -58,6 +58,7 @@ Codes: `auth_failed`, `unsupported_version`, `not_found`, `invalid_request`,
 | `set_bot_runtime` | `bot_id, runtime` | `bot` (requires `control`; restarts when changed) |
 | `update_bot` | `bot_id, name?, description?, instructions?, avatar?` | `bot` |
 | `delete_bot` | `bot_id, reason?` | `ok` — archives the bot; see Semantics |
+| `reorder_bots` | `project_id, bot_ids` (array of bot ids) | `bots` — the project's live bots in their new order; see Semantics |
 | `list_bot_revisions` | `bot_id, limit?` | `bot_revisions` |
 | `revert_bot_revision` | `revision_id` | `bot` |
 | `attach` | `bot_id, after_seq?` (number) | `attached` then `term` pushes |
@@ -169,6 +170,7 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 - `bot_state`: `{ "bot_id", "state", "reason", "at" }` — state ∈ `starting|ready|working|waiting_for_user|waiting_for_approval|rate_limited|auth_failed|crashed|stopping|stopped`.
 - `message_new`: `{ "message": {...} }` — any new bus message visible to the user.
 - `bot_updated`: `{ "bot": {...} }` — a bot was created, edited, or archived. Bots edit themselves unprompted, so clients must not cache identity across this push.
+- `bots_reordered`: `{ "project_id", "bot_ids": [...] }` — the project's roster was rearranged. `bot_ids` lists every live bot in the project in its new order.
 - `project_updated`: `{ "project": {...} }` — a project was created, renamed, or archived. As with `bot_updated`, archival is signalled by `deleted_at` being set rather than by a separate frame.
 - `activity_update`: `{ "activity": { "bot_id", "from", "text", "at" } }` — a bot's preview
   line changed. Sent when a finished turn becomes readable in the transcript, which lags
@@ -190,7 +192,7 @@ breaking wire-shape change; v1 clients must upgrade before connecting.
 Project  { "id", "name", "created_at" }
 Bot      { "id", "project_id", "name", "description", "avatar", "instructions",
            "state", "state_reason", "unread_count", "workspace_path", "dir_name",
-           "created_by_bot_id"?, "deleted_at"?, "created_at" }
+           "created_by_bot_id"?, "deleted_at"?, "sort_order", "created_at" }
 BotRevision { "id", "bot_id", "changed_by", "field", "old_value", "new_value",
            "created_at" }
 Conversation { "id", "project_id", "bot_id", "title" }
@@ -330,6 +332,23 @@ Like a bot, a project is archived rather than deleted (`bot.project_id` and
 tombstoned so it can be reused immediately. Its directory is kept; the
 workspaces inside it are reclaimed by retention on the usual
 `archived_bot_days` schedule.
+
+### Bot order
+
+Each project's bots have an owner-chosen order, shared by every client of the
+daemon. `list_bots` returns live bots by `sort_order`, then by name; daemons
+that predate ordering omit `sort_order` and list by name alone. Upgrading
+numbers existing bots in that name order, so nothing moves.
+
+A new bot, including a linked stand-in, joins the end of its project's roster
+whatever its name. Renaming or archiving a bot never moves the others.
+
+`reorder_bots` (requires `control`) puts `bot_ids` first, in that order. Live
+bots it does not mention keep their relative order after them, so a client
+whose list is a moment stale still lands its change. An id that is unknown or
+archived is refused with `not_found`, one from another project or listed twice
+with `invalid_request`; a refused request changes nothing. On success every
+client receives `bots_reordered`.
 
 ### Deletion is archival
 
