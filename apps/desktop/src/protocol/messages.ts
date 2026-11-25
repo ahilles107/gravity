@@ -160,6 +160,12 @@ export type ServerPush =
   | { readonly type: "message_new"; readonly message: BusMessage }
   | { readonly type: "bot_updated"; readonly bot: Bot }
   | { readonly type: "project_updated"; readonly project: Project }
+  | {
+      readonly type: "bots_reordered";
+      readonly project_id: string;
+      /** Every live bot in the project, in its new order. */
+      readonly bot_ids: readonly string[];
+    }
   | { readonly type: "activity_update"; readonly activity: BotActivity }
   | { readonly type: "delivery_update"; readonly delivery: Delivery }
   | { readonly type: "routine_run_update"; readonly routine_run: RoutineRun }

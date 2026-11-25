@@ -52,6 +52,11 @@ export interface Bot {
   readonly created_by_bot_id?: string | null;
   /** Set when archived: the row and its history survive, the bot does not. */
   readonly deleted_at?: string | null;
+  /**
+   * Position in the project's roster, chosen by the owner. Absent on daemons
+   * that predate ordering, which list bots by name.
+   */
+  readonly sort_order?: number;
   readonly created_at: string;
 }
 

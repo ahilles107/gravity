@@ -9,6 +9,9 @@ interface BotMenuOptions {
   readonly canControl: boolean;
   readonly onTogglePin: () => void;
   readonly onDelete: () => void;
+  /** Null when the bot is already at that end, or the order cannot change. */
+  readonly onMoveUp?: (() => void) | null;
+  readonly onMoveDown?: (() => void) | null;
 }
 
 /** The right-click menu shared by a bot's sidebar row and its pinned tile. */
@@ -18,9 +21,15 @@ export function useBotMenu({
   canControl,
   onTogglePin,
   onDelete,
+  onMoveUp = null,
+  onMoveDown = null,
 }: BotMenuOptions): RowMenuApi {
   return useRowMenu({
-    items: [{ label: pinned ? "Unpin" : "Pin to top", onSelect: onTogglePin }],
+    items: [
+      { label: pinned ? "Unpin" : "Pin to top", onSelect: onTogglePin },
+      ...(onMoveUp === null ? [] : [{ label: "Move up", onSelect: onMoveUp }]),
+      ...(onMoveDown === null ? [] : [{ label: "Move down", onSelect: onMoveDown }]),
+    ],
     deletion: canControl
       ? {
           label: "Delete",

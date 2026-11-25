@@ -98,6 +98,7 @@ export default function App(): ReactElement {
     addToast,
     refreshAll: daemon.refreshAll,
     applyBotUpdate: daemon.applyBotUpdate,
+    applyBotOrder: daemon.applyBotOrder,
     select,
   });
 
@@ -155,6 +156,7 @@ export default function App(): ReactElement {
           onCreateProject={actions.createProject}
           onCreateBot={actions.createBot}
           onDeleteBot={actions.deleteBot}
+          onReorderBots={actions.reorderBots}
           onDeleteProject={actions.deleteProject}
           onOpenSettings={overlays.openSettings}
         />

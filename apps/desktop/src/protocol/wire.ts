@@ -21,6 +21,7 @@ const PUSH_TYPES: Readonly<Record<ServerPushType, true>> = {
   message_new: true,
   bot_updated: true,
   project_updated: true,
+  bots_reordered: true,
   activity_update: true,
   delivery_update: true,
   routine_run_update: true,
